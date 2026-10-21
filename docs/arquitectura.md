@@ -59,3 +59,13 @@ plantilla aprobada. Si el afiliado responde antes, los seguimientos pendientes s
 - Los trabajos son idempotentes: procesarlos dos veces no duplica efectos.
 - Cada llamada a IA registra modelo, tokens, costo y herramientas usadas.
 - Los secretos solo en variables de entorno (ver `.env.example`).
+
+## Autenticación (Fase 2)
+- Supabase Auth con email y contraseña. Cada usuario tiene un `profiles` con organización y rol.
+- `src/proxy.ts` (Next.js 16) refresca la sesión en cada pedido y verifica la identidad con
+  `getClaims()`. Sin sesión redirige a `/login`. Las rutas `/api/*` quedan fuera del proxy y
+  validan su propio acceso.
+- Tres clientes de Supabase en `src/lib/supabase/`: `client.ts` (navegador), `server.ts` (actúa
+  como el usuario, RLS aplicada) y `admin.ts` (clave de servicio, saltea RLS, solo servidor).
+- Alta del primer superadministrador: `scripts/crear-superadmin.mts`.
+- El aislamiento se prueba con `npm test` (ver `tests/rls.test.ts`).

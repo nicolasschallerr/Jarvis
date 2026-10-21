@@ -92,6 +92,8 @@ npm run dev                                          servidor local en http://lo
 npm run build                                        build de producción (incluye chequeo de tipos)
 npm run lint                                         ESLint
 npx tsc --noEmit                                     chequeo de tipos
+npm test                                             pruebas de RLS contra jarvis-dev (datos descartables)
+npx tsx --env-file=.env.local scripts/crear-superadmin.mts --org-slug <slug> --org-name "<nombre>" --email <email> --name "<nombre>"
 npx tsx --env-file=.env.local scripts/test-claude.mts  prueba de la API key de Anthropic
 npx supabase migration new <nombre>                  crear una migración
 npx supabase db push                                 aplicar migraciones al proyecto enlazado

@@ -68,3 +68,29 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** los menús de Meta cambian y la guía oficial describe una versión anterior.
 - **Solución:** guiarse por capturas reales y usar solo el Paso 1 ("Pruébalo") para el número de prueba.
 - **Cómo evitarlo:** pedir captura antes de indicar clics exactos en paneles de terceros.
+
+## Fase 2
+
+### 11. El build falla con "uncached or runtime data during prerendering"
+- **Problema:** `npm run build` fallaba en la página de inicio al leer la sesión del usuario.
+- **Causa real:** el proyecto tiene Cache Components activado; leer cookies es un dato "de pedido" y debe ir dentro de `<Suspense>`.
+- **Solución:** mover la lectura a un componente async envuelto en `<Suspense>` con un fallback (la página queda como Partial Prerender).
+- **Cómo evitarlo:** en Next.js 16 con Cache Components, todo componente que lea cookies, headers o datos sin caché va dentro de `<Suspense>`. Leer `node_modules/next/dist/docs/` antes de escribir páginas.
+
+### 12. `npm install vitest` falla con ERESOLVE
+- **Problema:** conflicto de dependencias entre vitest y `@types/node`.
+- **Causa real:** el proyecto traía `@types/node@20`, pero el Node real es 24 y vitest pide una versión más nueva.
+- **Solución:** `npm install --save-dev @types/node@^24 vitest`.
+- **Cómo evitarlo:** alinear `@types/node` con la versión de Node instalada; no usar `--force`.
+
+### 13. Un comando con `&&` y `grep -c` sin coincidencias cortó la cadena
+- **Problema:** el commit no se hizo, aunque el comando parecía completo.
+- **Causa real:** `grep -c` devuelve código de salida 1 cuando cuenta 0, y `&&` se detiene.
+- **Solución:** repetir el commit aparte.
+- **Cómo evitarlo:** no encadenar con `&&` comprobaciones que pueden dar 0 a propósito; verificar `git log` después de cada commit.
+
+### 14. Pasos confirmados sin ejecutarse
+- **Problema:** se dio por hecho que el superadmin estaba creado y la base seguía vacía.
+- **Causa real:** confirmar sin comprobar el estado real.
+- **Solución:** consultar la base (conteos con la clave de servicio) antes de seguir.
+- **Cómo evitarlo:** cada paso que crea datos tiene un "cómo verificar" que se ejecuta de verdad.
