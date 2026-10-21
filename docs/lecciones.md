@@ -50,3 +50,21 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
   mostrando como error lo que Git escribe en stderr.
 - **Solución:** ninguna; mirar el resultado real (por ejemplo `a3cdc25..a37ba04 main -> main`).
 - **Cómo evitarlo:** saber que no son fallas.
+
+### 8. Claves reales pegadas en `.env.example` (el archivo que sí se versiona)
+- **Problema:** al completar las variables de Supabase, los valores reales quedaron en `.env.example` en vez de `.env.local`.
+- **Causa real:** `.env.example` es versionable y `.env.local` no existía todavía; Next.js solo lee `.env.local`.
+- **Solución:** copiar el archivo a `.env.local`, restaurar `.env.example` con `git checkout`, y verificar con `git status` y el historial que nada se haya commiteado.
+- **Cómo evitarlo:** crear `.env.local` antes de completar valores; regla: `.env.example` = solo nombres. Pendiente: verificación automática que impida commitear valores ahí.
+
+### 9. Capturas de pantalla con token y datos visibles
+- **Problema:** el panel de Meta muestra el token de acceso dentro de un bloque de código aunque se tache el campo principal.
+- **Causa real:** el mismo token aparece en el comando `curl` de ejemplo.
+- **Solución:** el token del panel es temporal; con los permanentes (Fase 3) sería grave.
+- **Cómo evitarlo:** tapar todos los bloques de código y IDs antes de compartir capturas.
+
+### 10. La interfaz de Meta no coincide con la guía
+- **Problema:** no existía un botón "Start using the API"; hay una experiencia guiada de 3 pasos.
+- **Causa real:** los menús de Meta cambian y la guía oficial describe una versión anterior.
+- **Solución:** guiarse por capturas reales y usar solo el Paso 1 ("Pruébalo") para el número de prueba.
+- **Cómo evitarlo:** pedir captura antes de indicar clics exactos en paneles de terceros.
