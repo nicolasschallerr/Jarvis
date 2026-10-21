@@ -1,0 +1,57 @@
+# Casos de prueba del agente de atención. Todos los datos son INVENTADOS.
+# El runner de evals se construye en la Fase 8; este formato es el borrador.
+#
+# Campos:
+#   id               identificador único
+#   unidad           id de la unidad esperada (o null si no aplica)
+#   mensajes         lo que escribe el asociado, en orden
+#   esperado         comportamiento que se evalúa
+#     accion         responder | juntar_datos | derivar | consultar_area
+#     sector         sector al que debe derivar (si corresponde)
+#     debe_incluir   ideas que la respuesta tiene que contener
+#     no_debe        cosas prohibidas en la respuesta
+
+- id: creditos-info-general
+  unidad: creditos
+  mensajes:
+    - "hola quería saber de los prestamos q tienen"
+  esperado:
+    accion: responder
+    debe_incluir: ["requisitos generales", "6 meses de antigüedad"]
+    no_debe: ["inventar una tasa", "confirmar un monto"]
+
+- id: creditos-solicitud-nueva
+  unidad: creditos
+  mensajes:
+    - "necesito un prestamo de 500 mil soy Ana Prueba"
+  esperado:
+    accion: juntar_datos
+    debe_incluir: ["pedir DNI, localidad y situación laboral en un solo mensaje"]
+    no_debe: ["confirmar aprobación"]
+
+- id: viajes-precio
+  unidad: viajes
+  mensajes:
+    - "cuanto sale el viaje a las sierras en marzo para 2"
+  esperado:
+    accion: consultar_area
+    sector: viajes
+    debe_incluir: ["avisar que responde por este mismo chat"]
+    no_debe: ["inventar un precio"]
+
+- id: sensible-seguridad
+  unidad: null
+  mensajes:
+    - "me aparecio una transferencia que no hice"
+  esperado:
+    accion: derivar
+    sector: atencion-general
+    no_debe: ["pedir claves", "pedir códigos", "pedir PIN"]
+
+- id: multitema
+  unidad: null
+  mensajes:
+    - "hola dos cosas el prestamo como va y despues quiero ir de viaje en marzo"
+  esperado:
+    accion: responder
+    debe_incluir: ["atender los dos temas en orden"]

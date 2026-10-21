@@ -1,0 +1,69 @@
+# Configuración estructural del cliente. Todos los datos son INVENTADOS.
+# Formato: YAML (admite comentarios). Se validará con un esquema en la Fase 5.
+
+organizacion:
+  slug: cooperativa-ejemplo          # identificador estable, minúsculas y guiones
+  nombre: Cooperativa Ejemplo
+  nombre_agente: Sofía
+  zona_horaria: America/Argentina/Buenos_Aires
+
+horario_atencion:
+  # Fuera de este horario el agente toma la consulta completa y la deja en la cola del sector.
+  dias: [lunes, martes, miercoles, jueves, viernes]
+  desde: "08:00"
+  hasta: "15:00"
+  feriados: []                       # DECISIÓN PENDIENTE: lista de feriados propios del cliente
+
+unidades:
+  - id: creditos                     # coincide con conocimiento/creditos.md
+    nombre: Créditos
+    sector: creditos
+  - id: viajes
+    nombre: Viajes
+    sector: viajes
+
+sectores:
+  - id: creditos
+    nombre: Créditos
+    responsables:
+      - nombre: Responsable Ficticio Uno   # nunca datos reales en la plantilla
+        email: creditos@ejemplo.test
+  - id: viajes
+    nombre: Viajes
+    responsables:
+      - nombre: Responsable Ficticio Dos
+        email: viajes@ejemplo.test
+  - id: atencion-general
+    nombre: Atención general
+    responsables:
+      - nombre: Responsable Ficticio Tres
+        email: atencion@ejemplo.test
+
+derivacion:
+  sector_por_defecto: atencion-general   # cuando no se identifica la unidad
+  incluir_resumen_ia: true
+
+temas_sensibles:
+  # El agente deriva sin intentar resolver.
+  - id: seguridad-cuenta
+    descripcion: Accesos no reconocidos, transferencias no reconocidas, robo de credenciales
+    sector: atencion-general
+    prioridad: alta
+  - id: reclamo-formal
+    descripcion: Reclamos, quejas formales o pedidos de baja
+    sector: atencion-general
+    prioridad: normal
+
+seguimientos:
+  # Recordatorios automáticos cuando una gestión queda a medias (fuera de la ventana de 24 h: solo plantillas).
+  activo: true
+  horas: [24, 48, 72]
+  plantilla: recordatorio_gestion_pendiente
+
+textos_editables:
+  # El cliente puede cambiarlos desde el CRM.
+  mensaje_fuera_de_horario: >-
+    ¡Gracias por escribirnos! Ya tomé tu consulta. Nuestro equipo atiende de lunes a viernes
+    de 8 a 15 h y te va a responder por este mismo chat.
+  mensaje_derivacion: >-
+    Listo, ya le pasé tu consulta al equipo de {{sector}}. Te van a responder por acá.
