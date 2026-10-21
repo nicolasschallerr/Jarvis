@@ -40,6 +40,12 @@ yarn-error.log*
 supabase/.temp
 supabase/.branches
 
+# clientes: la configuración real de cada cliente vive en su propio repo privado
+# (ver clientes/README.md y docs/decisiones/005). Aquí solo se versiona la plantilla.
+/clientes/*
+!/clientes/README.md
+!/clientes/_plantilla/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
