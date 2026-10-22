@@ -19,7 +19,7 @@ se ocupe solo de construir.
 | 0.5 | Proyecto Supabase `jarvis-dev` (São Paulo) enlazado con la Supabase CLI como dependencia del repo | `a37ba04`, `supabase/config.toml` |
 | 0.6a | App de Meta "Jarvis dev" en modo desarrollo con número de prueba creado y destinatario cargado | **Parcial**: el mensaje de prueba no llegó al celular; se retoma en la Fase 3 con el webhook |
 | 0.7 | SDK de Anthropic y script de prueba | `bb64d31`, `scripts/test-claude.mts`. **Pospuesto** a la Fase 6 para no gastar todavía (API key y ejecución pendientes) |
-| 0.8 | Variables de entorno y secretos | `03ddb6c`, `.env.example`; `.env.local` y Vercel con las variables de Supabase |
+| 0.8 | Variables de entorno y secretos | `03ddb6c`, `.env.example`; `.env.local` con las variables de Supabase. Las de Vercel quedaron sin cargar hasta la Fase 2 (lección 15) |
 | 0.9 | Convenciones del repo | Adelantado: estructura producto/cliente/aprendizaje, `CLAUDE.md`, `/cerrar-fase` |
 
 ## Cómo se resolvió

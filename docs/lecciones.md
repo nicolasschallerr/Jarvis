@@ -94,3 +94,15 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** confirmar sin comprobar el estado real.
 - **Solución:** consultar la base (conteos con la clave de servicio) antes de seguir.
 - **Cómo evitarlo:** cada paso que crea datos tiene un "cómo verificar" que se ejecuta de verdad.
+
+### 15. El sitio en Vercel daba error 500 tras el login
+- **Problema:** `jarvis-mu-inky.vercel.app` devolvía "Internal Server Error" en `/` y `/login`.
+- **Causa real:** las variables de entorno de Supabase nunca se cargaron en Vercel (solo en `.env.local`); el proxy creaba el cliente de Supabase sin URL ni clave. El paso 0.8 se dio por hecho sin comprobarlo.
+- **Solución:** cargarlas con `scripts/subir-variables-a-vercel.ps1` (la clave de servicio como sensible) y redesplegar; Vercel solo aplica variables a despliegues nuevos.
+- **Cómo evitarlo:** después de cualquier cambio que dependa de variables, comprobar con `npx vercel env ls` y probar el sitio desplegado, no solo el local.
+
+### 16. `vercel` no se reconoce aunque esté instalada
+- **Problema:** la CLI instalada de forma global no se encontraba desde la terminal del usuario.
+- **Causa real:** la carpeta global de npm no estaba en el PATH de esa terminal.
+- **Solución:** usar `npx vercel`.
+- **Cómo evitarlo:** preferir `npx` para herramientas de proyecto; es lo mismo que se hizo con la CLI de Supabase.
