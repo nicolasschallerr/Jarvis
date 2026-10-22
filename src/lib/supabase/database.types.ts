@@ -1743,13 +1743,14 @@ export type Database = {
         Args: {
           p_body: string
           p_channel_id: string
+          p_channel_type: Database["public"]["Enums"]["channel_type"]
           p_contact_name: string
           p_external_id: string
+          p_identifier: string
           p_organization_id: string
           p_provider_timestamp: string
           p_raw: Json
           p_type: Database["public"]["Enums"]["message_type"]
-          p_wa_id: string
         }
         Returns: string
       }

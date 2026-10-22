@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractEvents } from "@/lib/whatsapp/events";
-import { storeEvents } from "@/lib/whatsapp/ingest";
+import { storeEvents } from "@/lib/inbound/store";
 import { verifySignature } from "@/lib/whatsapp/signature";
 import { verifyWebhookRequest } from "@/lib/whatsapp/verify";
 
@@ -49,7 +49,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await storeEvents(createAdminClient(), extractEvents(body));
+    const events = extractEvents(body).map((event) => ({
+      channelType: "whatsapp" as const,
+      channelExternalId: event.phoneNumberId,
+      dedupeKey: event.dedupeKey,
+      payload: event.payload,
+    }));
+    await storeEvents(createAdminClient(), events);
   } catch (error) {
     // Se registra solo el motivo, nunca el cuerpo: contiene datos personales.
     console.error("whatsapp webhook: no se pudo guardar", error instanceof Error ? error.message : error);

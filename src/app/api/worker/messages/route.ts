@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { processPendingMessages } from "@/lib/whatsapp/process";
+import { processPendingMessages } from "@/lib/inbound/process";
 import { isAuthorizedWorkerRequest } from "@/lib/worker-auth";
 
 // Trabajador de mensajes entrantes. Lo invoca pg_cron (POST) con el secreto del trabajador.

@@ -1,0 +1,116 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import type { Database, Json } from "@/lib/supabase/database.types";
+
+import { normalizeTelegramEvent } from "./telegram";
+import type { NormalizedMessage } from "./types";
+import { normalizeWhatsAppEvent } from "./whatsapp";
+
+type ClaimedEvent = {
+  id: string;
+  organization_id: string | null;
+  dedupe_key: string;
+  payload: Json;
+};
+
+export type ProcessResult = {
+  claimed: number;
+  processed: number;
+  duplicates: number;
+  failed: number;
+};
+
+// Prefijo de la clave de deduplicación de cada canal (ver las funciones que arman los eventos).
+const CHANNEL_PREFIXES = ["msg:%", "tg:%"] as const;
+
+function normalize(event: ClaimedEvent, now: Date): NormalizedMessage {
+  return event.dedupe_key.startsWith("tg:")
+    ? normalizeTelegramEvent(event.payload, now)
+    : normalizeWhatsAppEvent(event.payload, now);
+}
+
+// Procesa el mensaje de un evento: lo guarda con su contacto, conversación y ventana de crédito.
+// Devuelve true si creó el mensaje y false si ya existía (reproceso).
+async function processMessageEvent(
+  admin: SupabaseClient<Database>,
+  event: ClaimedEvent,
+  now: Date,
+): Promise<boolean> {
+  if (!event.organization_id) {
+    throw new Error("Evento sin organización");
+  }
+
+  const message = normalize(event, now);
+
+  const { data: channel, error: channelError } = await admin
+    .from("channels")
+    .select("id")
+    .eq("organization_id", event.organization_id)
+    .eq("type", message.channelType)
+    .eq("external_id", message.channelExternalId)
+    .maybeSingle();
+
+  if (channelError) throw new Error(`No se pudo consultar el canal: ${channelError.message}`);
+  if (!channel) throw new Error(`Canal no encontrado: ${message.channelType} ${message.channelExternalId}`);
+
+  const { data: messageId, error } = await admin.rpc("ingest_inbound_message", {
+    p_organization_id: event.organization_id,
+    p_channel_id: channel.id,
+    p_channel_type: message.channelType,
+    p_identifier: message.identifier,
+    p_contact_name: message.contactName ?? "",
+    p_external_id: message.externalId,
+    p_type: message.type,
+    p_body: message.body ?? "",
+    p_provider_timestamp: message.providerTimestamp,
+    p_raw: message.raw,
+  });
+
+  if (error) throw new Error(`No se pudo guardar el mensaje: ${error.message}`);
+
+  return messageId !== null;
+}
+
+// Toma lotes de mensajes pendientes de todos los canales y los procesa uno por uno. Un evento que
+// falla no frena a los demás: queda con su error y se reintenta (hasta 5 veces, ver
+// claim_webhook_events).
+export async function processPendingMessages(
+  admin: SupabaseClient<Database>,
+  limit = 20,
+  now: Date = new Date(),
+): Promise<ProcessResult> {
+  const result: ProcessResult = { claimed: 0, processed: 0, duplicates: 0, failed: 0 };
+
+  for (const prefix of CHANNEL_PREFIXES) {
+    const { data: claimed, error: claimError } = await admin.rpc("claim_webhook_events", {
+      p_prefix: prefix,
+      p_limit: limit,
+    });
+
+    if (claimError) {
+      throw new Error(`No se pudo tomar el lote de eventos: ${claimError.message}`);
+    }
+
+    result.claimed += claimed?.length ?? 0;
+
+    for (const event of claimed ?? []) {
+      try {
+        const created = await processMessageEvent(admin, event, now);
+        if (created) result.processed += 1;
+        else result.duplicates += 1;
+
+        await admin
+          .from("webhook_events")
+          .update({ processed_at: new Date().toISOString(), error: null })
+          .eq("id", event.id);
+      } catch (error) {
+        result.failed += 1;
+        // Solo el motivo, nunca el contenido del mensaje: tiene datos personales.
+        const reason = error instanceof Error ? error.message : "Error desconocido";
+        await admin.from("webhook_events").update({ error: reason }).eq("id", event.id);
+      }
+    }
+  }
+
+  return result;
+}

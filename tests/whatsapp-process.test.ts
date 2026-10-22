@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { extractBody, mapMessageType, parseProviderTimestamp } from "../src/lib/whatsapp/process";
+import { extractBody, mapMessageType, parseProviderTimestamp } from "../src/lib/inbound/whatsapp";
 import { isAuthorizedWorkerRequest } from "../src/lib/worker-auth";
 
 describe("mapeo de mensajes de WhatsApp", () => {

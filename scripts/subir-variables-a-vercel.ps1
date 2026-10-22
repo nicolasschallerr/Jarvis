@@ -17,12 +17,14 @@ function Get-Valor($nombre) {
 }
 
 $publicas = @("NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY")
-$secretas = @("SUPABASE_SERVICE_ROLE_KEY", "META_WEBHOOK_VERIFY_TOKEN", "META_APP_SECRET", "WORKER_SECRET")
+$secretas = @("SUPABASE_SERVICE_ROLE_KEY", "META_WEBHOOK_VERIFY_TOKEN", "META_APP_SECRET", "WORKER_SECRET", "TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET")
 
 foreach ($nombre in $publicas + $secretas) {
     $valor = Get-Valor $nombre
     if (-not $valor) {
-        Write-Error "Falta $nombre en .env.local."
+        # Una variable vacía no frena a las demás: se avisa y se sigue.
+        Write-Warning "$nombre está vacía en .env.local: se omite."
+        continue
     }
 
     $argumentos = @("vercel", "env", "add", $nombre, "--value", $valor, "--environment", "production,preview", "--force", "--yes")

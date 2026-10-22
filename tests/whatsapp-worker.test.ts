@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { processPendingMessages } from "../src/lib/whatsapp/process";
+import { processPendingMessages } from "../src/lib/inbound/process";
 import { adminClient, randomId } from "./helpers/supabase-test";
 
 // Prueba de integración del procesamiento de mensajes entrantes contra el proyecto de desarrollo.
