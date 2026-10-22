@@ -23,7 +23,7 @@ Roles: `superadmin`, `operator`, `viewer` (consulta/reportes). "Servidor" = solo
 | `conversations` | Hilo continuo contacto + canal; interruptor IA, asignación, `last_inbound_at` (ventana de 24 h de WhatsApp) | Superadmin y operador |
 | `messages` | Mensajes entrantes y salientes. `external_id` único por organización (idempotencia); `provider_timestamp` ordena; `pricing` guarda la categoría de cobro de Meta | Servidor |
 | `media_files` | Archivos del bucket privado `media` (audios, imágenes, documentos) | Servidor |
-| `webhook_events` | Registro crudo de lo que envía el proveedor, con `dedupe_key` único | Servidor (sin acceso desde el navegador) |
+| `webhook_events` | Bandeja de entrada durable: lo que envía el proveedor, con `dedupe_key` único, `claimed_at` y `attempts` (reintentos; se descarta a los 5 intentos) | Servidor (sin acceso desde el navegador) |
 | `conversation_windows` | 1 fila = 1 crédito = 1 ventana de 24 h de un contacto; una restricción impide ventanas superpuestas | Servidor |
 
 ## Casos y CRM (migración 3)
@@ -56,3 +56,7 @@ Roles: `superadmin`, `operator`, `viewer` (consulta/reportes). "Servidor" = solo
 ## Pendiente de diseñar
 - Base de conocimiento por unidad con búsqueda semántica (`pgvector`): Fase 7.
 - Visibilidad de `conversations` y `messages` por sector (hoy es por organización): ver [ADR-009](decisiones/009-multitenant-rls-y-visibilidad-por-sector.md).
+
+## Funciones de base de datos (solo servidor)
+- `claim_webhook_events(prefijo, límite)`: toma un lote de eventos pendientes con `for update skip locked`, cuenta el intento y descarta los que superaron 5.
+- `ingest_inbound_message(...)`: en una transacción crea o reutiliza el contacto, la conversación, guarda el mensaje (idempotente por `external_id`), avanza el reloj de la conversación sin retroceder y abre una ventana de crédito si no hay una cubriendo ese momento.

@@ -1668,7 +1668,9 @@ export type Database = {
       }
       webhook_events: {
         Row: {
+          attempts: number
           channel_type: Database["public"]["Enums"]["channel_type"]
+          claimed_at: string | null
           dedupe_key: string
           error: string | null
           id: string
@@ -1678,7 +1680,9 @@ export type Database = {
           received_at: string
         }
         Insert: {
+          attempts?: number
           channel_type: Database["public"]["Enums"]["channel_type"]
+          claimed_at?: string | null
           dedupe_key: string
           error?: string | null
           id?: string
@@ -1688,7 +1692,9 @@ export type Database = {
           received_at?: string
         }
         Update: {
+          attempts?: number
           channel_type?: Database["public"]["Enums"]["channel_type"]
+          claimed_at?: string | null
           dedupe_key?: string
           error?: string | null
           id?: string
@@ -1712,7 +1718,41 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      claim_webhook_events: {
+        Args: { p_limit?: number; p_prefix: string }
+        Returns: {
+          attempts: number
+          channel_type: Database["public"]["Enums"]["channel_type"]
+          claimed_at: string | null
+          dedupe_key: string
+          error: string | null
+          id: string
+          organization_id: string | null
+          payload: Json
+          processed_at: string | null
+          received_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "webhook_events"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      ingest_inbound_message: {
+        Args: {
+          p_body: string
+          p_channel_id: string
+          p_contact_name: string
+          p_external_id: string
+          p_organization_id: string
+          p_provider_timestamp: string
+          p_raw: Json
+          p_type: Database["public"]["Enums"]["message_type"]
+          p_wa_id: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       agent_kind:
