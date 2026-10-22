@@ -17,7 +17,7 @@ function Get-Valor($nombre) {
 }
 
 $publicas = @("NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY")
-$secretas = @("SUPABASE_SERVICE_ROLE_KEY", "META_WEBHOOK_VERIFY_TOKEN")
+$secretas = @("SUPABASE_SERVICE_ROLE_KEY", "META_WEBHOOK_VERIFY_TOKEN", "META_APP_SECRET")
 
 foreach ($nombre in $publicas + $secretas) {
     $valor = Get-Valor $nombre
