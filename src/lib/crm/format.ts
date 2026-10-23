@@ -27,6 +27,30 @@ export function messagePreview(body: string | null, type: string | null): string
 const dayFormat = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
 const timeFormat = new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Argentina/Buenos_Aires" });
 
+const dateTimeFormat = new Intl.DateTimeFormat("es-AR", {
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "America/Argentina/Buenos_Aires",
+});
+
+export function dateTime(iso: string | null): string {
+  return iso ? dateTimeFormat.format(new Date(iso)) : "";
+}
+
+const SENDER_LABELS: Record<string, string> = {
+  agent: "Jarvis (IA)",
+  operator: "Operador",
+  system: "Sistema",
+};
+
+// Quién escribió, para la burbuja: el contacto con su nombre, el resto por su rol.
+export function senderLabel(sender: string, contactName: string | null): string {
+  return sender === "contact" ? contactName || "Contacto" : (SENDER_LABELS[sender] ?? sender);
+}
+
 // Hora si es de hoy, fecha si es de otro día (siempre en horario de Argentina).
 export function shortDate(iso: string | null, now: Date): string {
   if (!iso) return "";

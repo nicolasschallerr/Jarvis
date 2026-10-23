@@ -40,9 +40,12 @@ export default function CrmLayout({ children }: { children: React.ReactNode }) {
       <aside className="flex w-60 shrink-0 flex-col justify-between border-r border-zinc-200 p-4 dark:border-zinc-800">
         <div className="flex flex-col gap-6">
           <p className="px-3 text-lg font-semibold tracking-tight">Jarvis</p>
-          <nav className="flex flex-col gap-1" aria-label="Principal">
-            <NavLink href="/conversaciones">Conversaciones</NavLink>
-          </nav>
+          {/* usePathname() en una ruta dinámica es un dato de pedido: va dentro de <Suspense>. */}
+          <Suspense fallback={<div className="h-9" />}>
+            <nav className="flex flex-col gap-1" aria-label="Principal">
+              <NavLink href="/conversaciones">Conversaciones</NavLink>
+            </nav>
+          </Suspense>
         </div>
         <Suspense fallback={<p className="text-sm text-zinc-600 dark:text-zinc-400">Cargando...</p>}>
           <UserBlock />
