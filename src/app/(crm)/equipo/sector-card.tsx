@@ -50,7 +50,7 @@ export function SectorCard({ sector }: { sector: SectorView }) {
                   type="button"
                   disabled={pending}
                   onClick={() => run(() => toggleLead(sector.id, member.profileId, !member.isLead))}
-                  className="rounded-md border border-zinc-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-zinc-700"
+                  className="btn-secondary !px-2 !py-1 text-xs"
                 >
                   {member.isLead ? "Quitar responsable" : "Marcar responsable"}
                 </button>
@@ -58,7 +58,7 @@ export function SectorCard({ sector }: { sector: SectorView }) {
                   type="button"
                   disabled={pending}
                   onClick={() => run(() => removeMember(sector.id, member.profileId))}
-                  className="rounded-md border border-zinc-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-zinc-700"
+                  className="btn-secondary !px-2 !py-1 text-xs"
                 >
                   Quitar
                 </button>
@@ -80,7 +80,7 @@ export function SectorCard({ sector }: { sector: SectorView }) {
             name="profileId"
             defaultValue=""
             aria-label={`Sumar a una persona a ${sector.name}`}
-            className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 text-sm dark:border-zinc-700"
+            className="min-w-0 flex-1 field !py-1.5"
           >
             <option value="" disabled>
               Elegí a una persona...
@@ -94,7 +94,7 @@ export function SectorCard({ sector }: { sector: SectorView }) {
           <button
             type="submit"
             disabled={adding}
-            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+            className="btn-primary"
           >
             Sumar
           </button>

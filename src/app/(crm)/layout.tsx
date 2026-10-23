@@ -1,9 +1,12 @@
 import { Suspense } from "react";
 
 import { signOut } from "@/app/actions";
+import { Logo } from "@/components/ui/logo";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { getCurrentProfile } from "@/lib/auth/profile";
 
 import { NavLink } from "./nav-link";
+import { Shell } from "./shell";
 
 const ROLE_LABELS = {
   superadmin: "Superadministrador",
@@ -22,11 +25,9 @@ async function UserBlock() {
         <p className="text-zinc-600 dark:text-zinc-400">{ROLE_LABELS[profile.role]}</p>
         <p className="text-zinc-600 dark:text-zinc-400">{profile.organizationName}</p>
       </div>
+      <ThemeToggle />
       <form action={signOut}>
-        <button
-          type="submit"
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700"
-        >
+        <button type="submit" className="btn-secondary w-full">
           Cerrar sesión
         </button>
       </form>
@@ -48,27 +49,29 @@ async function MainNav() {
   );
 }
 
-export default function CrmLayout({ children }: { children: React.ReactNode }) {
+function Sidebar() {
   return (
-    <div className="flex min-h-screen flex-1">
-      <aside className="flex w-60 shrink-0 flex-col justify-between border-r border-zinc-200 p-4 dark:border-zinc-800">
-        <div className="flex flex-col gap-6">
-          <p className="px-3 text-lg font-semibold tracking-tight">Jarvis</p>
-          {/* El rol y usePathname() son datos de pedido: van dentro de <Suspense>. */}
-          <Suspense fallback={<div className="h-9" />}>
-            <MainNav />
-          </Suspense>
-        </div>
-        <Suspense fallback={<p className="text-sm text-zinc-600 dark:text-zinc-400">Cargando...</p>}>
-          <UserBlock />
-        </Suspense>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Suspense fallback={<p className="p-6 text-sm text-zinc-600 dark:text-zinc-400">Cargando...</p>}>
-          {children}
+    <>
+      <div className="flex flex-col gap-6">
+        <Logo className="px-3" />
+        {/* El rol y usePathname() son datos de pedido: van dentro de <Suspense>. */}
+        <Suspense fallback={<div className="h-9" />}>
+          <MainNav />
         </Suspense>
       </div>
-    </div>
+      <Suspense fallback={<p className="text-sm text-zinc-600 dark:text-zinc-400">Cargando...</p>}>
+        <UserBlock />
+      </Suspense>
+    </>
+  );
+}
+
+export default function CrmLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Shell sidebar={<Sidebar />}>
+      <Suspense fallback={<p className="p-6 text-sm text-zinc-600 dark:text-zinc-400">Cargando...</p>}>
+        {children}
+      </Suspense>
+    </Shell>
   );
 }

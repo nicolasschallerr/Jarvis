@@ -31,7 +31,7 @@ export function ReplyForm({ conversationId }: { conversationId: string }) {
           disabled={pending}
           placeholder="Escribí tu respuesta. Enter envía, Shift+Enter hace un salto de línea."
           aria-label="Respuesta"
-          className="min-h-12 flex-1 resize-y rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700"
+          className="min-h-12 flex-1 resize-y field"
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
@@ -42,7 +42,7 @@ export function ReplyForm({ conversationId }: { conversationId: string }) {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="btn-primary"
         >
           {pending ? "Enviando..." : "Enviar"}
         </button>

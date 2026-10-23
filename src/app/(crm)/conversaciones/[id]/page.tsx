@@ -69,7 +69,7 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
   );
 
   return (
-    <div className="flex h-screen">
+    <div className="flex min-h-0 flex-1">
     <main className="flex min-w-0 flex-1 flex-col">
       <header className="flex flex-col gap-1 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
         <Link href="/conversaciones" className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">
@@ -141,7 +141,7 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
         <ReplyForm conversationId={conversation.id ?? id} />
       )}
     </main>
-    <Suspense fallback={<aside className="w-80 shrink-0 border-l border-zinc-200 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">Cargando caso...</aside>}>
+    <Suspense fallback={<aside className="hidden w-80 shrink-0 border-l border-zinc-200 p-4 text-sm text-zinc-600 lg:block dark:border-zinc-800 dark:text-zinc-400">Cargando caso...</aside>}>
       <CasePanel conversationId={conversation.id ?? id} contactId={conversation.contact_id ?? ""} role={profile.role} currentUserId={profile.id} />
     </Suspense>
     </div>

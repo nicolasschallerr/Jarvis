@@ -88,7 +88,7 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
               name="sector"
               defaultValue={sectorId ?? ""}
               aria-label="Sector"
-              className="rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 text-sm dark:border-zinc-700"
+              className="field !py-1.5"
             >
               <option value="" disabled>
                 Elegí un sector...
@@ -99,7 +99,7 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
                 </option>
               ))}
             </select>
-            <button type="submit" className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
+            <button type="submit" className="btn-primary">
               Ver
             </button>
           </form>

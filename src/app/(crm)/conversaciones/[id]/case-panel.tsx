@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CaseControls, CreateCaseForm } from "./case-forms";
 import { ContactCard } from "./contact-card";
 import { NoteForm } from "./note-form";
+import { SidePanel } from "./side-panel";
 
 // Panel del caso de una conversación: el caso abierto con sus controles e historial, o el formulario
 // para abrir uno. La lectura es abierta en la organización (ADR-016); modificar lo decide RLS.
@@ -63,7 +64,7 @@ export async function CasePanel({
     : { data: [] };
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col gap-5 overflow-y-auto border-l border-zinc-200 p-4 dark:border-zinc-800">
+    <SidePanel>
       <ContactCard contactId={contactId} conversationId={conversationId} canEdit={role !== "viewer"} />
 
       <h2 className="text-base font-semibold">Caso</h2>
@@ -163,6 +164,6 @@ export async function CasePanel({
           </ul>
         </section>
       ) : null}
-    </aside>
+    </SidePanel>
   );
 }

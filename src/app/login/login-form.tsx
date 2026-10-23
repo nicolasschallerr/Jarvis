@@ -18,7 +18,7 @@ export function LoginForm() {
           type="email"
           autoComplete="email"
           required
-          className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-base font-normal dark:border-zinc-700"
+          className="field text-base font-normal"
         />
       </label>
 
@@ -29,7 +29,7 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
-          className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-base font-normal dark:border-zinc-700"
+          className="field text-base font-normal"
         />
       </label>
 
@@ -42,7 +42,7 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-zinc-900 px-4 py-2 font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+        className="btn-primary"
       >
         {pending ? "Ingresando..." : "Ingresar"}
       </button>
