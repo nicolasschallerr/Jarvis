@@ -4,7 +4,7 @@ import { parseArgs } from "node:util";
 
 import { createClient } from "@supabase/supabase-js";
 
-import { parseClientConfig, syncSectorsAndUnits } from "../src/lib/client-config/load";
+import { parseClientConfig, syncAgents, syncSectorsAndUnits } from "../src/lib/client-config/load";
 import type { Database } from "../src/lib/supabase/database.types";
 
 // Valida clientes/<carpeta>/sectores-y-reglas.yaml y carga sectores y unidades en la organización.
@@ -69,3 +69,6 @@ const summary = await syncSectorsAndUnits(admin, organization.id, parsed.config)
 
 console.log("Sectores:", summary.sectors);
 console.log("Unidades:", summary.units);
+
+const agents = await syncAgents(admin, organization.id, parsed.config);
+console.log("Agentes:", agents);

@@ -24,12 +24,21 @@ const unidadSchema = z.object({
   sector: slug,
 });
 
+// Cómo se llaman y qué frase tienen los agentes de este cliente. "atencion" es el que conversa con los
+// afiliados y "analitico" el que responde preguntas sobre los datos.
+const agenteSchema = z.object({
+  tipo: z.enum(["atencion", "analitico"]),
+  nombre: z.string().trim().min(1, "falta el nombre").max(40, "el nombre no puede superar los 40 caracteres"),
+  frase: z.string().trim().max(140, "la frase no puede superar los 140 caracteres").optional(),
+});
+
 export const clientConfigSchema = z
   .object({
     organizacion: z.object({ slug, nombre: z.string().min(1) }).loose(),
     unidades: z.array(unidadSchema).min(1, "tiene que haber al menos una unidad"),
     sectores: z.array(sectorSchema).min(1, "tiene que haber al menos un sector"),
     derivacion: z.object({ sector_por_defecto: slug }).loose().optional(),
+    agentes: z.array(agenteSchema).optional(),
   })
   .loose()
   .superRefine((config, ctx) => {
@@ -46,6 +55,12 @@ export const clientConfigSchema = z
     unitIds.forEach((id, index) => {
       if (unitIds.indexOf(id) !== index) {
         ctx.addIssue({ code: "custom", path: ["unidades", index, "id"], message: `la unidad "${id}" está repetida` });
+      }
+    });
+
+    (config.agentes ?? []).forEach((agente, index, all) => {
+      if (all.findIndex((other) => other.tipo === agente.tipo) !== index) {
+        ctx.addIssue({ code: "custom", path: ["agentes", index, "tipo"], message: `hay más de un agente de tipo "${agente.tipo}"` });
       }
     });
 

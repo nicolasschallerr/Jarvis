@@ -83,6 +83,50 @@ export type Database = {
           },
         ]
       }
+      agents: {
+        Row: {
+          created_at: string
+          id: string
+          is_enabled: boolean
+          kind: Database["public"]["Enums"]["agent_kind"]
+          name: string
+          organization_id: string
+          status: string
+          tagline: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          kind: Database["public"]["Enums"]["agent_kind"]
+          name: string
+          organization_id: string
+          status?: string
+          tagline?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          kind?: Database["public"]["Enums"]["agent_kind"]
+          name?: string
+          organization_id?: string
+          status?: string
+          tagline?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_calls: {
         Row: {
           agent_config_id: string | null

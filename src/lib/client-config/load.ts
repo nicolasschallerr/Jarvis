@@ -120,3 +120,29 @@ export async function syncSectorsAndUnits(
 
   return summary;
 }
+
+const AGENT_KIND = { atencion: "attention", analitico: "analytic" } as const;
+
+// Carga los agentes del cliente (nombre y frase). Es idempotente y NO toca el estado ni si el agente
+// está encendido: eso lo manejan el superadmin y el servidor, no el archivo de configuración.
+export async function syncAgents(
+  admin: SupabaseClient<Database>,
+  organizationId: string,
+  config: ClientConfig,
+): Promise<{ synced: number }> {
+  const agents = config.agentes ?? [];
+  if (agents.length === 0) return { synced: 0 };
+
+  const { error } = await admin.from("agents").upsert(
+    agents.map((agent) => ({
+      organization_id: organizationId,
+      kind: AGENT_KIND[agent.tipo],
+      name: agent.nombre,
+      tagline: agent.frase ?? null,
+    })),
+    { onConflict: "organization_id,kind" },
+  );
+  if (error) throw new Error(`No se pudieron guardar los agentes: ${error.message}`);
+
+  return { synced: agents.length };
+}

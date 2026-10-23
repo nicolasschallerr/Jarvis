@@ -42,6 +42,7 @@ async function MainNav() {
 
   return (
     <nav className="flex flex-col gap-1" aria-label="Principal">
+      <NavLink href="/">Inicio</NavLink>
       <NavLink href="/conversaciones">Conversaciones</NavLink>
       <NavLink href="/casos">Casos</NavLink>
       {profile.role === "superadmin" ? <NavLink href="/equipo">Equipo</NavLink> : null}

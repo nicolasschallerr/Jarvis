@@ -67,3 +67,12 @@ textos_editables:
     de 8 a 15 h y te va a responder por este mismo chat.
   mensaje_derivacion: >-
     Listo, ya le pasé tu consulta al equipo de {{sector}}. Te van a responder por acá.
+
+agentes:
+  # Cómo se llaman los agentes en el CRM y qué frase los acompaña (datos inventados).
+  - tipo: atencion          # atiende a los afiliados
+    nombre: Sofía
+    frase: "Estoy para ayudarte con tus consultas."
+  - tipo: analitico         # responde preguntas sobre los datos
+    nombre: Mateo
+    frase: "Los números cuentan una historia."

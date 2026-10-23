@@ -46,7 +46,7 @@ export function LiveRefresh(props: Scope) {
 
     // Las listas también cambian cuando se crea o actualiza una conversación o un caso.
     if (organizationId) {
-      for (const table of ["conversations", "cases"]) {
+      for (const table of ["conversations", "cases", "agents"]) {
         channel.on(
           "postgres_changes",
           { event: "*", schema: "public", table, filter: `organization_id=eq.${organizationId}` },

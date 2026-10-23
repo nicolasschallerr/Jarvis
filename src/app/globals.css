@@ -103,3 +103,67 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Animaciones de las mascotas de los agentes. Con prefers-reduced-motion las anula la regla de arriba. */
+@keyframes mascot-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes mascot-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes mascot-zzz {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(6px, -12px);
+  }
+}
+
+@keyframes mascot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.mascot-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mascot-blink 5s infinite;
+}
+
+.mascot-bob {
+  animation: mascot-bob 1.6s ease-in-out infinite;
+}
+
+.mascot-zzz {
+  animation: mascot-zzz 3s ease-in infinite;
+}
+
+.mascot-pulse {
+  animation: mascot-pulse 1.4s ease-in-out infinite;
+}
