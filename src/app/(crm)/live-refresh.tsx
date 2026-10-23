@@ -33,13 +33,15 @@ export function LiveRefresh(props: Scope) {
       .channel(`crm-${conversationId ?? organizationId}`, { config: { postgres_changes_options: { wait: true } } })
       .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: messageFilter }, refresh);
 
-    // En una conversación, también el caso (estado, prioridad, asignación) que otra persona cambie.
+    // En una conversación, también el caso (estado, prioridad, asignación) y las notas que otra persona cambie.
     if (conversationId) {
-      channel.on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "cases", filter: `conversation_id=eq.${conversationId}` },
-        refresh,
-      );
+      for (const table of ["cases", "internal_notes"]) {
+        channel.on(
+          "postgres_changes",
+          { event: "*", schema: "public", table, filter: `conversation_id=eq.${conversationId}` },
+          refresh,
+        );
+      }
     }
 
     // Las listas también cambian cuando se crea o actualiza una conversación o un caso.

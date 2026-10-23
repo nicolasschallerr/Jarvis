@@ -3,6 +3,7 @@ import type { CasePriority, CaseStatus } from "@/lib/crm/cases";
 import { createClient } from "@/lib/supabase/server";
 
 import { CaseControls, CreateCaseForm } from "./case-forms";
+import { NoteForm } from "./note-form";
 
 // Panel del caso de una conversación: el caso abierto con sus controles e historial, o el formulario
 // para abrir uno. La lectura es abierta en la organización (ADR-016); modificar lo decide RLS.
@@ -41,6 +42,13 @@ export async function CasePanel({
     sectors: new Map((sectors ?? []).map((sector) => [sector.id, sector.name])),
     profiles: new Map((people ?? []).map((person) => [person.id, person.full_name])),
   };
+
+  const { data: notes } = await supabase
+    .from("internal_notes")
+    .select("id, body, author_id, created_at")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .limit(50);
 
   const { data: events } = openCase
     ? await supabase
@@ -113,6 +121,26 @@ export async function CasePanel({
           />
         </>
       )}
+
+      <section className="flex flex-col gap-3">
+        <h3 className="text-sm font-semibold">Notas internas</h3>
+        <p className="text-xs text-zinc-600 dark:text-zinc-400">Solo las ve el equipo. No se envían al contacto.</p>
+        {role !== "viewer" ? <NoteForm conversationId={conversationId} /> : null}
+        {(notes ?? []).length === 0 ? (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">Todavía no hay notas.</p>
+        ) : (
+          <ul className="flex flex-col gap-3 text-sm">
+            {(notes ?? []).map((note) => (
+              <li key={note.id} className="flex flex-col rounded-md bg-amber-50 px-3 py-2 dark:bg-amber-950/40">
+                <span className="whitespace-pre-wrap break-words">{note.body}</span>
+                <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                  {note.author_id ? (names.profiles.get(note.author_id) ?? "Operador") : "Persona eliminada"} · {dateTime(note.created_at)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {closedCases.length > 0 ? (
         <section className="flex flex-col gap-2">
