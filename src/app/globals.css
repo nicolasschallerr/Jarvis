@@ -167,3 +167,21 @@ body {
 .mascot-pulse {
   animation: mascot-pulse 1.4s ease-in-out infinite;
 }
+
+/* Bienvenida animada: mientras suena, las mascotas de las tarjetas se esconden (la animación las hace
+   "aterrizar" ahí) y, si el JavaScript de la animación nunca llega, la cortina se retira sola. */
+[data-welcome="playing"] [data-mascot-slot] {
+  visibility: hidden;
+}
+
+@keyframes welcome-fallback {
+  to {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+.welcome-fallback {
+  animation: welcome-fallback 0.3s 6s forwards;
+}

@@ -3,18 +3,23 @@ import Link from "next/link";
 import { AgentCard, type AgentView } from "@/components/agents/agent-card";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { channelLabel, messagePreview, PRIORITY_LABELS, shortDate, STATUS_LABELS } from "@/lib/crm/format";
+import { WelcomeGate } from "@/components/welcome/welcome-gate";
 import { greetingFor, longDate } from "@/lib/crm/greeting";
 import { getHomeSummary } from "@/lib/crm/home";
+import { dayKey, welcomeLine } from "@/lib/crm/welcome";
 import { createClient } from "@/lib/supabase/server";
 
 import { LiveRefresh } from "./live-refresh";
 
 type Tile = { label: string; value: number; href: string; hint: string };
 
-export default async function InicioPage() {
+export default async function InicioPage({ searchParams }: PageProps<"/">) {
   const profile = await getCurrentProfile();
   const supabase = await createClient();
   const summary = await getHomeSummary({ userClient: supabase, userId: profile.id });
+
+  const query = await searchParams;
+  const playWelcome = query.bienvenida === "1";
 
   const now = new Date();
   const firstName = profile.fullName.trim().split(/\s+/)[0] ?? "";
@@ -36,6 +41,18 @@ export default async function InicioPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-8 p-4 sm:p-6">
+      <WelcomeGate
+        play={playWelcome}
+        todayKey={dayKey(now)}
+        greeting={greetingFor(now)}
+        firstName={firstName}
+        agents={agents.map((agent) => ({
+          kind: agent.kind,
+          name: agent.name,
+          status: agent.status,
+          line: welcomeLine(agent.kind, summary.counts),
+        }))}
+      />
       <LiveRefresh organizationId={profile.organizationId} />
 
       <header>

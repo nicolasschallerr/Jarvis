@@ -25,5 +25,6 @@ export async function signIn(
     return { error: "Email o contraseña incorrectos." };
   }
 
-  redirect("/");
+  // ?bienvenida=1 dispara la animación de bienvenida en el Inicio (una vez, al entrar).
+  redirect("/?bienvenida=1");
 }

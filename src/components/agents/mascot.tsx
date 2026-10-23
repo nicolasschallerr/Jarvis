@@ -13,6 +13,8 @@ type Props = {
   className?: string;
   // Desfasa el parpadeo para que dos mascotas juntas no parpadeen a la vez.
   blinkDelay?: number;
+  // Marca el lugar donde "aterriza" la mascota al terminar la bienvenida (ver welcome-overlay).
+  slot?: string;
 };
 
 function ClosedEyes({ cx1, cx2, cy }: { cx1: number; cx2: number; cy: number }) {
@@ -105,11 +107,11 @@ function Sinapsis({ status, blinkDelay }: { status: AgentStatus; blinkDelay: num
   );
 }
 
-export function Mascot({ kind, status, className = "size-28", blinkDelay = 0 }: Props) {
+export function Mascot({ kind, status, className = "size-28", blinkDelay = 0, slot }: Props) {
   const name = kind === "attention" ? "Jarvis" : "Sinapsis";
 
   return (
-    <svg viewBox="0 0 120 120" className={className} role="img" aria-label={`Mascota de ${name}`}>
+    <svg viewBox="0 0 120 120" className={className} role="img" aria-label={`Mascota de ${name}`} data-mascot-slot={slot}>
       <ellipse cx="60" cy="112" rx="28" ry="4.5" className="fill-foreground" opacity="0.1" />
       {kind === "attention" ? <Jarvis status={status} blinkDelay={blinkDelay} /> : <Sinapsis status={status} blinkDelay={blinkDelay} />}
       {status === "paused" ? <Zzz /> : null}

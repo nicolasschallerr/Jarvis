@@ -14,7 +14,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.{ts,tsx}"],
     // Los archivos corren de a uno: comparten la misma base y el trabajador toma eventos de cualquier prueba.
     fileParallelism: false,
     // Las pruebas de integración hablan con Supabase por red.

@@ -28,7 +28,7 @@ export function AgentCard({ agent, blinkDelay = 0 }: { agent: AgentView; blinkDe
   return (
     <article className="card relative flex items-center gap-4 overflow-hidden p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
       <span className={`absolute inset-y-0 left-0 w-1.5 ${accent}`} aria-hidden="true" />
-      <Mascot kind={agent.kind} status={agent.status} className="size-24 shrink-0 sm:size-28" blinkDelay={blinkDelay} />
+      <Mascot kind={agent.kind} status={agent.status} className="size-24 shrink-0 sm:size-28" blinkDelay={blinkDelay} slot={agent.kind} />
 
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div>
