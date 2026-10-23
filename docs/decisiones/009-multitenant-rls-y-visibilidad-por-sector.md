@@ -1,6 +1,8 @@
 # ADR-009: Multi-tenant con RLS por `organization_id` y visibilidad de casos por sector
 
-**Estado:** aceptada (2026-10-21), con una limitación abierta
+**Estado:** aceptada (2026-10-21). La visibilidad de casos por sector y la limitación abierta fueron
+reemplazadas por el [ADR-016](016-lectura-abierta-en-la-organizacion.md) (2026-10-23): hoy todos leen
+todo dentro de su organización y la escritura sigue por sector. El resto sigue vigente.
 
 ## Contexto
 

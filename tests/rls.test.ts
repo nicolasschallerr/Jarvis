@@ -302,15 +302,28 @@ describe("roles dentro de una organización", () => {
   });
 });
 
-describe("visibilidad de casos por sector", () => {
+describe("casos: lectura abierta en la organización, escritura por sector (ADR-016)", () => {
   it("el operador del sector ve el caso", async () => {
     const { data } = await aOperatorSector.client.from("cases").select("id").eq("id", caseA);
     expect(data).toHaveLength(1);
   });
 
-  it("el operador de otro sector no ve el caso", async () => {
+  it("el operador de otro sector también ve el caso", async () => {
     const { data } = await aOperatorOther.client.from("cases").select("id").eq("id", caseA);
+    expect(data).toHaveLength(1);
+  });
+
+  it("pero el operador de otro sector no puede modificarlo", async () => {
+    const { data } = await aOperatorOther.client.from("cases").update({ title: "cambiado por otro sector" }).eq("id", caseA).select("id");
     expect(data ?? []).toHaveLength(0);
+
+    const { data: unchanged } = await admin.from("cases").select("title").eq("id", caseA).single();
+    expect(unchanged?.title).toBe("Caso A");
+  });
+
+  it("el operador del sector sí puede modificarlo", async () => {
+    const { data } = await aOperatorSector.client.from("cases").update({ priority: "high" }).eq("id", caseA).select("id");
+    expect(data).toHaveLength(1);
   });
 
   it("el superadmin y consulta y reportes ven todos los casos", async () => {
@@ -320,7 +333,7 @@ describe("visibilidad de casos por sector", () => {
     expect(asViewer).toHaveLength(1);
   });
 
-  it("el operador de otro sector tampoco ve las notas internas del caso", async () => {
+  it("el operador de otro sector también ve las notas internas del caso", async () => {
     await admin.from("internal_notes").insert({
       organization_id: orgA,
       case_id: caseA,
@@ -328,7 +341,7 @@ describe("visibilidad de casos por sector", () => {
     });
 
     const { data } = await aOperatorOther.client.from("internal_notes").select("id").eq("case_id", caseA);
-    expect(data ?? []).toHaveLength(0);
+    expect(data).toHaveLength(1);
 
     const { data: visible } = await aOperatorSector.client.from("internal_notes").select("id").eq("case_id", caseA);
     expect(visible).toHaveLength(1);
