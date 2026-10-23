@@ -60,6 +60,7 @@ describe("bienvenida animada", () => {
     mockReducedMotion(false);
     localStorage.clear();
     delete document.documentElement.dataset.welcome;
+    delete document.documentElement.dataset.motion;
     window.history.replaceState(null, "", "/?bienvenida=1");
   });
 
@@ -165,6 +166,25 @@ describe("bienvenida animada", () => {
 
     expect(screen.queryByRole("status")).toBeNull();
     expect(container.querySelector(".welcome-fallback")).toBeNull();
+    expect(document.documentElement.dataset.welcome).toBeUndefined();
+  });
+
+  it("si la persona eligió siempre activas, se muestra aunque el sistema pida menos movimiento", async () => {
+    mockReducedMotion(true);
+    document.documentElement.dataset.motion = "full";
+    mount(true);
+    await advance(50);
+
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("si la persona eligió reducidas, no se muestra aunque el sistema permita animaciones", async () => {
+    mockReducedMotion(false);
+    document.documentElement.dataset.motion = "reduce";
+    mount(true);
+    await advance(100);
+
+    expect(screen.queryByRole("status")).toBeNull();
     expect(document.documentElement.dataset.welcome).toBeUndefined();
   });
 

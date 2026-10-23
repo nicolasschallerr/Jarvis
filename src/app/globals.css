@@ -92,11 +92,22 @@ body {
   }
 }
 
-/* Quien pide menos movimiento en su sistema no recibe transiciones ni animaciones. */
+/* Menos movimiento: sin transiciones ni animaciones. Se activa con data-motion="reduce", que fija un script
+   antes de pintar con la elección guardada en el menú o, si no hay, la preferencia del sistema. Sin
+   JavaScript vale la preferencia del sistema, y elegir "siempre activas" (data-motion="full") la anula. */
+:root[data-motion="reduce"] *,
+:root[data-motion="reduce"] *::before,
+:root[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  :root:not([data-motion="full"]) *,
+  :root:not([data-motion="full"]) *::before,
+  :root:not([data-motion="full"]) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -104,7 +115,7 @@ body {
   }
 }
 
-/* Animaciones de las mascotas de los agentes. Con prefers-reduced-motion las anula la regla de arriba. */
+/* Animaciones de las mascotas de los agentes. Con menos movimiento las anula la regla de arriba. */
 @keyframes mascot-blink {
   0%,
   92%,

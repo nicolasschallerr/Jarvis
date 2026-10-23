@@ -2,6 +2,7 @@ import { Suspense } from "react";
 
 import { signOut } from "@/app/actions";
 import { Logo } from "@/components/ui/logo";
+import { MotionToggle } from "@/components/ui/motion-toggle";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { getCurrentProfile } from "@/lib/auth/profile";
 
@@ -26,6 +27,7 @@ async function UserBlock() {
         <p className="text-zinc-600 dark:text-zinc-400">{profile.organizationName}</p>
       </div>
       <ThemeToggle />
+      <MotionToggle />
       <form action={signOut}>
         <button type="submit" className="btn-secondary w-full">
           Cerrar sesión

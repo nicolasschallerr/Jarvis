@@ -46,7 +46,10 @@ export function WelcomeGate({ play, todayKey, greeting, firstName, agents }: Pro
     const safety = setTimeout(done, SAFETY_MS);
 
     const decide = setTimeout(() => {
-      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      // data-motion lo fija el script de layout.tsx con la elección del menú o, si no hay, la preferencia del
+      // sistema. Si no está (por ejemplo, el script no corrió), se consulta la preferencia del sistema.
+      const motion = document.documentElement.dataset.motion;
+      const reduced = motion ? motion === "reduce" : window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (reduced) {
         // Quien pide menos movimiento no ve la animación.
         done();
