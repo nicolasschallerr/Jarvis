@@ -33,8 +33,22 @@ async function enqueue(messageId: string, timestamp: number, text?: string, name
 }
 
 // Procesa todo lo pendiente de esta organización (el lote puede traer eventos de otras pruebas).
+// OJO: el trabajador real (pg_cron → Vercel, cada 10 s) también toma eventos de esta base, así que
+// una parte puede procesarla él. Por eso se espera a que no quede nada pendiente de esta organización
+// y las pruebas comprueban el ESTADO en la base, no cuántos eventos procesó esta llamada.
 async function drain() {
-  return processPendingMessages(admin, 50);
+  const result = await processPendingMessages(admin, 50);
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const { data: pending } = await admin
+      .from("webhook_events")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .is("processed_at", null)
+      .is("error", null);
+    if (!pending?.length) break;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  return result;
 }
 
 beforeAll(async () => {
@@ -65,9 +79,7 @@ describe("procesamiento de mensajes entrantes", () => {
 
   it("crea contacto, conversación, mensaje y ventana de crédito", async () => {
     await enqueue(`wamid.zz-${runId}-1`, base, "quiero un préstamo");
-    const result = await drain();
-    expect(result.failed).toBe(0);
-    expect(result.processed).toBeGreaterThanOrEqual(1);
+    await drain();
 
     const { data: identity } = await admin
       .from("contact_identities")
@@ -142,8 +154,15 @@ describe("procesamiento de mensajes entrantes", () => {
       dedupe_key: `msg:wamid.zz-${runId}-1:reproceso`,
       payload: eventPayload(`wamid.zz-${runId}-1`, base, "quiero un préstamo"),
     });
-    const result = await drain();
-    expect(result.duplicates).toBeGreaterThanOrEqual(1);
+    await drain();
+
+    const { data: reprocessed } = await admin
+      .from("webhook_events")
+      .select("processed_at, error")
+      .eq("dedupe_key", `msg:wamid.zz-${runId}-1:reproceso`)
+      .single();
+    expect(reprocessed?.processed_at).not.toBeNull();
+    expect(reprocessed?.error).toBeNull();
 
     const { data: after } = await admin.from("messages").select("id").eq("organization_id", organizationId);
     expect(after).toHaveLength(before?.length ?? -1);

@@ -88,6 +88,8 @@ export function normalizeWhatsAppEvent(payload: Json, now: Date): NormalizedMess
     type: mapMessageType(asString(message.type)),
     body: extractBody(message),
     providerTimestamp: parseProviderTimestamp(message.timestamp, now),
+    // La descarga de adjuntos de WhatsApp se implementa en la Fase 14.
+    media: null,
     raw: message as Json,
   };
 }

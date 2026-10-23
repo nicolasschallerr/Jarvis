@@ -3,8 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendTextMessage } from "@/lib/outbound/send";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
+import { storeTelegramMedia } from "./media";
 import { normalizeTelegramEvent } from "./telegram";
-import type { NormalizedMessage } from "./types";
+import type { MediaRef, NormalizedMessage } from "./types";
 import { normalizeWhatsAppEvent } from "./whatsapp";
 
 type ClaimedEvent = {
@@ -45,7 +46,7 @@ async function processMessageEvent(
 
   const { data: channel, error: channelError } = await admin
     .from("channels")
-    .select("id")
+    .select("id, secret_ref")
     .eq("organization_id", event.organization_id)
     .eq("type", message.channelType)
     .eq("external_id", message.channelExternalId)
@@ -69,12 +70,46 @@ async function processMessageEvent(
 
   if (error) throw new Error(`No se pudo guardar el mensaje: ${error.message}`);
 
+  // El adjunto se descarga también al reprocesar: si falló la vez anterior, el mensaje ya existe
+  // (la función de guardado devuelve null) pero el archivo todavía no. Si falla, el evento queda
+  // con su error y se reintenta; el mensaje ya está guardado y no se duplica.
+  if (message.media && message.channelType === "telegram") {
+    await storeMessageMedia(admin, event.organization_id, message, message.media, channel.secret_ref);
+  }
+
   const created = messageId !== null;
   if (created) {
     await echoIfEnabled(admin, event.organization_id, message);
   }
 
   return created;
+}
+
+async function storeMessageMedia(
+  admin: SupabaseClient<Database>,
+  organizationId: string,
+  message: NormalizedMessage,
+  media: MediaRef,
+  secretRef: string | null,
+): Promise<void> {
+  const token = secretRef ? process.env[secretRef] : undefined;
+  if (!token) throw new Error(`Falta la variable de entorno del canal (${secretRef ?? "sin secret_ref"})`);
+
+  const { data: stored, error } = await admin
+    .from("messages")
+    .select("id, conversation_id")
+    .eq("organization_id", organizationId)
+    .eq("external_id", message.externalId)
+    .maybeSingle();
+  if (error || !stored) throw new Error("No se encontró el mensaje para guardar su adjunto");
+
+  await storeTelegramMedia(admin, {
+    organizationId,
+    conversationId: stored.conversation_id,
+    messageId: stored.id,
+    token,
+    media,
+  });
 }
 
 // MODO ECO (temporal, solo para validar el circuito de envío en desarrollo): con

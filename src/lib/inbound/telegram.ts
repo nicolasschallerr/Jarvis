@@ -1,6 +1,6 @@
 import type { Json } from "@/lib/supabase/database.types";
 
-import type { InboundEvent, MessageType, NormalizedMessage } from "./types";
+import type { InboundEvent, MediaRef, MessageType, NormalizedMessage } from "./types";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -55,6 +55,38 @@ export function mapTelegramType(message: JsonRecord): MessageType {
   return "unsupported";
 }
 
+// Adjunto descargable del mensaje, si lo tiene. De una foto Telegram manda varios tamaños: se
+// elige el más grande (por píxeles). Los stickers y ubicaciones no se descargan.
+export function extractTelegramMedia(message: JsonRecord): MediaRef | null {
+  let file: JsonRecord | null = null;
+  let fallbackMime: string | null = null;
+
+  if (Array.isArray(message.photo)) {
+    const sizes = message.photo.filter(isRecord);
+    const area = (size: JsonRecord) => (asInteger(size.width) ?? 0) * (asInteger(size.height) ?? 0);
+    file = sizes.reduce<JsonRecord | null>((best, size) => (!best || area(size) > area(best) ? size : best), null);
+    fallbackMime = "image/jpeg";
+  } else {
+    for (const key of ["voice", "audio", "document", "video", "video_note"]) {
+      const candidate = message[key];
+      if (isRecord(candidate)) {
+        file = candidate;
+        break;
+      }
+    }
+  }
+
+  const providerMediaId = file ? asString(file.file_id) : null;
+  if (!file || !providerMediaId) return null;
+
+  return {
+    providerMediaId,
+    mimeType: asString(file.mime_type) ?? fallbackMime,
+    fileName: asString(file.file_name),
+    sizeBytes: asInteger(file.file_size),
+  };
+}
+
 function contactName(sender: unknown): string | null {
   if (!isRecord(sender)) return null;
   const fullName = [asString(sender.first_name), asString(sender.last_name)].filter(Boolean).join(" ");
@@ -91,6 +123,7 @@ export function normalizeTelegramEvent(payload: Json, now: Date): NormalizedMess
     type: mapTelegramType(message),
     body: asString(message.text) ?? asString(message.caption),
     providerTimestamp: seconds && seconds > 0 ? new Date(seconds * 1000).toISOString() : now.toISOString(),
+    media: extractTelegramMedia(message),
     raw: message as Json,
   };
 }

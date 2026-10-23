@@ -13,6 +13,15 @@ export type InboundEvent = {
   payload: Json;
 };
 
+// Archivo adjunto de un mensaje entrante, aún sin descargar.
+export type MediaRef = {
+  // Identificador para pedírselo al proveedor (file_id en Telegram).
+  providerMediaId: string;
+  mimeType: string | null;
+  fileName: string | null;
+  sizeBytes: number | null;
+};
+
 // Un mensaje entrante en una forma común a todos los canales. Cada canal tiene su "normalizador"
 // que lo arma; el resto del sistema (guardado, créditos, agente) no sabe de qué canal vino.
 export type NormalizedMessage = {
@@ -25,5 +34,6 @@ export type NormalizedMessage = {
   type: MessageType;
   body: string | null;
   providerTimestamp: string;
+  media: MediaRef | null;
   raw: Json;
 };
