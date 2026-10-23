@@ -245,6 +245,49 @@ describe("resumen de conversaciones (vista de la bandeja)", () => {
   });
 });
 
+describe("altas de configuración: solo con el rol que corresponde (INSERT)", () => {
+  // Regresión: las políticas ALL tenían un WITH CHECK que solo miraba la organización, y un INSERT
+  // evalúa únicamente WITH CHECK, así que un operador podía crear canales, sectores o equipos.
+  const inserts = (user: TestUser, label: string) => [
+    { table: "channels", run: () => user.client.from("channels").insert({ organization_id: orgA, type: "telegram", name: `c-${label}`, external_id: `zz-${runId}-${label}` }) },
+    { table: "sectors", run: () => user.client.from("sectors").insert({ organization_id: orgA, slug: `s-${label}`, name: `S ${label}` }) },
+    { table: "business_units", run: () => user.client.from("business_units").insert({ organization_id: orgA, slug: `u-${label}`, name: `U ${label}` }) },
+    { table: "sector_members", run: () => user.client.from("sector_members").insert({ sector_id: sectorA2, profile_id: user.id, organization_id: orgA }) },
+  ];
+
+  it("un operador no crea canales, sectores, unidades ni miembros de sector", async () => {
+    for (const { table, run } of inserts(aOperatorSector, "op")) {
+      const { error } = await run();
+      expect(error, `tabla ${table}`).not.toBeNull();
+    }
+  });
+
+  it("consulta y reportes tampoco", async () => {
+    for (const { table, run } of inserts(aViewer, "vw")) {
+      const { error } = await run();
+      expect(error, `tabla ${table}`).not.toBeNull();
+    }
+  });
+
+  it("el superadmin sí los crea", async () => {
+    for (const { table, run } of inserts(aSuper, "su").filter((entry) => entry.table !== "sector_members")) {
+      const { error } = await run();
+      expect(error, `tabla ${table}`).toBeNull();
+    }
+  });
+
+  it("las etiquetas las crea un operador pero no consulta y reportes, y lo mismo las de caso", async () => {
+    const tag = (user: TestUser, name: string) => user.client.from("tags").insert({ organization_id: orgA, name });
+    expect((await tag(aViewer, `t-vw-${runId}`)).error).not.toBeNull();
+    expect((await tag(aOperatorSector, `t-op-${runId}`)).error).toBeNull();
+
+    const { data: created } = await admin.from("tags").select("id").eq("organization_id", orgA).eq("name", `t-op-${runId}`).single();
+    const caseTag = (user: TestUser) => user.client.from("case_tags").insert({ organization_id: orgA, case_id: caseA, tag_id: created?.id ?? "" });
+    expect((await caseTag(aViewer)).error).not.toBeNull();
+    expect((await caseTag(aOperatorSector)).error).toBeNull();
+  });
+});
+
 describe("roles dentro de una organización", () => {
   it("consulta y reportes lee pero no escribe contactos", async () => {
     const { data } = await aViewer.client.from("contacts").select("id").eq("id", contactA);
