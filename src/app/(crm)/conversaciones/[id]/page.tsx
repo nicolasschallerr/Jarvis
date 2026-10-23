@@ -5,13 +5,17 @@ import { getCurrentProfile } from "@/lib/auth/profile";
 import { channelLabel, dateTime, senderLabel } from "@/lib/crm/format";
 import { createClient } from "@/lib/supabase/server";
 
+import type { ChannelType } from "@/lib/inbound/types";
+import { canSendFreeText } from "@/lib/outbound/rules";
+
 import { MessageMedia, type MediaItem } from "./message-media";
+import { ReplyForm } from "./reply-form";
 
 const MESSAGE_LIMIT = 200;
 const SIGNED_URL_SECONDS = 3600;
 
 export default async function ConversacionPage({ params }: PageProps<"/conversaciones/[id]">) {
-  await getCurrentProfile();
+  const profile = await getCurrentProfile();
   const { id } = await params;
 
   const supabase = await createClient();
@@ -19,7 +23,7 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
   // RLS limita todo a la organización del usuario: un id ajeno simplemente no existe.
   const { data: conversation } = await supabase
     .from("conversation_summaries")
-    .select("id, contact_name, channel_type, window_open")
+    .select("id, contact_name, channel_type, window_open, last_inbound_at")
     .eq("id", id)
     .maybeSingle();
   if (!conversation) notFound();
@@ -52,6 +56,13 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
     const url = urlByPath.get(file.storage_path);
     if (url) mediaByMessage.set(file.message_id, { url, mimeType: file.mime_type });
   }
+
+  // Qué se le muestra al usuario debajo de los mensajes. La autorización real está en la acción.
+  const freeTextAllowed = canSendFreeText(
+    (conversation.channel_type ?? "whatsapp") as ChannelType,
+    conversation.last_inbound_at ? new Date(conversation.last_inbound_at) : null,
+    new Date(),
+  );
 
   return (
     <main className="flex flex-1 flex-col">
@@ -109,6 +120,19 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
           );
         })}
       </ol>
+
+      {profile.role === "viewer" ? (
+        <p className="border-t border-zinc-200 px-6 py-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
+          Tu rol es de consulta: podés leer la conversación pero no responder.
+        </p>
+      ) : !freeTextAllowed ? (
+        <p className="border-t border-zinc-200 px-6 py-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
+          Pasaron más de 24 horas desde el último mensaje del contacto: solo se pueden enviar plantillas
+          aprobadas (disponible más adelante).
+        </p>
+      ) : (
+        <ReplyForm conversationId={conversation.id ?? id} />
+      )}
     </main>
   );
 }
