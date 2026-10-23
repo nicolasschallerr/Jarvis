@@ -138,3 +138,35 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** se escribió sin releer la regla de confidencialidad.
 - **Solución:** reemplazado por "cliente piloto"; el chequeo de cierre de fase lo detectó.
 - **Cómo evitarlo:** correr el chequeo de confidencialidad de `/cerrar-fase` en cada cierre.
+
+## Fase 04
+
+### 22. `usePathname()` en el menú rompía el build de una ruta dinámica
+- **Problema:** `next build` fallaba en `/conversaciones/[id]` ("URL data `usePathname()` outside of `<Suspense>`").
+- **Causa real:** con Cache Components, en una ruta dinámica la ruta actual es un dato de pedido; el menú lateral del layout lo leía fuera de `Suspense`.
+- **Solución:** envolver el menú en `<Suspense>` con un relleno de la misma altura.
+- **Cómo evitarlo:** todo componente que lea la ruta, cookies o parámetros va dentro de `Suspense`; probar con `npm run build`, no solo con `next dev`.
+
+### 23. Tipos viejos de `.next` después de borrar una página
+- **Problema:** `tsc` y `build` fallaban buscando `src/app/page.js`, que ya no existía.
+- **Causa real:** Next genera tipos en `.next/` y quedaron referencias a la página borrada.
+- **Solución:** borrar `.next` y volver a compilar. Sin esa carpeta, `LayoutProps` no existe hasta el siguiente `build`.
+- **Cómo evitarlo:** tras borrar o mover rutas, limpiar `.next`; para chequear tipos usar `npm run build`.
+
+### 24. Realtime parecía no entregar eventos en la prueba
+- **Problema:** la prueba se suscribía, no daba error y no recibía nada.
+- **Causa real:** `SUBSCRIBED` se avisa al unirse al canal, antes de que el servidor confirme la suscripción a cambios de la base.
+- **Solución:** `postgres_changes_options: { wait: true }` al crear el canal, en la prueba y en la pantalla.
+- **Cómo evitarlo:** en suscripciones a la base, esperar la confirmación del servidor antes de provocar eventos.
+
+### 25. "No me aparece" no siempre es "no se guardó"
+- **Problema:** el operador respondió, llegó a Telegram y el CRM no lo mostraba.
+- **Causa real:** el mensaje estaba guardado; la pantalla no se enteraba del cambio (faltaba el tiempo real).
+- **Solución:** consultar primero la base para separar "no se guardó" de "no se muestra", y luego agregar Realtime.
+- **Cómo evitarlo:** ante un "no aparece", verificar el dato en la base antes de tocar la pantalla.
+
+### 26. Los comandos largos con varios bloques en una sola llamada fallan
+- **Problema:** una llamada de shell con varios heredocs falló entera con un error de comillas.
+- **Causa real:** el análisis de comillas del shell con muchos bloques y apóstrofes.
+- **Solución:** escribir cada archivo con la herramienta de escritura y usar el shell solo para comandos cortos.
+- **Cómo evitarlo:** un archivo, una herramienta de escritura; nada de documentos largos dentro de comandos.

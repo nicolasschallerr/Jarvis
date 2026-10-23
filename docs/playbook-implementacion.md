@@ -54,6 +54,7 @@
 - Organización en Jarvis (`organization_id`), usuarios y perfiles del CRM.
 - Canal de WhatsApp (número y credenciales como configuración) y plantillas sometidas a Meta.
 - Programación del trabajador de mensajes: secretos `jarvis_app_url` y `jarvis_worker_secret` en Vault y variables de entorno en Vercel (se aplican solo a despliegues nuevos: redesplegar).
+- Usuarios del CRM con su rol (superadministrador, operador, consulta y reportes): el rol de consulta lee pero no responde. La visibilidad por sector se define en la Fase 5.
 - Para desarrollar sin esperar a Meta: un bot de Telegram como canal de prueba (ADR-013).
 - Carga de la configuración del repo del cliente a la base (script pendiente, Fase 5).
 
