@@ -4,9 +4,11 @@ import { getCurrentProfile } from "@/lib/auth/profile";
 import { channelLabel, messagePreview, shortDate } from "@/lib/crm/format";
 import { createClient } from "@/lib/supabase/server";
 
+import { LiveRefresh } from "../live-refresh";
+
 export default async function ConversacionesPage() {
   // Verifica la sesión y el perfil; la lista la filtra RLS por organización.
-  await getCurrentProfile();
+  const profile = await getCurrentProfile();
 
   const supabase = await createClient();
   const { data: conversations, error } = await supabase
@@ -21,6 +23,7 @@ export default async function ConversacionesPage() {
 
   return (
     <main className="flex flex-1 flex-col">
+      <LiveRefresh organizationId={profile.organizationId} />
       <header className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
         <h1 className="text-xl font-semibold tracking-tight">Conversaciones</h1>
       </header>

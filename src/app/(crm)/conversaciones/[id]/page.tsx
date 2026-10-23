@@ -9,7 +9,9 @@ import type { ChannelType } from "@/lib/inbound/types";
 import { canSendFreeText } from "@/lib/outbound/rules";
 
 import { MessageMedia, type MediaItem } from "./message-media";
+import { LiveRefresh } from "../../live-refresh";
 import { ReplyForm } from "./reply-form";
+import { ScrollToEnd } from "./scroll-to-end";
 
 const MESSAGE_LIMIT = 200;
 const SIGNED_URL_SECONDS = 3600;
@@ -65,7 +67,7 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
   );
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex h-screen flex-col">
       <header className="flex flex-col gap-1 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
         <Link href="/conversaciones" className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">
           ← Conversaciones
@@ -119,7 +121,9 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
             </li>
           );
         })}
+        <ScrollToEnd count={messages.length} />
       </ol>
+      <LiveRefresh conversationId={conversation.id ?? id} />
 
       {profile.role === "viewer" ? (
         <p className="border-t border-zinc-200 px-6 py-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
