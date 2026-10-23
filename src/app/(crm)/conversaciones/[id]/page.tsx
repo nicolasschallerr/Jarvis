@@ -27,7 +27,7 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
   // RLS limita todo a la organización del usuario: un id ajeno simplemente no existe.
   const { data: conversation } = await supabase
     .from("conversation_summaries")
-    .select("id, contact_name, channel_type, window_open, last_inbound_at")
+    .select("id, contact_id, contact_name, channel_type, window_open, last_inbound_at")
     .eq("id", id)
     .maybeSingle();
   if (!conversation) notFound();
@@ -142,7 +142,7 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
       )}
     </main>
     <Suspense fallback={<aside className="w-80 shrink-0 border-l border-zinc-200 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">Cargando caso...</aside>}>
-      <CasePanel conversationId={conversation.id ?? id} role={profile.role} currentUserId={profile.id} />
+      <CasePanel conversationId={conversation.id ?? id} contactId={conversation.contact_id ?? ""} role={profile.role} currentUserId={profile.id} />
     </Suspense>
     </div>
   );
