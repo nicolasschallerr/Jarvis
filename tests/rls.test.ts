@@ -223,6 +223,28 @@ describe("aislamiento entre organizaciones", () => {
   });
 });
 
+describe("resumen de conversaciones (vista de la bandeja)", () => {
+  it("sin sesión no se lee nada", async () => {
+    const { data } = await anonClient().from("conversation_summaries").select("id");
+    expect(data ?? []).toHaveLength(0);
+  });
+
+  it("la organización B no ve las conversaciones de A", async () => {
+    const { data } = await bSuper.client.from("conversation_summaries").select("id");
+    expect(data ?? []).toHaveLength(0);
+  });
+
+  it("la organización A ve su conversación con contacto, canal y último mensaje", async () => {
+    const { data } = await aOperatorOther.client
+      .from("conversation_summaries")
+      .select("id, contact_name, channel_type, last_body, last_direction")
+      .eq("id", conversationA);
+    expect(data).toEqual([
+      { id: conversationA, contact_name: "Contacto A", channel_type: "whatsapp", last_body: "mensaje de prueba", last_direction: "inbound" },
+    ]);
+  });
+});
+
 describe("roles dentro de una organización", () => {
   it("consulta y reportes lee pero no escribe contactos", async () => {
     const { data } = await aViewer.client.from("contacts").select("id").eq("id", contactA);

@@ -172,6 +172,13 @@ export type Database = {
             foreignKeyName: "ai_calls_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "conversation_summaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_calls_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
@@ -304,6 +311,13 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "area_queries_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_summaries"
             referencedColumns: ["id"]
           },
           {
@@ -717,6 +731,13 @@ export type Database = {
             foreignKeyName: "cases_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "conversation_summaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cases_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
@@ -944,6 +965,13 @@ export type Database = {
             foreignKeyName: "conversation_evaluations_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "conversation_summaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_evaluations_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
@@ -996,6 +1024,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_windows_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_summaries"
             referencedColumns: ["id"]
           },
           {
@@ -1141,6 +1176,13 @@ export type Database = {
             foreignKeyName: "followups_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "conversation_summaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "followups_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
@@ -1201,6 +1243,13 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_notes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_summaries"
             referencedColumns: ["id"]
           },
           {
@@ -1395,6 +1444,13 @@ export type Database = {
           type?: Database["public"]["Enums"]["message_type"]
         }
         Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_summaries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "messages_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -1715,7 +1771,57 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      conversation_summaries: {
+        Row: {
+          ai_enabled: boolean | null
+          assigned_to: string | null
+          channel_id: string | null
+          channel_name: string | null
+          channel_type: Database["public"]["Enums"]["channel_type"] | null
+          contact_id: string | null
+          contact_name: string | null
+          id: string | null
+          last_body: string | null
+          last_direction:
+            | Database["public"]["Enums"]["message_direction"]
+            | null
+          last_inbound_at: string | null
+          last_message_at: string | null
+          last_type: Database["public"]["Enums"]["message_type"] | null
+          organization_id: string | null
+          window_open: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       claim_webhook_events: {
