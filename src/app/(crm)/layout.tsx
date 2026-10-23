@@ -34,17 +34,28 @@ async function UserBlock() {
   );
 }
 
+// El menú depende del rol: "Equipo" es solo para superadministradores. Ocultarlo es comodidad; la
+// seguridad real está en la página, en las acciones y en RLS.
+async function MainNav() {
+  const profile = await getCurrentProfile();
+
+  return (
+    <nav className="flex flex-col gap-1" aria-label="Principal">
+      <NavLink href="/conversaciones">Conversaciones</NavLink>
+      {profile.role === "superadmin" ? <NavLink href="/equipo">Equipo</NavLink> : null}
+    </nav>
+  );
+}
+
 export default function CrmLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-1">
       <aside className="flex w-60 shrink-0 flex-col justify-between border-r border-zinc-200 p-4 dark:border-zinc-800">
         <div className="flex flex-col gap-6">
           <p className="px-3 text-lg font-semibold tracking-tight">Jarvis</p>
-          {/* usePathname() en una ruta dinámica es un dato de pedido: va dentro de <Suspense>. */}
+          {/* El rol y usePathname() son datos de pedido: van dentro de <Suspense>. */}
           <Suspense fallback={<div className="h-9" />}>
-            <nav className="flex flex-col gap-1" aria-label="Principal">
-              <NavLink href="/conversaciones">Conversaciones</NavLink>
-            </nav>
+            <MainNav />
           </Suspense>
         </div>
         <Suspense fallback={<p className="text-sm text-zinc-600 dark:text-zinc-400">Cargando...</p>}>
