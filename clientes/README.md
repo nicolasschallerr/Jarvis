@@ -18,8 +18,10 @@ acuerdos de confidencialidad. Ver [ADR-005](../docs/decisiones/005-config-de-cli
 ## Cómo funciona en tiempo de ejecución
 
 1. La carpeta del cliente es la **fuente versionada** (quién cambió qué prompt o regla, y cuándo).
-2. Un script de carga (pendiente, Fase 5) valida los archivos contra un esquema y los guarda
-   en la base de Jarvis bajo el `organization_id` del cliente.
+2. El script `scripts/cargar-configuracion.mts` valida `sectores-y-reglas.yaml` contra un esquema
+   y guarda sectores y unidades en la base de Jarvis bajo el `organization_id` del cliente. Se puede
+   repetir sin duplicar; lo que se saca del archivo se desactiva, no se borra. Por ahora carga solo
+   sectores y unidades; el resto de las secciones se cargan cuando las use el agente (Fases 6 y 9).
 3. En producción el agente y el CRM leen la configuración **desde la base**. Los textos que el
    cliente puede editar (saludos, mensajes) se editan desde el CRM; los cambios estructurales
    (sectores, reglas, prompt) se hacen en la carpeta y se vuelven a cargar.
@@ -44,7 +46,8 @@ acuerdos de confidencialidad. Ver [ADR-005](../docs/decisiones/005-config-de-cli
    negocio, más los de temas sensibles. Siempre con datos personales inventados.
 6. **Commitear y pushear** en el repo del cliente (no en el del producto).
 7. **Cargar la configuración** en la base de Jarvis bajo su `organization_id`
-   (script de carga pendiente, Fase 5).
+   Desde la carpeta `jarvis`: `npx tsx --env-file=.env.local scripts/cargar-configuracion.mts --org-slug <slug>`
+   (con `--validar-solo` solo revisa el archivo, sin tocar la base).
 8. **Seguir el playbook** de implementación: [`docs/playbook-implementacion.md`](../docs/playbook-implementacion.md).
 
 ## Reglas
