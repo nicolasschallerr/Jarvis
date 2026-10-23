@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { getCurrentProfile } from "@/lib/auth/profile";
-import { channelLabel, messagePreview, shortDate } from "@/lib/crm/format";
+import { channelLabel, messagePreview, shortDate, STATUS_LABELS } from "@/lib/crm/format";
 import { createClient } from "@/lib/supabase/server";
 
 import { LiveRefresh } from "../live-refresh";
@@ -14,7 +14,7 @@ export default async function ConversacionesPage() {
   const { data: conversations, error } = await supabase
     .from("conversation_summaries")
     .select(
-      "id, contact_name, channel_type, channel_name, last_body, last_type, last_direction, last_message_at, window_open",
+      "id, contact_name, channel_type, channel_name, last_body, last_type, last_direction, last_message_at, window_open, case_status, case_priority, case_assigned_to",
     )
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .limit(100);
@@ -50,6 +50,12 @@ export default async function ConversacionesPage() {
                     <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                       {channelLabel(conversation.channel_type ?? "")}
                     </span>
+                    {conversation.case_status ? (
+                      <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                        Caso: {STATUS_LABELS[conversation.case_status]}
+                        {conversation.case_assigned_to === profile.id ? " · mío" : conversation.case_assigned_to ? "" : " · sin asignar"}
+                      </span>
+                    ) : null}
                     {conversation.window_open ? (
                       <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                         Ventana abierta

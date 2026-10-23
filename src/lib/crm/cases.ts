@@ -115,3 +115,59 @@ export async function changeCasePriority(
   if (!data?.length) return NOT_FOUND_OR_DENIED;
   return { ok: true, caseId: params.caseId };
 }
+
+// Asigna el caso a una persona (o lo deja sin asignar con null). La persona tiene que ser de la misma
+// organización, estar activa y poder trabajar casos. Lo puede hacer quien puede modificar el caso.
+export async function assignCase(params: CaseParams & { caseId: string; assigneeId: string | null }): Promise<CaseResult> {
+  if (params.profile.role === "viewer") return VIEWER;
+
+  if (params.assigneeId) {
+    const { data: person } = await params.userClient
+      .from("profiles")
+      .select("id, role, is_active")
+      .eq("id", params.assigneeId)
+      .maybeSingle();
+    if (!person) return { ok: false, error: "La persona no existe." };
+    if (!person.is_active) return { ok: false, error: "La persona está desactivada." };
+    if (person.role === "viewer") return { ok: false, error: "Un usuario de consulta y reportes no trabaja casos." };
+  }
+
+  const { data, error } = await params.userClient
+    .from("cases")
+    .update({ assigned_to: params.assigneeId })
+    .eq("id", params.caseId)
+    .select("id");
+
+  if (error) return { ok: false, error: "No se pudo asignar el caso." };
+  if (!data?.length) return NOT_FOUND_OR_DENIED;
+  return { ok: true, caseId: params.caseId };
+}
+
+// Deriva el caso a otro sector (o lo deja sin sector). Al cambiar de sector se quita la asignación:
+// la persona anterior puede no ser del sector nuevo, y el sector decide quién lo toma.
+export async function changeCaseSector(params: CaseParams & { caseId: string; sectorId: string | null }): Promise<CaseResult> {
+  if (params.profile.role === "viewer") return VIEWER;
+
+  if (params.sectorId) {
+    const { data: sector } = await params.userClient
+      .from("sectors")
+      .select("id, is_active")
+      .eq("id", params.sectorId)
+      .maybeSingle();
+    if (!sector || !sector.is_active) return { ok: false, error: "El sector no existe o está desactivado." };
+  }
+
+  const { data: current } = await params.userClient.from("cases").select("sector_id").eq("id", params.caseId).maybeSingle();
+  if (!current) return NOT_FOUND_OR_DENIED;
+  if (current.sector_id === params.sectorId) return { ok: true, caseId: params.caseId };
+
+  const { data, error } = await params.userClient
+    .from("cases")
+    .update({ sector_id: params.sectorId, assigned_to: null })
+    .eq("id", params.caseId)
+    .select("id");
+
+  if (error) return { ok: false, error: "No se pudo cambiar el sector." };
+  if (!data?.length) return NOT_FOUND_OR_DENIED;
+  return { ok: true, caseId: params.caseId };
+}

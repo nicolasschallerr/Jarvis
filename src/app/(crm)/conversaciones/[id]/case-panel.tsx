@@ -9,9 +9,11 @@ import { CaseControls, CreateCaseForm } from "./case-forms";
 export async function CasePanel({
   conversationId,
   role,
+  currentUserId,
 }: {
   conversationId: string;
   role: "superadmin" | "operator" | "viewer";
+  currentUserId: string;
 }) {
   const supabase = await createClient();
 
@@ -23,8 +25,14 @@ export async function CasePanel({
       .order("opened_at", { ascending: false })
       .limit(10),
     supabase.from("sectors").select("id, name, is_active").order("name"),
-    supabase.from("profiles").select("id, full_name"),
+    supabase.from("profiles").select("id, full_name, role, is_active"),
   ]);
+
+  // A quién se puede asignar un caso: superadmin y operadores activos.
+  const assignable = (people ?? [])
+    .filter((person) => person.is_active && person.role !== "viewer")
+    .map((person) => ({ id: person.id, name: person.full_name }));
+  const activeSectors = (sectors ?? []).filter((sector) => sector.is_active).map((sector) => ({ id: sector.id, name: sector.name }));
 
   const openCase = (cases ?? []).find((item) => item.status !== "resolved");
   const closedCases = (cases ?? []).filter((item) => item.status === "resolved");
@@ -67,6 +75,11 @@ export async function CasePanel({
             caseId={openCase.id}
             status={openCase.status as CaseStatus}
             priority={openCase.priority as CasePriority}
+            assignedTo={openCase.assigned_to}
+            sectorId={openCase.sector_id}
+            currentUserId={currentUserId}
+            people={assignable}
+            sectors={activeSectors}
             canEdit={role !== "viewer"}
           />
 
@@ -96,7 +109,7 @@ export async function CasePanel({
           </p>
           <CreateCaseForm
             conversationId={conversationId}
-            sectors={(sectors ?? []).filter((sector) => sector.is_active).map((sector) => ({ id: sector.id, name: sector.name }))}
+            sectors={activeSectors}
           />
         </>
       )}

@@ -42,13 +42,15 @@ export function LiveRefresh(props: Scope) {
       );
     }
 
-    // La lista también cambia cuando se crea o actualiza una conversación.
+    // Las listas también cambian cuando se crea o actualiza una conversación o un caso.
     if (organizationId) {
-      channel.on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "conversations", filter: `organization_id=eq.${organizationId}` },
-        refresh,
-      );
+      for (const table of ["conversations", "cases"]) {
+        channel.on(
+          "postgres_changes",
+          { event: "*", schema: "public", table, filter: `organization_id=eq.${organizationId}` },
+          refresh,
+        );
+      }
     }
 
     // Realtime necesita el token de la sesión para aplicar RLS antes de suscribirse.

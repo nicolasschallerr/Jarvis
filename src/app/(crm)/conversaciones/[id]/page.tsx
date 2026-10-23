@@ -142,7 +142,7 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
       )}
     </main>
     <Suspense fallback={<aside className="w-80 shrink-0 border-l border-zinc-200 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">Cargando caso...</aside>}>
-      <CasePanel conversationId={conversation.id ?? id} role={profile.role} />
+      <CasePanel conversationId={conversation.id ?? id} role={profile.role} currentUserId={profile.id} />
     </Suspense>
     </div>
   );

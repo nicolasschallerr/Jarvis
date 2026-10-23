@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { changeCasePriority, changeCaseStatus, createCase, MAX_CASE_TITLE_LENGTH } from "../src/lib/crm/cases";
+import { assignCase, changeCasePriority, changeCaseSector, changeCaseStatus, createCase, MAX_CASE_TITLE_LENGTH } from "../src/lib/crm/cases";
+import { listCases } from "../src/lib/crm/case-list";
 import { adminClient, createTestUser, randomId, type TestUser } from "./helpers/supabase-test";
 
 // Casos desde el CRM contra el proyecto de desarrollo: creación, estados e historial automático.
@@ -168,5 +169,83 @@ describe("casos desde el CRM", () => {
     await admin.from("cases").update({ priority: "high" }).eq("id", another?.id ?? "");
     const { data: log } = await admin.from("case_events").select("actor_type, actor_profile_id").eq("case_id", another?.id ?? "").eq("event_type", "priority_changed").single();
     expect(log).toEqual({ actor_type: "system", actor_profile_id: null });
+  });
+});
+
+describe("asignación, derivación y listas", () => {
+  let secondCase = "";
+
+  beforeAll(async () => {
+    const { data } = await admin.from("cases").select("id").eq("conversation_id", conversationId).eq("title", "Segundo caso").single();
+    secondCase = data?.id ?? "";
+  });
+
+  async function caseEvents(types: string[]) {
+    const { data } = await admin.from("case_events").select("event_type, data").eq("case_id", secondCase).in("event_type", types).order("created_at");
+    return data ?? [];
+  }
+
+  it("un operador se asigna un caso de su sector y aparece en 'mis casos'", async () => {
+    // El segundo caso no tiene sector: se lo ponemos desde el servidor para que el operador pueda tomarlo.
+    await admin.from("cases").update({ sector_id: sectorMain }).eq("id", secondCase);
+
+    expect(await assignCase({ ...as(operatorMain), caseId: secondCase, assigneeId: operatorMain.id })).toEqual({ ok: true, caseId: secondCase });
+
+    const mine = await listCases({ userClient: operatorMain.client, view: "mine", userId: operatorMain.id });
+    expect(mine.map((item) => item.id)).toContain(secondCase);
+
+    const unassigned = await listCases({ userClient: operatorMain.client, view: "unassigned", userId: operatorMain.id });
+    expect(unassigned.map((item) => item.id)).not.toContain(secondCase);
+
+    const assigned = (await caseEvents(["assigned"])).at(-1);
+    expect(assigned?.data).toEqual({ from: null, to: operatorMain.id });
+  });
+
+  it("no se asigna a un usuario de consulta, ni a alguien de otra organización", async () => {
+    expect((await assignCase({ ...as(operatorMain), caseId: secondCase, assigneeId: viewer.id })).ok).toBe(false);
+    expect(await assignCase({ ...as(operatorMain), caseId: secondCase, assigneeId: foreigner.id })).toEqual({ ok: false, error: "La persona no existe." });
+  });
+
+  it("un operador de otro sector no puede reasignar ni derivar un caso ajeno", async () => {
+    expect((await assignCase({ ...as(operatorOther), caseId: secondCase, assigneeId: operatorOther.id })).ok).toBe(false);
+    expect((await changeCaseSector({ ...as(operatorOther), caseId: secondCase, sectorId: sectorOther })).ok).toBe(false);
+
+    const { data } = await admin.from("cases").select("assigned_to, sector_id").eq("id", secondCase).single();
+    expect(data).toEqual({ assigned_to: operatorMain.id, sector_id: sectorMain });
+  });
+
+  it("al derivar a otro sector se quita la asignación y quedan los dos eventos", async () => {
+    expect(await changeCaseSector({ ...as(operatorMain), caseId: secondCase, sectorId: sectorOther })).toEqual({ ok: true, caseId: secondCase });
+
+    const { data } = await admin.from("cases").select("assigned_to, sector_id").eq("id", secondCase).single();
+    expect(data).toEqual({ assigned_to: null, sector_id: sectorOther });
+
+    const events = await caseEvents(["sector_changed", "assigned"]);
+    expect(events.some((event) => event.data && (event.data as { to?: string }).to === sectorOther)).toBe(true);
+    expect(events.at(-1)?.data).toEqual({ from: operatorMain.id, to: null });
+  });
+
+  it("el sector nuevo lo ve en su lista y su operador puede tomarlo; el anterior ya no puede modificarlo", async () => {
+    const bySector = await listCases({ userClient: operatorOther.client, view: "sector", userId: operatorOther.id, sectorId: sectorOther });
+    expect(bySector.map((item) => item.id)).toContain(secondCase);
+
+    expect((await assignCase({ ...as(operatorMain), caseId: secondCase, assigneeId: operatorMain.id })).ok).toBe(false);
+    expect((await assignCase({ ...as(operatorOther), caseId: secondCase, assigneeId: operatorOther.id })).ok).toBe(true);
+  });
+
+  it("derivar al mismo sector no hace nada y consulta y reportes no puede derivar", async () => {
+    const before = (await caseEvents(["sector_changed"])).length;
+    expect((await changeCaseSector({ ...as(operatorOther), caseId: secondCase, sectorId: sectorOther })).ok).toBe(true);
+    expect((await caseEvents(["sector_changed"])).length).toBe(before);
+
+    expect((await changeCaseSector({ ...as(viewer, "viewer"), caseId: secondCase, sectorId: sectorMain })).ok).toBe(false);
+  });
+
+  it("'por sector' sin sector elegido devuelve una lista vacía y la vista 'todos' trae los de la organización", async () => {
+    expect(await listCases({ userClient: viewer.client, view: "sector", userId: viewer.id, sectorId: null })).toEqual([]);
+
+    const all = await listCases({ userClient: viewer.client, view: "all", userId: viewer.id, includeResolved: true });
+    expect(all.length).toBeGreaterThanOrEqual(2);
+    expect(all.every((item) => item.id !== undefined)).toBe(true);
   });
 });

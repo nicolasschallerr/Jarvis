@@ -3,7 +3,16 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentProfile } from "@/lib/auth/profile";
-import { changeCasePriority, changeCaseStatus, createCase, type CasePriority, type CaseResult, type CaseStatus } from "@/lib/crm/cases";
+import {
+  assignCase,
+  changeCasePriority,
+  changeCaseSector,
+  changeCaseStatus,
+  createCase,
+  type CasePriority,
+  type CaseResult,
+  type CaseStatus,
+} from "@/lib/crm/cases";
 import { createClient } from "@/lib/supabase/server";
 
 export type CaseState = { error: string | null };
@@ -50,4 +59,14 @@ export async function changeStatusAction(
 export async function changePriorityAction(conversationId: string, caseId: string, priority: CasePriority): Promise<CaseState> {
   const { profile, userClient } = await context();
   return done(conversationId, await changeCasePriority({ userClient, profile, caseId, priority }));
+}
+
+export async function assignCaseAction(conversationId: string, caseId: string, assigneeId: string | null): Promise<CaseState> {
+  const { profile, userClient } = await context();
+  return done(conversationId, await assignCase({ userClient, profile, caseId, assigneeId }));
+}
+
+export async function changeSectorAction(conversationId: string, caseId: string, sectorId: string | null): Promise<CaseState> {
+  const { profile, userClient } = await context();
+  return done(conversationId, await changeCaseSector({ userClient, profile, caseId, sectorId }));
 }

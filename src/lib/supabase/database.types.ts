@@ -1775,6 +1775,9 @@ export type Database = {
         Row: {
           ai_enabled: boolean | null
           assigned_to: string | null
+          case_assigned_to: string | null
+          case_priority: Database["public"]["Enums"]["case_priority"] | null
+          case_status: Database["public"]["Enums"]["case_status"] | null
           channel_id: string | null
           channel_name: string | null
           channel_type: Database["public"]["Enums"]["channel_type"] | null
@@ -1792,6 +1795,13 @@ export type Database = {
           window_open: boolean | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cases_assigned_to_fkey"
+            columns: ["case_assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversations_assigned_to_fkey"
             columns: ["assigned_to"]

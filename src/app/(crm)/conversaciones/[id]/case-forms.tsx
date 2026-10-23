@@ -5,7 +5,14 @@ import { useActionState, useState, useTransition } from "react";
 import { CASE_PRIORITIES, CASE_STATUSES, type CasePriority, type CaseStatus } from "@/lib/crm/cases";
 import { PRIORITY_LABELS, STATUS_LABELS } from "@/lib/crm/format";
 
-import { changePriorityAction, changeStatusAction, createCaseAction, type CaseState } from "./case-actions";
+import {
+  assignCaseAction,
+  changePriorityAction,
+  changeSectorAction,
+  changeStatusAction,
+  createCaseAction,
+  type CaseState,
+} from "./case-actions";
 
 const NO_ERROR: CaseState = { error: null };
 const fieldClass = "rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 text-sm dark:border-zinc-700";
@@ -59,6 +66,11 @@ export function CaseControls(props: {
   caseId: string;
   status: CaseStatus;
   priority: CasePriority;
+  assignedTo: string | null;
+  sectorId: string | null;
+  currentUserId: string;
+  people: { id: string; name: string }[];
+  sectors: { id: string; name: string }[];
   canEdit: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -153,6 +165,52 @@ export function CaseControls(props: {
           ))}
         </select>
       </label>
+
+      <label className="flex flex-col gap-1 text-sm">
+        Sector
+        <select
+          value={props.sectorId ?? ""}
+          disabled={pending}
+          onChange={(event) => run(() => changeSectorAction(props.conversationId, props.caseId, event.target.value || null))}
+          className={fieldClass}
+        >
+          <option value="">Sin sector</option>
+          {props.sectors.map((sector) => (
+            <option key={sector.id} value={sector.id}>
+              {sector.name}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-zinc-600 dark:text-zinc-400">Al cambiar de sector se quita la asignación.</span>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm">
+        Asignado a
+        <select
+          value={props.assignedTo ?? ""}
+          disabled={pending}
+          onChange={(event) => run(() => assignCaseAction(props.conversationId, props.caseId, event.target.value || null))}
+          className={fieldClass}
+        >
+          <option value="">Sin asignar</option>
+          {props.people.map((person) => (
+            <option key={person.id} value={person.id}>
+              {person.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {props.assignedTo !== props.currentUserId ? (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => run(() => assignCaseAction(props.conversationId, props.caseId, props.currentUserId))}
+          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-zinc-700"
+        >
+          Tomarlo yo
+        </button>
+      ) : null}
 
       {error ? (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">
