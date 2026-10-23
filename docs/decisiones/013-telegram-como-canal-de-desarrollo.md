@@ -22,7 +22,7 @@ producción lo antes posible.
 - Lo hecho para WhatsApp (verificación del webhook, firma, recepción) se conserva y sigue probado;
   se conectará en la Fase 14 cuando exista el número de producción verificado.
 - Telegram es un canal de **desarrollo**, no un reemplazo de WhatsApp para el cliente final: los
-  afiliados de UPCN usan WhatsApp.
+  afiliados del cliente piloto usan WhatsApp.
 
 ## Alternativas descartadas
 

@@ -53,11 +53,14 @@
 **Qué configura el proveedor**
 - Organización en Jarvis (`organization_id`), usuarios y perfiles del CRM.
 - Canal de WhatsApp (número y credenciales como configuración) y plantillas sometidas a Meta.
+- Programación del trabajador de mensajes: secretos `jarvis_app_url` y `jarvis_worker_secret` en Vault y variables de entorno en Vercel (se aplican solo a despliegues nuevos: redesplegar).
+- Para desarrollar sin esperar a Meta: un bot de Telegram como canal de prueba (ADR-013).
 - Carga de la configuración del repo del cliente a la base (script pendiente, Fase 5).
 
 **Checklist**
 - [ ] Verificación de Meta iniciada / aprobada
 - [ ] Número registrado y webhook recibiendo mensajes
+- [ ] El trabajador corre solo (cron) y un mensaje de prueba llega, se guarda y se contesta
 - [ ] Plantillas aprobadas
 
 **Riesgos conocidos**

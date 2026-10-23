@@ -106,3 +106,35 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** la carpeta global de npm no estaba en el PATH de esa terminal.
 - **Solución:** usar `npx vercel`.
 - **Cómo evitarlo:** preferir `npx` para herramientas de proyecto; es lo mismo que se hizo con la CLI de Supabase.
+
+## Fase 03
+
+### 17. Un secreto guardado con el texto de ejemplo
+- **Problema:** el trabajador respondía 401: en Vault estaba guardado un texto de ejemplo y no el secreto real.
+- **Causa real:** se pegó literalmente el SQL de ejemplo (una vez el navegador tradujo el editor y otra se pegó la salida de la terminal en vez del portapapeles).
+- **Solución:** script `scripts/copiar-sql-vault.ps1` que deja el SQL real en el portapapeles; se verificó la coincidencia con una consulta que no imprime el secreto.
+- **Cómo evitarlo:** nunca pedir pegar un SQL con un valor "de ejemplo" para un secreto; generarlo con un script y verificar la igualdad sin mostrarlo.
+
+### 18. Un archivo de variables editado a mano rompió la lectura
+- **Problema:** la CLI no leía `.env.local`.
+- **Causa real:** se renombró una clave (`WORKER_SECRET-REAL=`), que no es un nombre válido.
+- **Solución:** restaurar solo el nombre de la clave.
+- **Cómo evitarlo:** en `.env.local` se cambia únicamente el valor, nunca el nombre.
+
+### 19. El trabajador real compite con las pruebas
+- **Problema:** dos pruebas fallaban en la corrida completa y pasaban solas.
+- **Causa real:** la base de desarrollo tiene el cron corriendo cada 10 s, que toma eventos de cualquier organización, también los de las pruebas.
+- **Solución:** las pruebas esperan a que no quede nada pendiente de su organización y comprueban el estado en la base, no cuántos eventos procesó cada llamada.
+- **Cómo evitarlo:** con un proceso real sobre la misma base, las pruebas de integración no asumen exclusividad sobre las colas.
+
+### 20. Una prueba con un Telegram falso no prueba el Telegram real
+- **Problema:** riesgo de dar por bueno el circuito de adjuntos solo con pruebas automáticas.
+- **Causa real:** el falso devuelve lo que uno supone (tipo de archivo, rutas).
+- **Solución:** además del test, se mandó una foto y un audio reales y se verificó en la base y en el bucket (`image/jpeg` y `audio/ogg`).
+- **Cómo evitarlo:** cada integración externa lleva una verificación real al cerrar el paso, no solo tests.
+
+### 21. Datos del cliente piloto en un ADR
+- **Problema:** el ADR-013 nombraba al cliente piloto.
+- **Causa real:** se escribió sin releer la regla de confidencialidad.
+- **Solución:** reemplazado por "cliente piloto"; el chequeo de cierre de fase lo detectó.
+- **Cómo evitarlo:** correr el chequeo de confidencialidad de `/cerrar-fase` en cada cierre.
