@@ -1739,6 +1739,14 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      finalize_outbound_message: {
+        Args: {
+          p_external_id: string
+          p_message_id: string
+          p_provider_timestamp: string
+        }
+        Returns: undefined
+      }
       ingest_inbound_message: {
         Args: {
           p_body: string

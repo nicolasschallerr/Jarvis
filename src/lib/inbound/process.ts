@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { sendTextMessage } from "@/lib/outbound/send";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
 import { normalizeTelegramEvent } from "./telegram";
@@ -68,7 +69,45 @@ async function processMessageEvent(
 
   if (error) throw new Error(`No se pudo guardar el mensaje: ${error.message}`);
 
-  return messageId !== null;
+  const created = messageId !== null;
+  if (created) {
+    await echoIfEnabled(admin, event.organization_id, message);
+  }
+
+  return created;
+}
+
+// MODO ECO (temporal, solo para validar el circuito de envío en desarrollo): con
+// JARVIS_ECHO_MODE=true, cada texto recibido por Telegram se contesta repitiéndolo. Se elimina
+// cuando el agente de atención (Fase 6) pase a responder. Un fallo acá no invalida el mensaje
+// recibido, que ya quedó guardado.
+async function echoIfEnabled(
+  admin: SupabaseClient<Database>,
+  organizationId: string,
+  message: NormalizedMessage,
+): Promise<void> {
+  if (process.env.JARVIS_ECHO_MODE !== "true") return;
+  if (message.channelType !== "telegram" || message.type !== "text" || !message.body) return;
+
+  try {
+    const { data: stored } = await admin
+      .from("messages")
+      .select("conversation_id")
+      .eq("organization_id", organizationId)
+      .eq("external_id", message.externalId)
+      .maybeSingle();
+
+    if (!stored) return;
+
+    await sendTextMessage(admin, {
+      conversationId: stored.conversation_id,
+      text: `Recibí tu mensaje: ${message.body}`.slice(0, 4000),
+      sender: "system",
+    });
+  } catch (error) {
+    // Solo el motivo, nunca el contenido del mensaje.
+    console.error("modo eco:", error instanceof Error ? error.message : "Error desconocido");
+  }
 }
 
 // Toma lotes de mensajes pendientes de todos los canales y los procesa uno por uno. Un evento que

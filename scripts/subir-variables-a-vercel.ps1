@@ -16,7 +16,7 @@ function Get-Valor($nombre) {
     return ($linea -replace "^$nombre=", "").Trim()
 }
 
-$publicas = @("NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY")
+$publicas = @("NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "JARVIS_ECHO_MODE")
 $secretas = @("SUPABASE_SERVICE_ROLE_KEY", "META_WEBHOOK_VERIFY_TOKEN", "META_APP_SECRET", "WORKER_SECRET", "TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET")
 
 foreach ($nombre in $publicas + $secretas) {
