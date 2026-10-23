@@ -69,7 +69,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await admin.from("webhook_events").delete().eq("organization_id", organizationId);
-  await admin.from("webhook_events").delete().eq("channel_type", "telegram").like("dedupe_key", "tg:9%").is("organization_id", null);
+  await admin.from("webhook_events").delete().eq("channel_type", "telegram").is("organization_id", null).like("error", "Canal no registrado: telegram 990%");
   await admin.from("organizations").delete().eq("id", organizationId);
 });
 
