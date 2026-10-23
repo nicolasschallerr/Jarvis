@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { channelLabel, dateTime, senderLabel } from "@/lib/crm/format";
@@ -8,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { ChannelType } from "@/lib/inbound/types";
 import { canSendFreeText } from "@/lib/outbound/rules";
 
+import { CasePanel } from "./case-panel";
 import { MessageMedia, type MediaItem } from "./message-media";
 import { LiveRefresh } from "../../live-refresh";
 import { ReplyForm } from "./reply-form";
@@ -67,7 +69,8 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
   );
 
   return (
-    <main className="flex h-screen flex-col">
+    <div className="flex h-screen">
+    <main className="flex min-w-0 flex-1 flex-col">
       <header className="flex flex-col gap-1 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
         <Link href="/conversaciones" className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">
           ← Conversaciones
@@ -138,5 +141,9 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
         <ReplyForm conversationId={conversation.id ?? id} />
       )}
     </main>
+    <Suspense fallback={<aside className="w-80 shrink-0 border-l border-zinc-200 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">Cargando caso...</aside>}>
+      <CasePanel conversationId={conversation.id ?? id} role={profile.role} />
+    </Suspense>
+    </div>
   );
 }

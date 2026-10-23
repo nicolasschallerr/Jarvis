@@ -51,6 +51,61 @@ export function senderLabel(sender: string, contactName: string | null): string 
   return sender === "contact" ? contactName || "Contacto" : (SENDER_LABELS[sender] ?? sender);
 }
 
+export const STATUS_LABELS: Record<string, string> = {
+  new: "Nuevo",
+  in_progress: "En curso",
+  waiting_contact: "Esperando al contacto",
+  waiting_area: "Esperando al área",
+  resolved: "Resuelto",
+};
+
+export const PRIORITY_LABELS: Record<string, string> = {
+  low: "Baja",
+  normal: "Normal",
+  high: "Alta",
+  urgent: "Urgente",
+};
+
+export type EventNames = { sectors: Map<string, string>; profiles: Map<string, string> };
+
+type CaseEventRow = { event_type: string; actor_type: string; actor_profile_id: string | null; data: unknown };
+
+function field(data: unknown, key: string): string | null {
+  if (typeof data !== "object" || data === null) return null;
+  const value = (data as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
+}
+
+// Frase para el historial del caso: qué cambió y quién lo hizo.
+export function describeCaseEvent(event: CaseEventRow, names: EventNames): { text: string; actor: string } {
+  const actor =
+    event.actor_type === "operator" && event.actor_profile_id
+      ? (names.profiles.get(event.actor_profile_id) ?? "Operador")
+      : event.actor_type === "agent"
+        ? "Jarvis (IA)"
+        : "Sistema";
+
+  const sector = (id: string | null) => (id ? (names.sectors.get(id) ?? "sector desconocido") : "sin sector");
+  const person = (id: string | null) => (id ? (names.profiles.get(id) ?? "persona desconocida") : "sin asignar");
+  const status = (value: string | null) => STATUS_LABELS[value ?? ""] ?? value ?? "";
+  const priority = (value: string | null) => PRIORITY_LABELS[value ?? ""] ?? value ?? "";
+
+  switch (event.event_type) {
+    case "created":
+      return { text: "Caso creado", actor };
+    case "status_changed":
+      return { text: `Estado: ${status(field(event.data, "from"))} → ${status(field(event.data, "to"))}`, actor };
+    case "priority_changed":
+      return { text: `Prioridad: ${priority(field(event.data, "from"))} → ${priority(field(event.data, "to"))}`, actor };
+    case "sector_changed":
+      return { text: `Sector: ${sector(field(event.data, "from"))} → ${sector(field(event.data, "to"))}`, actor };
+    case "assigned":
+      return { text: `Asignación: ${person(field(event.data, "from"))} → ${person(field(event.data, "to"))}`, actor };
+    default:
+      return { text: event.event_type, actor };
+  }
+}
+
 // Hora si es de hoy, fecha si es de otro día (siempre en horario de Argentina).
 export function shortDate(iso: string | null, now: Date): string {
   if (!iso) return "";

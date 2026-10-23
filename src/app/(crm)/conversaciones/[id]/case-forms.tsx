@@ -1,0 +1,164 @@
+"use client";
+
+import { useActionState, useState, useTransition } from "react";
+
+import { CASE_PRIORITIES, CASE_STATUSES, type CasePriority, type CaseStatus } from "@/lib/crm/cases";
+import { PRIORITY_LABELS, STATUS_LABELS } from "@/lib/crm/format";
+
+import { changePriorityAction, changeStatusAction, createCaseAction, type CaseState } from "./case-actions";
+
+const NO_ERROR: CaseState = { error: null };
+const fieldClass = "rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 text-sm dark:border-zinc-700";
+const buttonClass =
+  "rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900";
+
+export function CreateCaseForm({ conversationId, sectors }: { conversationId: string; sectors: { id: string; name: string }[] }) {
+  const [state, action, pending] = useActionState(createCaseAction.bind(null, conversationId), NO_ERROR);
+
+  return (
+    <form action={action} className="flex flex-col gap-2">
+      <label className="flex flex-col gap-1 text-sm">
+        Título del caso
+        <input name="title" required maxLength={120} placeholder="Ej.: Consulta de préstamo" className={fieldClass} />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Sector
+        <select name="sectorId" defaultValue="" className={fieldClass}>
+          <option value="">Sin sector todavía</option>
+          {sectors.map((sector) => (
+            <option key={sector.id} value={sector.id}>
+              {sector.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Prioridad
+        <select name="priority" defaultValue="normal" className={fieldClass}>
+          {CASE_PRIORITIES.map((priority) => (
+            <option key={priority} value={priority}>
+              {PRIORITY_LABELS[priority]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="submit" disabled={pending} className={buttonClass}>
+        {pending ? "Creando..." : "Crear caso"}
+      </button>
+      {state.error ? (
+        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+          {state.error}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
+export function CaseControls(props: {
+  conversationId: string;
+  caseId: string;
+  status: CaseStatus;
+  priority: CasePriority;
+  canEdit: boolean;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const [resolution, setResolution] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  function run(action: () => Promise<CaseState>, onSuccess?: () => void) {
+    startTransition(async () => {
+      const result = await action();
+      setError(result.error);
+      if (!result.error) onSuccess?.();
+    });
+  }
+
+  if (!props.canEdit) return null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <label className="flex flex-col gap-1 text-sm">
+        Estado
+        <select
+          value={props.status}
+          disabled={pending}
+          onChange={(event) => {
+            const status = event.target.value as CaseStatus;
+            if (status === "resolved") {
+              setResolving(true);
+              return;
+            }
+            setResolving(false);
+            run(() => changeStatusAction(props.conversationId, props.caseId, status, ""));
+          }}
+          className={fieldClass}
+        >
+          {CASE_STATUSES.map((status) => (
+            <option key={status} value={status}>
+              {STATUS_LABELS[status]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {resolving ? (
+        <div className="flex flex-col gap-2 rounded-md border border-zinc-300 p-2 dark:border-zinc-700">
+          <label className="flex flex-col gap-1 text-sm">
+            ¿Cómo se resolvió? (opcional)
+            <textarea
+              rows={3}
+              maxLength={1000}
+              value={resolution}
+              onChange={(event) => setResolution(event.target.value)}
+              className={fieldClass}
+            />
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={pending}
+              className={buttonClass}
+              onClick={() =>
+                run(
+                  () => changeStatusAction(props.conversationId, props.caseId, "resolved", resolution),
+                  () => {
+                    setResolving(false);
+                    setResolution("");
+                  },
+                )
+              }
+            >
+              Marcar como resuelto
+            </button>
+            <button type="button" onClick={() => setResolving(false)} className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <label className="flex flex-col gap-1 text-sm">
+        Prioridad
+        <select
+          value={props.priority}
+          disabled={pending}
+          onChange={(event) => run(() => changePriorityAction(props.conversationId, props.caseId, event.target.value as CasePriority))}
+          className={fieldClass}
+        >
+          {CASE_PRIORITIES.map((priority) => (
+            <option key={priority} value={priority}>
+              {PRIORITY_LABELS[priority]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {error ? (
+        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
