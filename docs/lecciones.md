@@ -267,3 +267,9 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** las pruebas usaban la plantilla como ejemplo mínimo y asumían que derivar siempre funciona.
 - **Solución:** las pruebas que derivan por un tema sensible declaran la excepción (`datos_incompletos_ok`) y la que quita una unidad quita también sus campos. El esquema rechazando el campo huérfano es el comportamiento buscado.
 - **Cómo evitarlo:** al sumar una regla de validación, correr la suite completa enseguida: las fallas muestran qué suponía cada prueba.
+
+### 42. Una inserción de varias filas con claves distintas manda nulo a las que faltan
+- **Problema:** al sembrar datos de una prueba con un solo `insert` de tres filas, la base rechazó todo con "null value in column status violates not-null constraint", y la prueba que dependía de esos datos vio cero filas, sin ningún aviso.
+- **Causa real:** `supabase-js` arma la inserción con la unión de las claves de todas las filas; a la fila que no trae una clave (aquí `status`, que sí tenía valor por defecto) se le manda `null` en vez de usar el valor por defecto. Además el error no se estaba revisando.
+- **Solución:** todas las filas con las mismas claves y el valor explícito, y revisar `error` al sembrar datos.
+- **Cómo evitarlo:** en las siembras de pruebas, comprobar siempre el error de cada inserción; una siembra que falla en silencio produce fallas lejos de su causa.

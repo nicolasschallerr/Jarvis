@@ -26,8 +26,9 @@ junte datos, derive al sector con un resumen o consulte al área, y deje todo re
 | 6.14 | Adelanto de la Fase 11: panel de consumo (créditos y uso de IA por día) | migración `…160000`, `src/lib/crm/consumption.ts`, `(crm)/consumo/page.tsx`, ADR-023 |
 | 6.15 | Adelanto de la Fase 12: unir contactos duplicados con función atómica, solo superadmin | migración `…170000`, `src/lib/crm/contact-merge.ts`, `conversaciones/[id]/duplicate-contacts.tsx`, ADR-024 |
 | 6.16 | Adelanto de la Fase 7: imágenes y PDF que ve el modelo, y transcripción de audios por interfaz (sin proveedor aún) | `ai/types.ts`, `agent/context.ts`, `agent/load.ts`, `ai/transcription.ts`, `inbound/transcribe.ts`, ADR-025 |
+| 6.17 | Agente analítico de solo lectura: herramientas fijas, motor, pantalla "Analítico" | `src/lib/analytics/*`, `(crm)/analitico/*`, ADR-026 |
 
-Pruebas: **332** en 39 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
+Pruebas: **357** en 40 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
 
 ## Cómo se resolvió
 1. El modelo nunca toca las tablas: sus herramientas llaman funciones de la base que validan y fijan el actor (ADR-019, lección 37).
@@ -61,6 +62,7 @@ Ver lecciones 37 a 39.
   sin enviar y se revisa en cada pasada; falta poder marcarla como "transmitida por un operador".
 - **Ramas del cliente piloto:** el contenido real vive en `clientes/<slug>/` (ignorado por git, sin cargar a la base de desarrollo). Faltan datos del cliente marcados `[COMPLETAR]` (tipologías y tarifas del hotel, capacidad de los salones, tres beneficios) y `DECISIÓN PENDIENTE` (nombre del agente, feriados, temas sensibles, seguimientos). No se probó con Claude real.
 - **Unir contactos:** no se puede deshacer; solo se propone por documento igual y desde la ficha de una conversación; los contactos absorbidos quedan marcados y las listas nuevas deben excluirlos.
+- **Agente analítico:** solo contesta con sus 5 herramientas sobre datos de Jarvis; no consulta la base del cliente (falta acceso y vistas filtradas); no se probó con Claude real ni se midió su costo por pregunta; hay que encender al agente analítico desde Agentes para usarlo.
 - **Consumo:** el panel no tiene límites ni alertas, no incluye servicios distintos de Claude y no se exporta; el costo depende de los precios que cargue el cliente.
 - **Seguimientos:** nadie pone aún el caso en "esperando al asociado" de forma automática (hoy lo hace una persona); falta que el agente lo haga al pedir datos. Fuera de la ventana de 24 h de WhatsApp quedan omitidos hasta tener plantillas de Meta. No hay pantalla para ver o cancelar los programados.
 - **Avisos:** solo se ven en Inicio y se refrescan al recargar o al cambiar algo en vivo; no hay campana en el menú

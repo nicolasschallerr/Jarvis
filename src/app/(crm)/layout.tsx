@@ -49,6 +49,7 @@ async function MainNav() {
       <NavLink href="/casos">Casos</NavLink>
       {profile.role === "superadmin" ? <NavLink href="/equipo">Equipo</NavLink> : null}
       {profile.role === "superadmin" ? <NavLink href="/agentes">Agentes</NavLink> : null}
+      {profile.role !== "operator" ? <NavLink href="/analitico">Analítico</NavLink> : null}
       {profile.role !== "operator" ? <NavLink href="/consumo">Consumo</NavLink> : null}
     </nav>
   );

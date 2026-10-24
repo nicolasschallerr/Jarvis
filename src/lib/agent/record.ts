@@ -7,9 +7,12 @@ import type { StepRecord } from "./loop";
 
 type RecordParams = {
   organizationId: string;
-  conversationId: string;
+  // El agente de atención siempre trabaja sobre una conversación; el analítico, no.
+  conversationId: string | null;
   messageId: string | null;
-  agentConfigId: string;
+  agentConfigId: string | null;
+  // Qué agente hizo la llamada (por defecto, el de atención).
+  agentKind?: Database["public"]["Enums"]["agent_kind"];
   model: string;
   pricing: AttentionSettings["pricing"];
   steps: StepRecord[];
@@ -35,7 +38,7 @@ export async function recordAiCalls(admin: SupabaseClient<Database>, params: Rec
         organization_id: params.organizationId,
         conversation_id: params.conversationId,
         message_id: params.messageId,
-        agent_kind: "attention",
+        agent_kind: params.agentKind ?? "attention",
         agent_config_id: params.agentConfigId,
         model: params.model,
         error: params.error,
@@ -50,7 +53,7 @@ export async function recordAiCalls(admin: SupabaseClient<Database>, params: Rec
           organization_id: params.organizationId,
           conversation_id: params.conversationId,
           message_id: params.messageId,
-          agent_kind: "attention",
+          agent_kind: params.agentKind ?? "attention",
           agent_config_id: params.agentConfigId,
           model: params.model,
           input_tokens: step.response.usage.inputTokens,
