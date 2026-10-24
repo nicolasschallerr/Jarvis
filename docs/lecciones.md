@@ -201,6 +201,7 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Problema:** `descarta un evento tras 5 intentos fallidos` falló dos veces en la suite completa y pasó sola.
 - **Causa real (hipótesis):** el trabajador real (pg_cron → Vercel, cada 10 s) comparte la base con las pruebas y puede tocar un evento en medio de la prueba. Misma familia que la lección 19.
 - **Solución provisional:** repetir la suite; en las corridas siguientes pasó 3 de 3 sola y en la suite completa.
+- **Se repitió (Fase 6):** también falló una vez en la suite completa `un evento inválido queda con su error, sin frenar a los demás` (esperaba 1 evento fallido y vio 0) y pasó 2 de 2 sola. Cualquier prueba que mire eventos de la bandeja es candidata; conviene pausar el trabajador al correr la suite.
 - **Cómo evitarlo:** pausar el trabajador mientras corren las pruebas (por ejemplo, una función que lo active y desactive). Queda como deuda.
 
 ### 32. Un navegador oculto no dibuja cuadros: ni la animación ni la hidratación avanzan

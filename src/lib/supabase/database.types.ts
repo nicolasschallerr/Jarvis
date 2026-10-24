@@ -1946,6 +1946,22 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      consumption_by_day: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          ai_calls: number
+          ai_errors: number
+          calls_without_cost: number
+          cost_usd: number
+          credits: number
+          day: string
+          input_tokens: number
+          output_tokens: number
+          windows: number
+          windows_by_business: number
+          windows_by_contact: number
+        }[]
+      }
       finalize_outbound_message: {
         Args: {
           p_external_id: string

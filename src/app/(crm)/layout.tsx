@@ -37,7 +37,7 @@ async function UserBlock() {
   );
 }
 
-// El menú depende del rol: "Equipo" y "Agentes" son solo para superadministradores. Ocultarlo es comodidad; la
+// El menú depende del rol: "Equipo" y "Agentes" son solo para superadministradores, y "Consumo" para superadmin y consulta y reportes. Ocultarlo es comodidad; la
 // seguridad real está en la página, en las acciones y en RLS.
 async function MainNav() {
   const profile = await getCurrentProfile();
@@ -49,6 +49,7 @@ async function MainNav() {
       <NavLink href="/casos">Casos</NavLink>
       {profile.role === "superadmin" ? <NavLink href="/equipo">Equipo</NavLink> : null}
       {profile.role === "superadmin" ? <NavLink href="/agentes">Agentes</NavLink> : null}
+      {profile.role !== "operator" ? <NavLink href="/consumo">Consumo</NavLink> : null}
     </nav>
   );
 }
