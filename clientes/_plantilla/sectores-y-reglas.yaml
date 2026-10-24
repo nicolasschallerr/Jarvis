@@ -76,3 +76,11 @@ agentes:
   - tipo: analitico         # responde preguntas sobre los datos
     nombre: Mateo
     frase: "Los números cuentan una historia."
+
+ia:
+  # Modelo del agente de atención (opcional; por defecto el perfil intermedio de Jarvis).
+  modelo_atencion: claude-sonnet-5-5
+  # Precios en USD por millón de tokens (opcional). Sin ellos no se calcula el costo de cada llamada.
+  # Verificarlos en la documentación oficial de Anthropic antes de cargarlos.
+  # precio_entrada_usd_por_millon: 0
+  # precio_salida_usd_por_millon: 0

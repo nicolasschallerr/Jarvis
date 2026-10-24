@@ -32,9 +32,35 @@ const agenteSchema = z.object({
   frase: z.string().trim().max(140, "la frase no puede superar los 140 caracteres").optional(),
 });
 
+const horarioSchema = z.object({
+  dias: z.array(z.string()).min(1),
+  desde: z.string().regex(/^\d{2}:\d{2}$/, "formato HH:MM"),
+  hasta: z.string().regex(/^\d{2}:\d{2}$/, "formato HH:MM"),
+  feriados: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "formato AAAA-MM-DD")).default([]),
+});
+
+const temaSensibleSchema = z.object({
+  id: slug,
+  descripcion: z.string().min(1),
+  sector: slug,
+  prioridad: z.string().default("normal"),
+});
+
+// Modelo y precios del agente de atención. Los precios son opcionales: sin ellos no se calcula el costo.
+const iaSchema = z.object({
+  modelo_atencion: z.string().min(1).optional(),
+  precio_entrada_usd_por_millon: z.number().nonnegative().optional(),
+  precio_salida_usd_por_millon: z.number().nonnegative().optional(),
+});
+
 export const clientConfigSchema = z
   .object({
-    organizacion: z.object({ slug, nombre: z.string().min(1) }).loose(),
+    organizacion: z
+      .object({ slug, nombre: z.string().min(1), nombre_agente: z.string().optional(), zona_horaria: z.string().optional() })
+      .loose(),
+    horario_atencion: horarioSchema.optional(),
+    temas_sensibles: z.array(temaSensibleSchema).optional(),
+    ia: iaSchema.optional(),
     unidades: z.array(unidadSchema).min(1, "tiene que haber al menos una unidad"),
     sectores: z.array(sectorSchema).min(1, "tiene que haber al menos un sector"),
     derivacion: z.object({ sector_por_defecto: slug }).loose().optional(),
