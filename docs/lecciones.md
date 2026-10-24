@@ -252,3 +252,15 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** el cliente simulado devuelve lo que se le escribió de antemano.
 - **Solución:** declarar la fase como no cerrada hasta correr una conversación real y, en la Fase 8, evaluar con casos fijos.
 - **Cómo evitarlo:** separar "el circuito funciona" de "el agente atiende bien", y no dar la segunda por cierta con pruebas de la primera.
+
+### 40. Las barras invertidas dentro de un script escrito por el shell se pierden
+- **Problema:** al editar archivos con un script de Python armado en el comando, un `\n` o un `\d` escrito dentro del texto terminaba como un salto de línea real y dejaba el código roto (`Unterminated string literal`).
+- **Causa real:** el texto pasa por varias capas (shell, intérprete) y cada una consume barras invertidas; lo que llega al archivo no es lo que se escribió. Es el mismo origen que la lección 35.
+- **Solución:** para texto con barras invertidas (regex, `\n`), usar la herramienta de edición o escribir el archivo completo; reservar los scripts de reemplazo para texto sin barras.
+- **Cómo evitarlo:** después de cualquier reemplazo automático, compilar (`npx tsc --noEmit`) antes de seguir; el error aparece enseguida.
+
+### 41. Un dato obligatorio nuevo en la plantilla rompe las pruebas que derivan sin datos
+- **Problema:** al definir `campos` en la plantilla, cuatro pruebas pasaron a fallar: derivaban sin datos y ahora el guardián lo bloquea, y otra quitaba una unidad a la que un campo apuntaba.
+- **Causa real:** las pruebas usaban la plantilla como ejemplo mínimo y asumían que derivar siempre funciona.
+- **Solución:** las pruebas que derivan por un tema sensible declaran la excepción (`datos_incompletos_ok`) y la que quita una unidad quita también sus campos. El esquema rechazando el campo huérfano es el comportamiento buscado.
+- **Cómo evitarlo:** al sumar una regla de validación, correr la suite completa enseguida: las fallas muestran qué suponía cada prueba.

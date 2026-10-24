@@ -8,6 +8,15 @@ import { ContactCard } from "./contact-card";
 import { NoteForm } from "./note-form";
 import { SidePanel } from "./side-panel";
 
+// Datos juntados por el agente, listos para mostrar. Las claves que empiezan con "_" son internas (por
+// ejemplo, el contador de reintentos) y no se muestran.
+function collectedEntries(data: unknown): Array<[string, string]> {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return [];
+  return Object.entries(data as Record<string, unknown>)
+    .filter(([key, value]) => !key.startsWith("_") && value !== null && value !== undefined && String(value).trim() !== "")
+    .map(([key, value]) => [key.replace(/_/g, " "), typeof value === "object" ? JSON.stringify(value) : String(value)]);
+}
+
 // Panel del caso de una conversación: el caso abierto con sus controles e historial, o el formulario
 // para abrir uno. La lectura es abierta en la organización (ADR-016); modificar lo decide RLS.
 export async function CasePanel({
@@ -26,7 +35,7 @@ export async function CasePanel({
   const [{ data: cases }, { data: sectors }, { data: people }] = await Promise.all([
     supabase
       .from("cases")
-      .select("id, title, status, priority, sector_id, assigned_to, opened_at, resolved_at, resolution")
+      .select("id, title, status, priority, sector_id, assigned_to, opened_at, resolved_at, resolution, summary, collected_data")
       .eq("conversation_id", conversationId)
       .order("opened_at", { ascending: false })
       .limit(10),
@@ -99,6 +108,23 @@ export async function CasePanel({
               Asignado a: {openCase.assigned_to ? (names.profiles.get(openCase.assigned_to) ?? "—") : "sin asignar"}
             </p>
           </div>
+
+          {openCase.summary || collectedEntries(openCase.collected_data).length > 0 ? (
+            <section className="flex flex-col gap-2">
+              <h3 className="text-sm font-semibold">Datos del caso</h3>
+              {openCase.summary ? <p className="whitespace-pre-wrap break-words text-sm">{openCase.summary}</p> : null}
+              {collectedEntries(openCase.collected_data).length > 0 ? (
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                  {collectedEntries(openCase.collected_data).map(([key, value]) => (
+                    <div key={key} className="contents">
+                      <dt className="text-zinc-600 dark:text-zinc-400">{key}</dt>
+                      <dd className="break-words">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
+            </section>
+          ) : null}
 
           <CaseControls
             conversationId={conversationId}

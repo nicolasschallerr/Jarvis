@@ -21,8 +21,9 @@ junte datos, derive al sector con un resumen o consulte al área, y deje todo re
 | 6.9 | Avisos al sector cuando el agente deriva o consulta, visibles en Inicio | migración `…20261024110000`, `src/lib/crm/notifications.ts`, `(crm)/page.tsx` |
 | 6.10 | Adelanto de la Fase 8: runner de evals con juez, probado con modelo simulado | `src/lib/evals/*`, `scripts/correr-evals.mts`, ADR-020 |
 | 6.11 | Adelanto de la Fase 9: seguimientos a las 24, 48 y 72 h, probados con reloj controlado | `src/lib/followups/run.ts`, ADR-021 |
+| 6.12 | Ramas por carpeta, datos validados con reintentos, guardián antes de derivar, comando MENÚ y mensaje oficial de derivación | `src/lib/agent/tools.ts`, `context.ts`, `client-config/*`, migraciones `…120000`, `…130000`, `…140000`, ADR-022 |
 
-Pruebas: **250** en 32 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
+Pruebas: **286** en 35 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
 
 ## Cómo se resolvió
 1. El modelo nunca toca las tablas: sus herramientas llaman funciones de la base que validan y fijan el actor (ADR-019, lección 37).
@@ -54,6 +55,7 @@ Ver lecciones 37 a 39.
 - **Historial largo:** se muestran los últimos 30 mensajes; falta resumir conversaciones largas.
 - **Respuestas del área pendientes:** si un operador tomó el chat o se cerró la ventana de 24 h, la respuesta queda
   sin enviar y se revisa en cada pasada; falta poder marcarla como "transmitida por un operador".
+- **Ramas del cliente piloto:** el contenido real vive en `clientes/<slug>/` (ignorado por git, sin cargar a la base de desarrollo). Faltan datos del cliente marcados `[COMPLETAR]` (tipologías y tarifas del hotel, capacidad de los salones, tres beneficios) y `DECISIÓN PENDIENTE` (nombre del agente, feriados, temas sensibles, seguimientos). No se probó con Claude real.
 - **Seguimientos:** nadie pone aún el caso en "esperando al asociado" de forma automática (hoy lo hace una persona); falta que el agente lo haga al pedir datos. Fuera de la ventana de 24 h de WhatsApp quedan omitidos hasta tener plantillas de Meta. No hay pantalla para ver o cancelar los programados.
 - **Avisos:** solo se ven en Inicio y se refrescan al recargar o al cambiar algo en vivo; no hay campana en el menú
   ni aviso por email o WhatsApp al responsable (Fase 9). Tampoco se avisa cuando el sector responde una consulta.
