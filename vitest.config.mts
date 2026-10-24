@@ -15,6 +15,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.{ts,tsx}"],
+    // Pausa el trabajador real de mensajes mientras corren las pruebas y lo reanuda al terminar.
+    globalSetup: ["./tests/helpers/pause-worker.ts"],
     // Los archivos corren de a uno: comparten la misma base y el trabajador toma eventos de cualquier prueba.
     fileParallelism: false,
     // Las pruebas de integración hablan con Supabase por red.

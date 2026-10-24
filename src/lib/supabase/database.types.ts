@@ -2002,6 +2002,7 @@ export type Database = {
         Args: { p_keep: string; p_remove: string }
         Returns: Json
       }
+      set_worker_active: { Args: { p_active?: boolean }; Returns: boolean }
     }
     Enums: {
       agent_kind:

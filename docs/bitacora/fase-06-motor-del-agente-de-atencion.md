@@ -26,7 +26,7 @@ junte datos, derive al sector con un resumen o consulte al área, y deje todo re
 | 6.14 | Adelanto de la Fase 11: panel de consumo (créditos y uso de IA por día) | migración `…160000`, `src/lib/crm/consumption.ts`, `(crm)/consumo/page.tsx`, ADR-023 |
 | 6.15 | Adelanto de la Fase 12: unir contactos duplicados con función atómica, solo superadmin | migración `…170000`, `src/lib/crm/contact-merge.ts`, `conversaciones/[id]/duplicate-contacts.tsx`, ADR-024 |
 
-Pruebas: **312** en 37 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
+Pruebas: **315** en 38 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
 
 ## Cómo se resolvió
 1. El modelo nunca toca las tablas: sus herramientas llaman funciones de la base que validan y fijan el actor (ADR-019, lección 37).

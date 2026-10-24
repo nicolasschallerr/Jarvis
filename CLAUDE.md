@@ -92,7 +92,8 @@ npm run dev                                          servidor local en http://lo
 npm run build                                        build de producción (incluye chequeo de tipos)
 npm run lint                                         ESLint
 npx tsc --noEmit                                     chequeo de tipos
-npm test                                             pruebas de RLS contra jarvis-dev (datos descartables)
+npm test                                             pruebas contra jarvis-dev (datos descartables); pausa el trabajador real y lo reanuda al terminar
+npx tsx --env-file=.env.local scripts/trabajador.mts --estado|--pausar|--reanudar   trabajador de mensajes (si una corrida se corta y queda pausado)
 npx tsx --env-file=.env.local scripts/crear-superadmin.mts --org-slug <slug> --org-name "<nombre>" --email <email> --name "<nombre>"
 npx tsx --env-file=.env.local scripts/test-claude.mts  prueba de la API key de Anthropic
 npx tsx --env-file=.env.local scripts/correr-evals.mts --dir clientes/<cliente>  evals del agente con Claude real (cuesta dinero)
