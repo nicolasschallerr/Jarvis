@@ -20,8 +20,10 @@ acuerdos de confidencialidad. Ver [ADR-005](../docs/decisiones/005-config-de-cli
 1. La carpeta del cliente es la **fuente versionada** (quién cambió qué prompt o regla, y cuándo).
 2. El script `scripts/cargar-configuracion.mts` valida `sectores-y-reglas.yaml` contra un esquema
    y guarda sectores y unidades en la base de Jarvis bajo el `organization_id` del cliente. Se puede
-   repetir sin duplicar; lo que se saca del archivo se desactiva, no se borra. Por ahora carga solo
-   sectores y unidades; el resto de las secciones se cargan cuando las use el agente (Fases 6 y 9).
+   repetir sin duplicar; lo que se saca del archivo se desactiva, no se borra. Carga sectores,
+   unidades, agentes y la configuración del agente de atención (`agente-prompt.md`, `conocimiento/`,
+   horario, temas sensibles y `ia`) como una versión nueva solo si algo cambió. El resto de las
+   secciones se cargan cuando las use el agente (Fase 9).
 3. En producción el agente y el CRM leen la configuración **desde la base**. Los textos que el
    cliente puede editar (saludos, mensajes) se editan desde el CRM; los cambios estructurales
    (sectores, reglas, prompt) se hacen en la carpeta y se vuelven a cargar.
