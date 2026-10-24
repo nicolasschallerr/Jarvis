@@ -1886,6 +1886,10 @@ export type Database = {
         }
         Returns: string
       }
+      agent_case_snapshot: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
       agent_handoff_case: {
         Args: {
           p_conversation_id: string
@@ -1895,6 +1899,14 @@ export type Database = {
         }
         Returns: string
       }
+      agent_record_field_attempt: {
+        Args: { p_conversation_id: string; p_field: string; p_ok: boolean }
+        Returns: number
+      }
+      agent_reset_attempts: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
       agent_save_case_data: {
         Args: {
           p_conversation_id: string
@@ -1903,6 +1915,15 @@ export type Database = {
           p_unit_slug: string
         }
         Returns: string
+      }
+      agent_save_contact_data: {
+        Args: {
+          p_conversation_id: string
+          p_display_name: string
+          p_document_number: string
+          p_locality: string
+        }
+        Returns: undefined
       }
       claim_webhook_events: {
         Args: { p_limit?: number; p_prefix: string }
