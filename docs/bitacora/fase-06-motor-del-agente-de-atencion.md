@@ -17,9 +17,10 @@ junte datos, derive al sector con un resumen o consulte al área, y deje todo re
 | 6.5 | El procesador de mensajes responde con el agente; se quita el modo eco | `src/lib/inbound/process.ts` (`4ee604d`) |
 | 6.6 | Pantalla de Agentes: nombre, frase y encendido, solo superadmin | `src/app/(crm)/agentes/*`, `src/lib/crm/agents.ts` (`9800cda`) |
 | 6.7 | El sector responde las consultas del agente desde el panel del caso | `src/lib/crm/area-queries.ts`, `conversaciones/[id]/area-*` (`7df15da`) |
-| 6.8 | El agente le transmite al asociado la respuesta del área por el mismo chat | `src/lib/agent/area-replies.ts`, `src/lib/agent/load.ts`, ruta del trabajador |
+| 6.8 | El agente le transmite al asociado la respuesta del área por el mismo chat | `src/lib/agent/area-replies.ts`, `src/lib/agent/load.ts`, ruta del trabajador (`0e43cc8`, `2e40125`) |
+| 6.9 | Avisos al sector cuando el agente deriva o consulta, visibles en Inicio | migración `…20261024110000`, `src/lib/crm/notifications.ts`, `(crm)/page.tsx` |
 
-Pruebas: **208** en 27 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
+Pruebas: **227** en 30 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
 
 ## Cómo se resolvió
 1. El modelo nunca toca las tablas: sus herramientas llaman funciones de la base que validan y fijan el actor (ADR-019, lección 37).
@@ -51,7 +52,7 @@ Ver lecciones 37 a 39.
 - **Historial largo:** se muestran los últimos 30 mensajes; falta resumir conversaciones largas.
 - **Respuestas del área pendientes:** si un operador tomó el chat o se cerró la ventana de 24 h, la respuesta queda
   sin enviar y se revisa en cada pasada; falta poder marcarla como "transmitida por un operador".
-- **Avisos al sector:** el sector no recibe una notificación cuando el agente le hace una consulta; hoy la ve al
-  abrir el caso (tabla `notifications` sin usar, Fase 9).
+- **Avisos:** solo se ven en Inicio y se refrescan al recargar o al cambiar algo en vivo; no hay campana en el menú
+  ni aviso por email o WhatsApp al responsable (Fase 9). Tampoco se avisa cuando el sector responde una consulta.
 - **Auditoría:** `audit_log` sigue cubriendo solo contactos.
 - **Heredado:** estados y adjuntos de WhatsApp (Fase 14), retención de la bandeja de eventos, rotar claves antes de producción.

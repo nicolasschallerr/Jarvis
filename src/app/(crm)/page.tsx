@@ -6,9 +6,11 @@ import { channelLabel, messagePreview, PRIORITY_LABELS, shortDate, STATUS_LABELS
 import { WelcomeGate } from "@/components/welcome/welcome-gate";
 import { greetingFor, longDate } from "@/lib/crm/greeting";
 import { getHomeSummary } from "@/lib/crm/home";
+import { getUnreadNotifications } from "@/lib/crm/notifications";
 import { dayKey, welcomeLine } from "@/lib/crm/welcome";
 import { createClient } from "@/lib/supabase/server";
 
+import { markNoticesRead } from "./avisos-actions";
 import { LiveRefresh } from "./live-refresh";
 
 type Tile = { label: string; value: number; href: string; hint: string };
@@ -16,7 +18,10 @@ type Tile = { label: string; value: number; href: string; hint: string };
 export default async function InicioPage({ searchParams }: PageProps<"/">) {
   const profile = await getCurrentProfile();
   const supabase = await createClient();
-  const summary = await getHomeSummary({ userClient: supabase, userId: profile.id });
+  const [summary, notices] = await Promise.all([
+    getHomeSummary({ userClient: supabase, userId: profile.id }),
+    getUnreadNotifications({ userClient: supabase, userId: profile.id }),
+  ]);
 
   const query = await searchParams;
   const playWelcome = query.bienvenida === "1";
@@ -66,6 +71,46 @@ export default async function InicioPage({ searchParams }: PageProps<"/">) {
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">
           Algunos datos no se pudieron cargar. Probá recargar la página.
         </p>
+      ) : null}
+
+      {notices.unread > 0 ? (
+        <section aria-labelledby="avisos" className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="avisos" className="text-sm font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400">
+              Avisos ({notices.unread})
+            </h2>
+            <form action={markNoticesRead}>
+              <button type="submit" className="btn-secondary !px-2 !py-1 text-xs">
+                Marcar como leídos
+              </button>
+            </form>
+          </div>
+          <ul className="card divide-y divide-zinc-200 dark:divide-zinc-800">
+            {notices.items.map((notice) => {
+              const body = (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{notice.title}</p>
+                  <p className="truncate text-sm text-zinc-600 dark:text-zinc-400">{notice.body}</p>
+                </div>
+              );
+              const conversationId = notice.cases?.conversation_id;
+              return (
+                <li key={notice.id}>
+                  {conversationId ? (
+                    <Link href={`/conversaciones/${conversationId}`} className="flex items-start gap-3 px-4 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/60">
+                      {body}
+                      <time className="shrink-0 text-xs text-zinc-600 dark:text-zinc-400" dateTime={notice.created_at}>
+                        {shortDate(notice.created_at, now)}
+                      </time>
+                    </Link>
+                  ) : (
+                    <div className="flex items-start gap-3 px-4 py-3">{body}</div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       ) : null}
 
       <section aria-labelledby="agentes" className="flex flex-col gap-3">
