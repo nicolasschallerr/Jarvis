@@ -50,6 +50,18 @@ describe("campos en la configuración", () => {
     if (!sameDestination.ok) expect(sameDestination.errors.join("\n")).toContain("más de un campo");
   });
 
+  it("las instrucciones piden juntar los datos en pocos mensajes, y de a uno si el cliente lo prefiere", () => {
+    const together = buildSystemPrompt("Hola", settings, new Date("2026-10-26T15:00:00Z"));
+    expect(together).toContain("en la menor cantidad de mensajes posible");
+    expect(together).toContain("hasta 3 por mensaje");
+    expect(together).toContain("no se lo vuelvas a pedir");
+    expect(together).toContain("(si escribe por WhatsApp se toma del número: no se lo pidas)");
+
+    const oneByOne = buildSystemPrompt("Hola", { ...settings, fieldsPerMessage: 1 }, new Date("2026-10-26T15:00:00Z"));
+    expect(oneByOne).toContain("de a uno por mensaje");
+    expect(oneByOne).not.toContain("hasta 1 por mensaje");
+  });
+
   it("las instrucciones listan los datos, los generales y los de cada unidad", () => {
     const prompt = buildSystemPrompt("Hola", settings, new Date("2026-10-26T15:00:00Z"));
     expect(prompt).toContain("Datos a juntar");
@@ -59,9 +71,10 @@ describe("campos en la configuración", () => {
   });
 });
 
-function tools() {
+// Por defecto la conversación es de WhatsApp: el teléfono se toma del número y no se pide.
+function tools(channel: { type: string | null; identifier: string | null } = { type: "whatsapp", identifier: "549 0000-000000" }) {
   const actions: RecordedAction[] = [];
-  const backend = createMemoryBackend(actions);
+  const backend = createMemoryBackend(actions, channel);
   const context: ToolContext = {
     unitSlugs: settings.units.map((unit) => unit.id),
     sectorSlugs: settings.sectors.map((sector) => sector.id),
@@ -168,6 +181,24 @@ describe("guardián de datos antes de derivar", () => {
     expect(actions.filter((action) => action.kind === "handoff")).toHaveLength(1);
   });
 
+  it("por WhatsApp el teléfono no se pide: se toma del número y se guarda al derivar", async () => {
+    const { backend, run } = tools();
+    await completeContact(run);
+    await run("guardar_datos_del_caso", { unidad: "creditos", datos: { monto: "500000" } });
+
+    const result = await run("derivar_a_sector", { sector: "creditos", resumen: "Pide un crédito" });
+    expect(result.isError).toBeUndefined();
+    expect(backend.state.data.telefono).toBe("5490000000000");
+  });
+
+  it("por un canal que no da el teléfono, sí se pide", async () => {
+    const { run } = tools({ type: "telegram", identifier: "100000000" });
+    await completeContact(run);
+    const result = await run("derivar_a_sector", { sector: "viajes", resumen: "Consulta de viaje" });
+    expect(result.isError).toBe(true);
+    expect(result.output).toContain("Teléfono de contacto");
+  });
+
   it("sin datos configurados no exige nada", () => {
     expect(missingRequiredFields([], { unit: null, data: {}, contact: { name: null, document: null, locality: null } })).toEqual([]);
   });
@@ -255,10 +286,13 @@ describe("funciones de la base para los datos", () => {
     await admin.rpc("agent_save_case_data", { p_conversation_id: conversationId, p_unit_slug: "", p_title: "Caso de prueba", p_data: { monto: "500000" } });
     const { data, error } = await admin.rpc("agent_case_snapshot", { p_conversation_id: conversationId });
     expect(error).toBeNull();
-    expect(data).toEqual({
+    expect(data).toMatchObject({
       unit: null,
       data: { monto: "500000" },
       contact: { name: "Ana Prueba", document: "12345678", locality: "Villa Ejemplo" },
+      // El canal de la conversación y el identificador del contacto en él (en WhatsApp, su teléfono).
+      channel: { type: "telegram" },
     });
+    expect((data as { channel: { identifier: string | null } }).channel.identifier).toMatch(/^\d+$/);
   });
 });

@@ -17,6 +17,7 @@ import { parseEvalCases } from "../src/lib/evals/schema";
 // Uso (desde la carpeta jarvis):
 //   npx tsx --env-file=.env.local scripts/correr-evals.mts --dir clientes/_plantilla
 //   --caso <id>      corre solo un caso
+//   --canal <tipo>   canal simulado: whatsapp (por defecto, el teléfono se toma del número) o telegram
 //   --solo-validar   solo revisa el archivo de casos, sin llamar al modelo
 //
 // Termina con código 1 si algún caso falla.
@@ -25,6 +26,7 @@ const { values } = parseArgs({
   options: {
     dir: { type: "string" },
     caso: { type: "string" },
+    canal: { type: "string", default: "whatsapp" },
     "solo-validar": { type: "boolean", default: false },
   },
 });
@@ -81,6 +83,8 @@ const summary = await runEvals(
     judgeModel: DEFAULT_JUDGE_MODEL,
     prompt: files.prompt,
     settings: buildAttentionSettings(config.config, files.knowledge),
+    // Identificador inventado: solo sirve para que el teléfono "ya se conozca" como en WhatsApp.
+    channel: { type: values.canal ?? "whatsapp", identifier: values.canal === "telegram" ? "100000000" : "5490000000000" },
   },
   cases,
 );

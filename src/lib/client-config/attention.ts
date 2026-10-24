@@ -58,8 +58,10 @@ export function buildAttentionSettings(config: ClientConfig, knowledge: Record<s
       store: STORE_BY_DESTINATION[field.guardar_en],
       units: field.unidades ?? null,
       required: field.obligatorio,
+      fromChannel: field.desde_canal,
     })),
     maxFieldRetries: config.validacion?.reintentos_por_campo ?? 3,
+    fieldsPerMessage: config.validacion?.datos_por_mensaje ?? 3,
     followups: {
       active: config.seguimientos?.activo ?? false,
       hours: [...(config.seguimientos?.horas ?? [])].sort((a, b) => a - b),

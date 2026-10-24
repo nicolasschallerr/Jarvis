@@ -223,7 +223,7 @@ describe("agente de atención", () => {
     const client = createScriptedClient([
       {
         content: [
-          { type: "tool_use", id: "a", name: "guardar_datos_del_caso", input: { unidad: "creditos", titulo: "Solicitud de crédito", datos: { nombre: "Ana Prueba", dni: "12.345.678", localidad: "Villa Ejemplo", monto: "$ 500.000" } } },
+          { type: "tool_use", id: "a", name: "guardar_datos_del_caso", input: { unidad: "creditos", titulo: "Solicitud de crédito", datos: { nombre: "Ana Prueba", dni: "12.345.678", localidad: "Villa Ejemplo", telefono: "3420000000", monto: "$ 500.000" } } },
           { type: "tool_use", id: "b", name: "derivar_a_sector", input: { sector: "creditos", resumen: "Ana Prueba pide un crédito de $500.000." } },
         ],
         stopReason: "tool_use",
@@ -256,9 +256,10 @@ ${official}` });
 
     // La respuesta se guardó como del agente.
     const { data: replies } = await admin.from("messages").select("sender, status, body").eq("conversation_id", conversationId).eq("direction", "outbound").order("created_at");
-    expect(replies).toHaveLength(2);
+    // Un solo mensaje: el del agente y, a continuación, el oficial.
+    expect(replies).toHaveLength(1);
     expect(replies?.every((reply) => reply.sender === "agent" && reply.status === "sent")).toBe(true);
-    expect(replies?.[1]?.body).toBe(official);
+    expect(replies?.[0]?.body).toBe(`Listo, le pasé tu consulta al equipo de Créditos.\n\n${official}`);
 
     // Los datos del asociado quedaron en su ficha, ya limpios.
     const { data: contact } = await admin.from("contacts").select("display_name, document_number, locality").eq("organization_id", organizationId).limit(1).single();

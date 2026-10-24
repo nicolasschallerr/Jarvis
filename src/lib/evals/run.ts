@@ -64,6 +64,9 @@ function transcriptOf(messages: string[], replies: string[], actions: RecordedAc
 }
 
 export type EvalRunParams = {
+  // Canal simulado de las conversaciones (por defecto, uno que no da ningún dato). Con WhatsApp, el teléfono
+  // se toma del número y no se pide.
+  channel?: { type: string | null; identifier: string | null };
   // Modelo que hace de agente y modelo que hace de juez.
   agentClient: ModelClient;
   judgeClient: ModelClient;
@@ -102,7 +105,7 @@ export async function runEvalCase(params: EvalRunParams, evalCase: EvalCase): Pr
   };
 
   try {
-    const tools = createAttentionTools(createMemoryBackend(actions), {
+    const tools = createAttentionTools(createMemoryBackend(actions, params.channel), {
       unitSlugs: params.settings.units.map((unit) => unit.id),
       sectorSlugs: params.settings.sectors.map((sector) => sector.id),
       fields: params.settings.fields,

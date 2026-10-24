@@ -177,13 +177,13 @@ describe("MENÚ en una conversación", () => {
 });
 
 describe("derivación con mensaje oficial", () => {
-  it("el sistema manda el mensaje oficial de la unidad después del mensaje del modelo", async () => {
+  it("el sistema suma el mensaje oficial de la unidad al del modelo, en un solo mensaje", async () => {
     const identifier = `6${Date.now().toString().slice(-8)}`;
     const { messageId, conversationId } = await ingest(identifier, "quiero viajar a las sierras");
     const client = createScriptedClient([
       {
         content: [
-          { type: "tool_use", id: "a", name: "guardar_datos_del_caso", input: { unidad: "viajes", datos: { nombre: "Ana Prueba", dni: "12345678", localidad: "Villa Ejemplo" } } },
+          { type: "tool_use", id: "a", name: "guardar_datos_del_caso", input: { unidad: "viajes", datos: { nombre: "Ana Prueba", dni: "12345678", localidad: "Villa Ejemplo", telefono: "3420000000" } } },
           { type: "tool_use", id: "b", name: "derivar_a_sector", input: { sector: "viajes", resumen: "Consulta de viaje a las sierras" } },
         ],
         stopReason: "tool_use",
@@ -195,7 +195,8 @@ describe("derivación con mensaje oficial", () => {
     expect(result).toEqual({ status: "replied", text: "Ya registré tu consulta.\n\nTu consulta de viajes pasó a Viajes." });
 
     const { data: sent } = await admin.from("messages").select("body").eq("conversation_id", conversationId).eq("direction", "outbound").order("created_at");
-    expect(sent?.map((message) => message.body)).toEqual(["Ya registré tu consulta.", "Tu consulta de viajes pasó a Viajes."]);
+    // Un solo mensaje, no dos seguidos.
+    expect(sent?.map((message) => message.body)).toEqual(["Ya registré tu consulta.\n\nTu consulta de viajes pasó a Viajes."]);
   });
 
   it("si el modelo no escribe nada pero derivó, igual sale el mensaje oficial", async () => {

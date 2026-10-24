@@ -22,8 +22,9 @@ junte datos, derive al sector con un resumen o consulte al área, y deje todo re
 | 6.10 | Adelanto de la Fase 8: runner de evals con juez, probado con modelo simulado | `src/lib/evals/*`, `scripts/correr-evals.mts`, ADR-020 |
 | 6.11 | Adelanto de la Fase 9: seguimientos a las 24, 48 y 72 h, probados con reloj controlado | `src/lib/followups/run.ts`, ADR-021 |
 | 6.12 | Ramas por carpeta, datos validados con reintentos, guardián antes de derivar, comando MENÚ y mensaje oficial de derivación | `src/lib/agent/tools.ts`, `context.ts`, `client-config/*`, migraciones `…120000`, `…130000`, `…140000`, ADR-022 |
+| 6.13 | Naturalidad: datos juntos en un mensaje, teléfono tomado del canal, un solo mensaje por turno y prompt como persona | `agent/context.ts`, `agent/tools.ts`, `agent/attention.ts`, migración `…150000`, ADR-022 |
 
-Pruebas: **286** en 35 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
+Pruebas: **289** en 35 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
 
 ## Cómo se resolvió
 1. El modelo nunca toca las tablas: sus herramientas llaman funciones de la base que validan y fijan el actor (ADR-019, lección 37).

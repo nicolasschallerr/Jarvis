@@ -11,7 +11,11 @@ export type RecordedAction =
 // Backend en memoria: se comporta como la base (los datos se suman, los reintentos se cuentan y se
 // borran al validar) para que los evals ejerciten el guardián de datos y los límites de reintentos igual
 // que en producción.
-export function createMemoryBackend(actions: RecordedAction[]): CaseBackend & { state: CaseSnapshot } {
+export function createMemoryBackend(
+  actions: RecordedAction[],
+  // Canal simulado de la conversación (por defecto, uno que no da ningún dato).
+  channel: { type: string | null; identifier: string | null } = { type: null, identifier: null },
+): CaseBackend & { state: CaseSnapshot } {
   const state: CaseSnapshot = { unit: null, data: {}, contact: { name: null, document: null, locality: null } };
   const attempts = new Map<string, number>();
 
@@ -40,7 +44,7 @@ export function createMemoryBackend(actions: RecordedAction[]): CaseBackend & { 
       return next;
     },
     async snapshot() {
-      return { unit: state.unit, data: { ...state.data }, contact: { ...state.contact } };
+      return { unit: state.unit, data: { ...state.data }, contact: { ...state.contact }, channel: { ...channel } };
     },
     async handoff(input) {
       actions.push({ kind: "handoff", sector: input.sector, summary: input.summary });

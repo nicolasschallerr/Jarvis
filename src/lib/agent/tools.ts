@@ -21,6 +21,9 @@ export type CaseSnapshot = {
   unit: string | null;
   data: Record<string, unknown>;
   contact: { name: string | null; document: string | null; locality: string | null };
+  // Canal de la conversación e identificador del contacto en él (por WhatsApp, su teléfono). Es opcional
+  // para que un estado viejo o simulado sin canal siga siendo válido.
+  channel?: { type: string | null; identifier: string | null };
 };
 
 // Dónde se guardan los efectos de las herramientas. En producción es la base (funciones que fijan el
@@ -131,7 +134,17 @@ export function fieldsForUnit(fields: FieldDefinition[], unit: string | null): F
   return fields.filter((field) => field.units === null || (unit !== null && field.units.includes(unit)));
 }
 
+// El valor que el canal ya conoce para un dato (el teléfono por WhatsApp), o null. Solo cuenta si el dato
+// está marcado `desde_canal` en la configuración y el canal es WhatsApp, donde el identificador del chat
+// es el número de teléfono.
+export function valueFromChannel(field: FieldDefinition, snapshot: CaseSnapshot): string | null {
+  if (!field.fromChannel || snapshot.channel?.type !== "whatsapp") return null;
+  const digits = (snapshot.channel.identifier ?? "").replace(/\D/g, "");
+  return digits === "" ? null : digits;
+}
+
 function hasValue(field: FieldDefinition, snapshot: CaseSnapshot): boolean {
+  if (valueFromChannel(field, snapshot) !== null) return true;
   if (field.store === "contact_name") return Boolean(snapshot.contact.name);
   if (field.store === "contact_document") return Boolean(snapshot.contact.document);
   if (field.store === "contact_locality") return Boolean(snapshot.contact.locality);
@@ -259,6 +272,17 @@ export function createAttentionTools(backend: CaseBackend, context: ToolContext)
               isError: true,
             };
           }
+        }
+
+        // Los datos que el canal ya conoce (el teléfono por WhatsApp) se guardan solos en el caso.
+        const fromChannel: Record<string, string> = {};
+        for (const field of fieldsForUnit(context.fields, snapshot.unit)) {
+          const value = valueFromChannel(field, snapshot);
+          if (value !== null && field.store === "case" && snapshot.data[field.id] === undefined) fromChannel[field.id] = value;
+        }
+        if (Object.keys(fromChannel).length > 0) {
+          const saveFailure = await backend.saveCaseData({ unit: "", title: "", data: fromChannel });
+          if (saveFailure) return { output: `No se pudo guardar: ${saveFailure}`, isError: true };
         }
 
         const failure = await backend.handoff({

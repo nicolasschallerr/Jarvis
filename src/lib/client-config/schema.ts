@@ -92,9 +92,17 @@ const campoSchema = z.object({
   guardar_en: z.enum(CAMPO_DESTINOS).default("caso"),
   unidades: z.array(slug).optional(),
   obligatorio: z.boolean().default(true),
+  // Si el canal ya lo da (el teléfono, cuando escriben por WhatsApp), se toma de ahí y no se le pide al
+  // asociado.
+  desde_canal: z.boolean().default(false),
 });
 
-const validacionSchema = z.object({ reintentos_por_campo: z.number().int().min(1).max(10).default(3) });
+// "datos_por_mensaje": cuántos datos puede pedir el agente en un mismo mensaje. Con 1 pide de a uno; con más,
+// junta los que falten en pocos mensajes (menos idas y vueltas).
+const validacionSchema = z.object({
+  reintentos_por_campo: z.number().int().min(1).max(10).default(3),
+  datos_por_mensaje: z.number().int().min(1).max(6).default(3),
+});
 
 // Modelo y precios del agente de atención. Los precios son opcionales: sin ellos no se calcula el costo.
 const iaSchema = z.object({

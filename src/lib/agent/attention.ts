@@ -140,17 +140,18 @@ export async function respondToMessage(
       .maybeSingle();
     if (newest && newest.id !== latest.id) return skipped("llego_un_mensaje_mas_nuevo");
 
-    for (const text of texts) {
-      await sendTextMessage(admin, {
-        conversationId: params.conversationId,
-        text: text.slice(0, 4000),
-        sender: "agent",
-        now,
-        fetchImpl: params.fetchImpl,
-      });
-    }
+    // Todo en un solo mensaje: la respuesta del agente y, si derivó, el mensaje oficial a continuación.
+    // Menos mensajes seguidos se sienten más como hablar con una persona.
+    const reply = texts.join("\n\n");
+    await sendTextMessage(admin, {
+      conversationId: params.conversationId,
+      text: reply.slice(0, 4000),
+      sender: "agent",
+      now,
+      fetchImpl: params.fetchImpl,
+    });
 
-    return { status: "replied", text: texts.join("\n\n") };
+    return { status: "replied", text: reply };
   } catch (error) {
     return { status: "failed", reason: error instanceof Error ? error.message : "Error desconocido" };
   } finally {

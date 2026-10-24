@@ -76,6 +76,12 @@ campos:
     regex: '^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñ ]{2,50}$'
     ayuda: Escribí tu localidad o ciudad.
     guardar_en: contacto_localidad
+  - id: telefono
+    etiqueta: Teléfono de contacto
+    limpiar: digitos
+    regex: '^\d{8,15}$'
+    ayuda: Escribí tu teléfono solo con números y con el código de área.
+    desde_canal: true                # por WhatsApp se toma del número del chat: no se pide
   - id: monto
     etiqueta: Monto solicitado
     limpiar: digitos
@@ -91,6 +97,7 @@ campos:
 
 validacion:
   reintentos_por_campo: 3          # tras 3 intentos fallidos con un dato, el agente deriva a una persona
+  datos_por_mensaje: 3             # cuántos datos puede pedir juntos en un mismo mensaje (1 = de a uno)
 
 seguimientos:
   # Recordatorios automáticos cuando una gestión queda a medias (fuera de la ventana de 24 h: solo plantillas).

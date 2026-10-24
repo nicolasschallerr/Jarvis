@@ -35,10 +35,13 @@ export const attentionSettingsSchema = z.object({
         store: z.enum(["case", "contact_name", "contact_document", "contact_locality"]),
         units: z.array(z.string()).nullable(),
         required: z.boolean(),
+        fromChannel: z.boolean().default(false),
       }),
     )
     .default([]),
   maxFieldRetries: z.number().default(3),
+  // Cuántos datos se pueden pedir en un mismo mensaje.
+  fieldsPerMessage: z.number().default(3),
   // Recordatorios cuando el caso espera al asociado: horas desde que quedó esperando y texto a enviar.
   followups: z
     .object({ active: z.boolean(), hours: z.array(z.number()), text: z.string().nullable() })
@@ -115,11 +118,15 @@ export function buildSystemPrompt(prompt: string, settings: AttentionSettings, n
 
   if (settings.fields.length > 0) {
     const describeField = (field: AttentionSettings["fields"][number]) =>
-      `- \`${field.id}\`: ${field.label}${field.required ? "" : " (opcional)"}${field.help ? `. ${field.help}` : ""}`;
+      `- \`${field.id}\`: ${field.label}${field.required ? "" : " (opcional)"}${field.help ? `. ${field.help}` : ""}${field.fromChannel ? " (si escribe por WhatsApp se toma del número: no se lo pidas)" : ""}`;
+    const perMessage =
+      settings.fieldsPerMessage <= 1
+        ? "Pedí los datos de a uno por mensaje, en el orden de la lista."
+        : `Juntá los datos en la menor cantidad de mensajes posible: pedí los que falten juntos, en un solo mensaje escrito con naturalidad, hasta ${settings.fieldsPerMessage} por mensaje.`;
     const common = settings.fields.filter((field) => field.units === null);
     const lines = [
       "## Datos a juntar (usá estos nombres exactos en guardar_datos_del_caso)",
-      "Pedí los datos obligatorios de a uno por mensaje, en el orden de la lista, y guardalos apenas el asociado los dé. Si un dato es inválido, explicale cómo escribirlo y pedí solo ese. Tras superar los intentos permitidos con un dato, derivá a una persona.",
+      `${perMessage} Si la persona ya dio algún dato (aunque sea dentro de otra frase), guardalo y no se lo vuelvas a pedir. Guardá los datos apenas los dé. Si un dato es inválido, explicale cómo escribirlo y pedí solo ese. Tras superar los intentos permitidos con un dato, derivá a una persona.`,
     ];
     if (common.length > 0) lines.push("", "En todas las áreas:", ...common.map(describeField));
     for (const unit of settings.units) {

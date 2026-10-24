@@ -39,6 +39,25 @@ Hay que conservar las reglas del cliente sin convertir al agente en un menú rí
 - **Contenido real del cliente solo en `clientes/<slug>/`** (git lo ignora) y sin cargarlo a la base de
   desarrollo hasta definir la región y la privacidad.
 
+## Ajuste de naturalidad (mismo día)
+
+El dueño del proyecto pidió que el agente se sienta como una persona y no como un chatbot: que sepa qué
+responder desde el primer mensaje, guíe un camino con la menor cantidad de mensajes posible y use el flujo del
+cliente solo como referencia de cómo trabaja. Cambios:
+
+- **Datos juntos, no de a uno.** `validacion.datos_por_mensaje` (por defecto 3) dice cuántos datos puede pedir el
+  agente en un mismo mensaje, escrito con naturalidad; con 1 vuelve a pedir de a uno. Si la persona ya dio un dato
+  dentro de otra frase, se guarda y no se repite.
+- **Dato desde el canal.** `desde_canal: true` en un campo (el teléfono) hace que, por WhatsApp, se tome del número
+  del chat: no se pide y se guarda solo al derivar. El estado del caso devuelve el canal y el identificador.
+- **Un solo mensaje.** La respuesta del agente y el mensaje oficial de derivación salen juntos, en un único
+  mensaje.
+- **Prompt como persona.** El prompt del cliente pide responder primero con lo útil, cerrar con un único próximo
+  paso, sin menús numerados ni frases de formulario, y adaptarse a cómo escribe la persona. Los textos de la base
+  son contenido para contar con palabras propias, no guiones. Solo los textos fijos que manda el sistema (menú,
+  derivación) salen tal cual.
+- Los casos de evaluación del cliente miden estas cosas (sin menú numerado, sin repetir datos, pocos mensajes).
+
 ## Alternativas descartadas
 
 - **Máquina de estados con menús numerados:** fiel al documento del cliente, pero contradice el pedido de
