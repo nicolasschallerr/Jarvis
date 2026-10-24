@@ -4,7 +4,8 @@ import type { ModelClient } from "@/lib/ai/types";
 import { sendTextMessage } from "@/lib/outbound/send";
 import type { Database } from "@/lib/supabase/database.types";
 
-import { attentionSettingsSchema, buildHistory, buildSystemPrompt, type HistoryRow } from "./context";
+import { buildHistory, buildSystemPrompt } from "./context";
+import { loadAttentionAgent, loadHistoryRows } from "./load";
 import { runAgentLoop } from "./loop";
 import { recordAiCalls } from "./record";
 import { createAttentionTools } from "./tools";
@@ -13,10 +14,6 @@ export type AttentionResult =
   | { status: "replied"; text: string }
   | { status: "skipped"; reason: string }
   | { status: "failed"; reason: string };
-
-// Cuántos mensajes del historial se le muestran al agente. Alcanza para una gestión; las
-// conversaciones largas se resumirán más adelante.
-const HISTORY_LIMIT = 30;
 
 type Params = {
   conversationId: string;
@@ -53,86 +50,55 @@ export async function respondToMessage(
 
   const organizationId = conversation.organization_id;
 
-  const { data: agent } = await admin
-    .from("agents")
-    .select("id, is_enabled")
-    .eq("organization_id", organizationId)
-    .eq("kind", "attention")
-    .maybeSingle();
-  if (!agent?.is_enabled) return skipped("agente_apagado");
+  const loaded = await loadAttentionAgent(admin, organizationId);
+  if (!loaded.ok) return { status: loaded.status, reason: loaded.reason };
+  const { agentId, config, settings } = loaded.agent;
 
-  const { data: config } = await admin
-    .from("agent_configs")
-    .select("id, model, prompt, settings")
-    .eq("organization_id", organizationId)
-    .eq("kind", "attention")
-    .eq("is_active", true)
-    .maybeSingle();
-  if (!config) return skipped("sin_configuracion_activa");
+  const ordered = await loadHistoryRows(admin, params.conversationId);
+  if (!ordered) return { status: "failed", reason: "No se pudo leer el historial" };
 
-  const settings = attentionSettingsSchema.safeParse(config.settings);
-  if (!settings.success) return { status: "failed", reason: "La configuración del agente no es válida" };
-
-  const { data: rows, error: rowsError } = await admin
-    .from("messages")
-    .select("id, direction, type, body, transcription")
-    .eq("conversation_id", params.conversationId)
-    .order("provider_timestamp", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(HISTORY_LIMIT);
-  if (rowsError) return { status: "failed", reason: "No se pudo leer el historial" };
-
-  const ordered = [...(rows ?? [])].reverse();
   const latest = ordered[ordered.length - 1];
   // Si lo último no es del asociado, ya se le contestó (o escribió un operador): no se responde dos veces.
   if (!latest || latest.direction !== "inbound") return skipped("ya_respondido");
 
-  const history = buildHistory(ordered as HistoryRow[]);
+  const history = buildHistory(ordered);
   if (history.length === 0) return skipped("sin_mensajes_para_responder");
 
-  await admin.from("agents").update({ status: "working" }).eq("id", agent.id);
+  await admin.from("agents").update({ status: "working" }).eq("id", agentId);
 
   try {
     const tools = createAttentionTools(admin, {
       conversationId: params.conversationId,
-      unitSlugs: settings.data.units.map((unit) => unit.id),
-      sectorSlugs: settings.data.sectors.map((sector) => sector.id),
+      unitSlugs: settings.units.map((unit) => unit.id),
+      sectorSlugs: settings.sectors.map((sector) => sector.id),
     });
+
+    const record = {
+      organizationId,
+      conversationId: params.conversationId,
+      messageId: params.messageId,
+      agentConfigId: config.id,
+      model: config.model,
+      pricing: settings.pricing,
+    };
 
     let result;
     try {
       result = await runAgentLoop({
         client,
         model: config.model,
-        system: buildSystemPrompt(config.prompt, settings.data, now),
+        system: buildSystemPrompt(config.prompt, settings, now),
         history,
         tools,
       });
     } catch (error) {
       // Solo el motivo, nunca el contenido de la conversación.
       const reason = error instanceof Error ? error.message : "Error desconocido";
-      await recordAiCalls(admin, {
-        organizationId,
-        conversationId: params.conversationId,
-        messageId: params.messageId,
-        agentConfigId: config.id,
-        model: config.model,
-        pricing: settings.data.pricing,
-        steps: [],
-        error: reason,
-      });
+      await recordAiCalls(admin, { ...record, steps: [], error: reason });
       return { status: "failed", reason };
     }
 
-    await recordAiCalls(admin, {
-      organizationId,
-      conversationId: params.conversationId,
-      messageId: params.messageId,
-      agentConfigId: config.id,
-      model: config.model,
-      pricing: settings.data.pricing,
-      steps: result.steps,
-    });
+    await recordAiCalls(admin, { ...record, steps: result.steps });
 
     if (!result.text) return skipped("el_modelo_no_escribio_respuesta");
 
@@ -161,6 +127,6 @@ export async function respondToMessage(
   } catch (error) {
     return { status: "failed", reason: error instanceof Error ? error.message : "Error desconocido" };
   } finally {
-    await admin.from("agents").update({ status: "paused" }).eq("id", agent.id);
+    await admin.from("agents").update({ status: "paused" }).eq("id", agentId);
   }
 }
