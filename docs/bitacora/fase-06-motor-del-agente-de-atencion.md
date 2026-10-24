@@ -16,6 +16,8 @@ junte datos, derive al sector con un resumen o consulte al área, y deje todo re
 | 6.4 | Carga versionada del prompt, el conocimiento y el modelo del cliente | `src/lib/client-config/attention.ts`, `scripts/cargar-configuracion.mts`, ADR-019 (`d2f58c0`) |
 | 6.5 | El procesador de mensajes responde con el agente; se quita el modo eco | `src/lib/inbound/process.ts` (`4ee604d`) |
 | 6.6 | Pantalla de Agentes: nombre, frase y encendido, solo superadmin | `src/app/(crm)/agentes/*`, `src/lib/crm/agents.ts` (`9800cda`) |
+| 6.7 | El sector responde las consultas del agente desde el panel del caso | `src/lib/crm/area-queries.ts`, `conversaciones/[id]/area-*` (`7df15da`) |
+| 6.8 | El agente le transmite al asociado la respuesta del área por el mismo chat | `src/lib/agent/area-replies.ts`, `src/lib/agent/load.ts`, ruta del trabajador |
 
 Pruebas: **208** en 27 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
 
@@ -36,7 +38,8 @@ Ver lecciones 37 a 39.
 
 ## Pendiente para cerrar la fase
 - Crear la API key en el workspace `jarvis-dev` con límite de gasto (ADR-006) y correr `scripts/test-claude.mts`.
-- Encender a Jarvis desde `/agentes` y probar una conversación real por Telegram (juntar datos, derivar, consultar al área).
+- Encender a Jarvis desde `/agentes` y probar una conversación real por Telegram (juntar datos, derivar, consultar al
+  área, responder la consulta desde el caso y ver que el agente se la transmite al asociado).
 - Ajustar el prompt y el modelo según lo observado.
 - Confirmar con el dueño del proyecto cómo se ve la pantalla de Agentes (no se vio en navegador).
 - Poner el tag `fase-06` con `/cerrar-fase`.
@@ -46,5 +49,9 @@ Ver lecciones 37 a 39.
 - **Adjuntos:** audio, imagen y PDF se le presentan al agente como "todavía no puedo escucharlo" (Fase 7).
 - **Conocimiento:** va completo en las instrucciones; pasar a búsqueda por similitud cuando no entre cómodo.
 - **Historial largo:** se muestran los últimos 30 mensajes; falta resumir conversaciones largas.
+- **Respuestas del área pendientes:** si un operador tomó el chat o se cerró la ventana de 24 h, la respuesta queda
+  sin enviar y se revisa en cada pasada; falta poder marcarla como "transmitida por un operador".
+- **Avisos al sector:** el sector no recibe una notificación cuando el agente le hace una consulta; hoy la ve al
+  abrir el caso (tabla `notifications` sin usar, Fase 9).
 - **Auditoría:** `audit_log` sigue cubriendo solo contactos.
 - **Heredado:** estados y adjuntos de WhatsApp (Fase 14), retención de la bandeja de eventos, rotar claves antes de producción.

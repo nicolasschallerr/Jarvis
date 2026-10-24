@@ -2,6 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import type { ModelClient, ModelRequest, ModelResponse } from "./types";
 
+// El cliente real si hay ANTHROPIC_API_KEY, o null. Sin clave el sistema sigue recibiendo y guardando
+// mensajes; solo no hay respuestas automáticas. Así se puede desarrollar el resto sin la clave.
+export function anthropicClientFromEnv(): ModelClient | null {
+  return process.env.ANTHROPIC_API_KEY ? createAnthropicClient(process.env.ANTHROPIC_API_KEY) : null;
+}
+
 // Cliente real de Claude. Lee la clave de ANTHROPIC_API_KEY (la crea el SDK) y falla con un mensaje
 // claro si no está, en vez de dejar que la primera llamada devuelva un error de autenticación.
 export function createAnthropicClient(apiKey: string | undefined = process.env.ANTHROPIC_API_KEY): ModelClient {

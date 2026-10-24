@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { respondToMessage } from "@/lib/agent/attention";
-import { createAnthropicClient } from "@/lib/ai/anthropic-client";
+import { anthropicClientFromEnv } from "@/lib/ai/anthropic-client";
 import type { ModelClient } from "@/lib/ai/types";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
@@ -134,16 +134,6 @@ async function replyWithAgent(
   }
 }
 
-// Sin ANTHROPIC_API_KEY el sistema sigue recibiendo y guardando mensajes; solo no hay respuesta
-// automática. Así se puede desarrollar el resto sin la clave.
-function defaultModelClient(): ModelClient | null {
-  try {
-    return createAnthropicClient();
-  } catch {
-    return null;
-  }
-}
-
 // Toma lotes de mensajes pendientes de todos los canales y los procesa uno por uno. Un evento que
 // falla no frena a los demás: queda con su error y se reintenta (hasta 5 veces, ver
 // claim_webhook_events).
@@ -151,8 +141,8 @@ export async function processPendingMessages(
   admin: SupabaseClient<Database>,
   limit = 20,
   now: Date = new Date(),
-  // undefined = el cliente real si hay clave; null = sin agente (las pruebas lo usan).
-  modelClient: ModelClient | null = defaultModelClient(),
+  // Por defecto, el cliente real si hay clave; null = sin agente (las pruebas lo usan).
+  modelClient: ModelClient | null = anthropicClientFromEnv(),
 ): Promise<ProcessResult> {
   const result: ProcessResult = { claimed: 0, processed: 0, duplicates: 0, failed: 0 };
 

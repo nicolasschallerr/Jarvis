@@ -33,6 +33,11 @@ sistema, sin escribir nada de un cliente en el código (regla de separación pro
 - **Se responde un mensaje a la vez**: no se contesta si el último mensaje no es del asociado, si la IA está
   apagada en la conversación o el agente está apagado, y se descarta la respuesta si mientras tanto llegó un
   mensaje más nuevo (esa otra ejecución contesta con el contexto completo).
+- **Consultas al área, ida y vuelta**: el sector responde desde el panel del caso (solo sus miembros o el
+  superadmin). El trabajador, en cada pasada, toma las respuestas sin enviar, el agente las redacta **sin
+  herramientas** (solo transmite lo que confirmó el sector) y las manda por el mismo chat. Cada respuesta se
+  reserva marcando `reply_sent_at` antes de enviar y se libera si algo falla, para no mandarla dos veces.
+  Si un operador tomó el chat o la conversación está fuera de la ventana de 24 h, queda a la vista en el caso.
 - **Sin API key el sistema sigue funcionando**: recibe y guarda mensajes, solo no contesta solo. Se quitó
   el modo eco.
 
@@ -48,4 +53,8 @@ sistema, sin escribir nada de un cliente en el código (regla de separación pro
 - El estado del agente en el CRM hoy usa `working` mientras trabaja y `paused` en reposo; un agente
   encendido y ocioso se ve "en pausa". Falta un estado propio de reposo (deuda).
 - Audios, imágenes y PDF se mencionan al agente como "todavía no puedo escucharlo": se resuelven en la Fase 7.
+- Si el envío falla después de que el canal ya entregó el mensaje (por ejemplo, al cerrarlo en la base), la
+  respuesta del área se libera y puede salir dos veces. Es poco probable y se acepta por ahora.
+- Las respuestas del área que quedan pendientes (chat tomado por un operador, fuera de ventana) se vuelven a
+  revisar en cada pasada del trabajador; falta marcarlas como "las transmitió un operador".
 - Los evals (Fase 8) usan el mismo `ModelClient` para correr los casos de `evals/casos.yaml`.
