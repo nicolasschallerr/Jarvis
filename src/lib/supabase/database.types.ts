@@ -1878,6 +1878,32 @@ export type Database = {
       }
     }
     Functions: {
+      agent_ask_area: {
+        Args: {
+          p_conversation_id: string
+          p_question: string
+          p_sector_slug: string
+        }
+        Returns: string
+      }
+      agent_handoff_case: {
+        Args: {
+          p_conversation_id: string
+          p_priority?: Database["public"]["Enums"]["case_priority"]
+          p_sector_slug: string
+          p_summary: string
+        }
+        Returns: string
+      }
+      agent_save_case_data: {
+        Args: {
+          p_conversation_id: string
+          p_data: Json
+          p_title: string
+          p_unit_slug: string
+        }
+        Returns: string
+      }
       claim_webhook_events: {
         Args: { p_limit?: number; p_prefix: string }
         Returns: {
