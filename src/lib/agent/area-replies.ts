@@ -6,7 +6,7 @@ import { sendTextMessage } from "@/lib/outbound/send";
 import type { Database } from "@/lib/supabase/database.types";
 
 import { buildHistory, buildSystemPrompt } from "./context";
-import { loadAttentionAgent, loadHistoryRows } from "./load";
+import { loadAttentionAgent, loadHistoryRows, loadInlineMedia } from "./load";
 import { runAgentLoop } from "./loop";
 import { recordAiCalls } from "./record";
 
@@ -115,7 +115,7 @@ async function deliverOne(
     return "failed";
   }
 
-  const history = appendNotice(buildHistory(rows), areaAnswerNotice(query.sectors?.name ?? "consultado", query.question, query.answer));
+  const history = appendNotice(buildHistory(rows, await loadInlineMedia(admin, rows)), areaAnswerNotice(query.sectors?.name ?? "consultado", query.question, query.answer));
 
   await admin.from("agents").update({ status: "working" }).eq("id", agentId);
 

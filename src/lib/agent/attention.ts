@@ -5,7 +5,7 @@ import { sendTextMessage } from "@/lib/outbound/send";
 import type { Database } from "@/lib/supabase/database.types";
 
 import { buildHistory, buildSystemPrompt, handoffText, isMenuCommand, sinceLastMenu } from "./context";
-import { loadAttentionAgent, loadHistoryRows } from "./load";
+import { loadAttentionAgent, loadHistoryRows, loadInlineMedia } from "./load";
 import { runAgentLoop } from "./loop";
 import { recordAiCalls } from "./record";
 import { createAttentionTools, createSupabaseBackend } from "./tools";
@@ -74,7 +74,8 @@ export async function respondToMessage(
     return { status: "replied", text: settings.menuText };
   }
 
-  const history = buildHistory(sinceLastMenu(ordered));
+  const visible = sinceLastMenu(ordered);
+  const history = buildHistory(visible, await loadInlineMedia(admin, visible));
   if (history.length === 0) return skipped("sin_mensajes_para_responder");
 
   await admin.from("agents").update({ status: "working" }).eq("id", agentId);

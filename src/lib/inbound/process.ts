@@ -2,10 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { respondToMessage } from "@/lib/agent/attention";
 import { anthropicClientFromEnv } from "@/lib/ai/anthropic-client";
+import { transcriptionClientFromEnv, type TranscriptionClient } from "@/lib/ai/transcription";
 import type { ModelClient } from "@/lib/ai/types";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
 import { storeTelegramMedia } from "./media";
+import { transcribeAudioMessage } from "./transcribe";
 import { normalizeTelegramEvent } from "./telegram";
 import type { MediaRef, NormalizedMessage } from "./types";
 import { normalizeWhatsAppEvent } from "./whatsapp";
@@ -40,6 +42,7 @@ async function processMessageEvent(
   event: ClaimedEvent,
   now: Date,
   modelClient: ModelClient | null,
+  transcriber: TranscriptionClient | null,
 ): Promise<boolean> {
   if (!event.organization_id) {
     throw new Error("Evento sin organización");
@@ -76,8 +79,14 @@ async function processMessageEvent(
   // El adjunto se descarga también al reprocesar: si falló la vez anterior, el mensaje ya existe
   // (la función de guardado devuelve null) pero el archivo todavía no. Si falla, el evento queda
   // con su error y se reintenta; el mensaje ya está guardado y no se duplica.
+  let storedMessageId: string | null = null;
   if (message.media && message.channelType === "telegram") {
-    await storeMessageMedia(admin, event.organization_id, message, message.media, channel.secret_ref);
+    storedMessageId = await storeMessageMedia(admin, event.organization_id, message, message.media, channel.secret_ref);
+  }
+
+  // Un audio se transcribe antes de que el agente responda, así lo entiende como si fuera texto.
+  if (storedMessageId && message.type === "audio" && transcriber) {
+    await transcribeSafely(admin, transcriber, storedMessageId);
   }
 
   const created = messageId !== null;
@@ -94,7 +103,7 @@ async function storeMessageMedia(
   message: NormalizedMessage,
   media: MediaRef,
   secretRef: string | null,
-): Promise<void> {
+): Promise<string> {
   const token = secretRef ? process.env[secretRef] : undefined;
   if (!token) throw new Error(`Falta la variable de entorno del canal (${secretRef ?? "sin secret_ref"})`);
 
@@ -113,6 +122,22 @@ async function storeMessageMedia(
     token,
     media,
   });
+
+  return stored.id;
+}
+
+// Un fallo del servicio de transcripción no invalida el mensaje, que ya quedó guardado: el agente verá el
+// audio sin transcribir y le pedirá al asociado que escriba. Solo el motivo, nunca el contenido.
+async function transcribeSafely(
+  admin: SupabaseClient<Database>,
+  transcriber: TranscriptionClient,
+  messageId: string,
+): Promise<void> {
+  try {
+    await transcribeAudioMessage(admin, transcriber, messageId);
+  } catch (error) {
+    console.error("transcripción:", error instanceof Error ? error.message : "Error desconocido");
+  }
 }
 
 // El agente de atención contesta el mensaje recién guardado. Un fallo acá no invalida el mensaje
@@ -143,6 +168,8 @@ export async function processPendingMessages(
   now: Date = new Date(),
   // Por defecto, el cliente real si hay clave; null = sin agente (las pruebas lo usan).
   modelClient: ModelClient | null = anthropicClientFromEnv(),
+  // Por defecto, el transcriptor configurado (hoy ninguno); null = audios sin transcribir.
+  transcriber: TranscriptionClient | null = transcriptionClientFromEnv(),
 ): Promise<ProcessResult> {
   const result: ProcessResult = { claimed: 0, processed: 0, duplicates: 0, failed: 0 };
 
@@ -160,7 +187,7 @@ export async function processPendingMessages(
 
     for (const event of claimed ?? []) {
       try {
-        const created = await processMessageEvent(admin, event, now, modelClient);
+        const created = await processMessageEvent(admin, event, now, modelClient, transcriber);
         if (created) result.processed += 1;
         else result.duplicates += 1;
 

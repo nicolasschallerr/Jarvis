@@ -52,7 +52,7 @@ sistema, sin escribir nada de un cliente en el código (regla de separación pro
 - Todo cambio de comportamiento de las herramientas pasa por una migración de las funciones.
 - El estado del agente en el CRM hoy usa `working` mientras trabaja y `paused` en reposo; un agente
   encendido y ocioso se ve "en pausa". Falta un estado propio de reposo (deuda).
-- Audios, imágenes y PDF se mencionan al agente como "todavía no puedo escucharlo": se resuelven en la Fase 7.
+- Imágenes y PDF los ve el modelo y los audios se transcriben (ADR-025); sin servicio de transcripción, el agente le pide al asociado que escriba.
 - Si el envío falla después de que el canal ya entregó el mensaje (por ejemplo, al cerrarlo en la base), la
   respuesta del área se libera y puede salir dos veces. Es poco probable y se acepta por ahora.
 - Las respuestas del área que quedan pendientes (chat tomado por un operador, fuera de ventana) se vuelven a

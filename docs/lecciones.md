@@ -259,6 +259,8 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** el texto pasa por varias capas (shell, intérprete) y cada una consume barras invertidas; lo que llega al archivo no es lo que se escribió. Es el mismo origen que la lección 35.
 - **Solución:** para texto con barras invertidas (regex, `\n`), usar la herramienta de edición o escribir el archivo completo; reservar los scripts de reemplazo para texto sin barras.
 - **Cómo evitarlo:** después de cualquier reemplazo automático, compilar (`npx tsc --noEmit`) antes de seguir; el error aparece enseguida.
+- **Se repitió** (Fase 7) al agregar un texto con `
+` a un archivo desde un script: el compilador lo marcó al instante y se corrigió con la herramienta de edición. La regla vale tal cual: texto con barras invertidas, siempre con la herramienta de edición.
 
 ### 41. Un dato obligatorio nuevo en la plantilla rompe las pruebas que derivan sin datos
 - **Problema:** al definir `campos` en la plantilla, cuatro pruebas pasaron a fallar: derivaban sin datos y ahora el guardián lo bloquea, y otra quitaba una unidad a la que un campo apuntaba.

@@ -1,11 +1,27 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-import type { ModelClient, ModelRequest, ModelResponse } from "./types";
+import type { ChatMessage, ModelClient, ModelRequest, ModelResponse } from "./types";
 
 // El cliente real si hay ANTHROPIC_API_KEY, o null. Sin clave el sistema sigue recibiendo y guardando
 // mensajes; solo no hay respuestas automáticas. Así se puede desarrollar el resto sin la clave.
 export function anthropicClientFromEnv(): ModelClient | null {
   return process.env.ANTHROPIC_API_KEY ? createAnthropicClient(process.env.ANTHROPIC_API_KEY) : null;
+}
+
+// Pasa los mensajes al formato del SDK. Las imágenes y los PDF van como bloques base64.
+export function toSdkMessages(messages: ChatMessage[]): Anthropic.MessageParam[] {
+  return messages.map((message): Anthropic.MessageParam => {
+    if (message.role === "assistant" || typeof message.content === "string") return message as Anthropic.MessageParam;
+
+    return {
+      role: "user",
+      content: message.content.map((block): Anthropic.ContentBlockParam => {
+        if (block.type === "image") return { type: "image", source: { type: "base64", media_type: block.mediaType, data: block.data } };
+        if (block.type === "document") return { type: "document", source: { type: "base64", media_type: block.mediaType, data: block.data } };
+        return block;
+      }),
+    };
+  });
 }
 
 // Cliente real de Claude. Lee la clave de ANTHROPIC_API_KEY (la crea el SDK) y falla con un mensaje
@@ -24,7 +40,7 @@ export function createAnthropicClient(apiKey: string | undefined = process.env.A
           // El prompt y el conocimiento son iguales en cada turno de un cliente: se marcan para
           // que el proveedor los guarde en caché y las llamadas siguientes salgan más baratas.
           system: [{ type: "text", text: request.system, cache_control: { type: "ephemeral" } }],
-          messages: request.messages,
+          messages: toSdkMessages(request.messages),
           tools: request.tools.map((tool) => ({
             name: tool.name,
             description: tool.description,

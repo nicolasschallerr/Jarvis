@@ -25,8 +25,9 @@ junte datos, derive al sector con un resumen o consulte al área, y deje todo re
 | 6.13 | Naturalidad: datos juntos en un mensaje, teléfono tomado del canal, un solo mensaje por turno y prompt como persona | `agent/context.ts`, `agent/tools.ts`, `agent/attention.ts`, migración `…150000`, ADR-022 |
 | 6.14 | Adelanto de la Fase 11: panel de consumo (créditos y uso de IA por día) | migración `…160000`, `src/lib/crm/consumption.ts`, `(crm)/consumo/page.tsx`, ADR-023 |
 | 6.15 | Adelanto de la Fase 12: unir contactos duplicados con función atómica, solo superadmin | migración `…170000`, `src/lib/crm/contact-merge.ts`, `conversaciones/[id]/duplicate-contacts.tsx`, ADR-024 |
+| 6.16 | Adelanto de la Fase 7: imágenes y PDF que ve el modelo, y transcripción de audios por interfaz (sin proveedor aún) | `ai/types.ts`, `agent/context.ts`, `agent/load.ts`, `ai/transcription.ts`, `inbound/transcribe.ts`, ADR-025 |
 
-Pruebas: **315** en 38 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
+Pruebas: **332** en 39 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
 
 ## Cómo se resolvió
 1. El modelo nunca toca las tablas: sus herramientas llaman funciones de la base que validan y fijan el actor (ADR-019, lección 37).
@@ -53,7 +54,7 @@ Ver lecciones 37 a 39.
 
 ## Deuda técnica pendiente
 - **Estado de reposo:** un agente encendido y sin trabajar se ve "en pausa"; falta un estado propio.
-- **Adjuntos:** audio, imagen y PDF se le presentan al agente como "todavía no puedo escucharlo" (Fase 7).
+- **Adjuntos:** imágenes y PDF ya los ve el modelo (solo los 3 más recientes, hasta 5 MB; verificar el límite con Anthropic). Falta elegir el servicio de transcripción de audio (hoy ninguno) y los adjuntos de WhatsApp (Fase 14).
 - **Conocimiento:** va completo en las instrucciones; pasar a búsqueda por similitud cuando no entre cómodo.
 - **Historial largo:** se muestran los últimos 30 mensajes; falta resumir conversaciones largas.
 - **Respuestas del área pendientes:** si un operador tomó el chat o se cerró la ventana de 24 h, la respuesta queda

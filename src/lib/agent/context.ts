@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { ChatMessage } from "@/lib/ai/types";
+import type { ChatMessage, DocumentBlock, ImageBlock } from "@/lib/ai/types";
 
 // Lo que el agente necesita saber de la configuración del cliente. Se guarda en agent_configs.settings
 // (cargado desde clientes/<slug>/); nada de esto está escrito en el código.
@@ -142,6 +142,10 @@ export function buildSystemPrompt(prompt: string, settings: AttentionSettings, n
   }
 
   sections.push(
+    "## Adjuntos\n\nSi el asociado manda una imagen o un PDF, lo ves: es parte de su consulta (por ejemplo, un comprobante o un formulario). Leelo y usá lo que muestre, sin pedir de nuevo lo que ya está ahí. Los audios te llegan transcriptos con la marca [Audio transcripto]; una transcripción puede tener errores, y si algo importante no se entiende, confirmalo. Si un adjunto no se pudo leer, pedile con amabilidad que lo escriba. No repitas ni guardes datos sensibles de un adjunto que no necesites para la gestión.",
+  );
+
+  sections.push(
     "## Cómo usar las herramientas\n\nGuardá los datos con `guardar_datos_del_caso` apenas el asociado los dé. Cuando tengas todo lo que pide la unidad, usá `derivar_a_sector`. Si falta un dato que solo sabe el área, usá `consultar_al_area`. Después de usar una herramienta, escribile al asociado un mensaje breve que diga qué pasó y qué sigue. Respondé siempre con el texto que se le envía al asociado, sin explicar tu razonamiento.",
   );
 
@@ -155,25 +159,39 @@ export function buildSystemPrompt(prompt: string, settings: AttentionSettings, n
 }
 
 export type HistoryRow = {
+  // Identificador del mensaje: sirve para asociarle el adjunto que se muestre en línea.
+  id?: string;
   direction: "inbound" | "outbound";
   type: string;
   body: string | null;
   transcription: string | null;
+  // El mensaje tiene un archivo guardado (aunque no se muestre en línea porque es viejo o pesado).
+  hasFile?: boolean;
 };
 
-// Lo que el agente "lee" de un mensaje. Los adjuntos que todavía no se entienden (audio, imagen,
-// PDF: Fase 7) se mencionan para que el agente le pida al asociado que lo escriba.
-export function describeMessage(row: HistoryRow): string {
+// Adjunto que el modelo ve directamente en el historial.
+export type InlineMedia = ImageBlock | DocumentBlock;
+
+// Lo que el agente "lee" de un mensaje. Las imágenes y los PDF recientes se le muestran directamente
+// (`inline`); los viejos o pesados se mencionan; los audios llegan transcriptos si hay servicio de
+// transcripción, y si no se le avisa para que le pida al asociado que lo escriba.
+export function describeMessage(row: HistoryRow, inline = false): string {
   const text = (row.transcription ?? row.body ?? "").trim();
   switch (row.type) {
     case "text":
       return text;
     case "audio":
-      return text ? `[Audio transcripto] ${text}` : "[El asociado envió un audio que todavía no puedo escuchar]";
+      return text
+        ? `[Audio transcripto] ${text}`
+        : "[El asociado envió un audio que no se pudo transcribir: pedile con amabilidad que lo escriba]";
     case "image":
-      return text ? `[Imagen con texto] ${text}` : "[El asociado envió una imagen que todavía no puedo ver]";
+      if (inline) return text || "[El asociado envió una imagen]";
+      if (row.hasFile) return text ? `[Imagen enviada antes, ya no se muestra] ${text}` : "[El asociado envió una imagen antes; ya no se muestra]";
+      return text ? `[Imagen con texto] ${text}` : "[El asociado envió una imagen que no se pudo ver: pedile con amabilidad que lo escriba]";
     case "document":
-      return text ? `[Documento] ${text}` : "[El asociado envió un documento que todavía no puedo leer]";
+      if (inline) return text || "[El asociado envió un documento]";
+      if (row.hasFile) return text ? `[Documento enviado antes, ya no se muestra] ${text}` : "[El asociado envió un documento antes; ya no se muestra]";
+      return text ? `[Documento] ${text}` : "[El asociado envió un documento que no se pudo leer: pedile con amabilidad que lo escriba]";
     default:
       return text || "[Mensaje de un tipo que todavía no puedo leer]";
   }
@@ -181,26 +199,32 @@ export function describeMessage(row: HistoryRow): string {
 
 // Convierte el historial guardado en turnos user/assistant. La API exige que se alternen y que el
 // primero sea del usuario: los mensajes seguidos del mismo lado se juntan y se descarta lo previo
-// al primer mensaje del asociado.
-export function buildHistory(rows: HistoryRow[]): ChatMessage[] {
-  const turns: Array<{ role: "user" | "assistant"; text: string }> = [];
+// al primer mensaje del asociado. `media` trae los adjuntos que se muestran en línea, por id de mensaje.
+export function buildHistory(rows: HistoryRow[], media: Map<string, InlineMedia> = new Map()): ChatMessage[] {
+  const turns: Array<{ role: "user" | "assistant"; text: string; blocks: InlineMedia[] }> = [];
 
   for (const row of rows) {
-    const text = describeMessage(row);
+    const block = row.id ? media.get(row.id) : undefined;
+    const text = describeMessage(row, block !== undefined);
     if (!text) continue;
     const role = row.direction === "inbound" ? "user" : "assistant";
     const last = turns[turns.length - 1];
-    if (last && last.role === role) last.text += `\n${text}`;
-    else turns.push({ role, text });
+    if (last && last.role === role) {
+      last.text += `\n${text}`;
+      if (block) last.blocks.push(block);
+    } else {
+      turns.push({ role, text, blocks: block ? [block] : [] });
+    }
   }
 
   while (turns.length > 0 && turns[0]?.role !== "user") turns.shift();
 
-  return turns.map((turn) =>
-    turn.role === "user"
-      ? { role: "user", content: turn.text }
-      : { role: "assistant", content: [{ type: "text", text: turn.text }] },
-  );
+  return turns.map((turn): ChatMessage => {
+    if (turn.role === "assistant") return { role: "assistant", content: [{ type: "text", text: turn.text }] };
+    return turn.blocks.length > 0
+      ? { role: "user", content: [{ type: "text", text: turn.text }, ...turn.blocks] }
+      : { role: "user", content: turn.text };
+  });
 }
 
 // Comando universal MENÚ: en cualquier momento, escribir esa palabra (con o sin tilde, en mayúsculas o

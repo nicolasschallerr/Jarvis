@@ -5,8 +5,18 @@ export type TextBlock = { type: "text"; text: string };
 export type ToolUseBlock = { type: "tool_use"; id: string; name: string; input: unknown };
 export type ToolResultBlock = { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean };
 
+// Adjuntos que el modelo puede leer directamente: imágenes y PDF, en base64.
+export type ImageBlock = {
+  type: "image";
+  mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+  data: string;
+};
+export type DocumentBlock = { type: "document"; mediaType: "application/pdf"; data: string };
+
+export type UserBlock = TextBlock | ImageBlock | DocumentBlock | ToolResultBlock;
+
 export type ChatMessage =
-  | { role: "user"; content: string | ToolResultBlock[] }
+  | { role: "user"; content: string | UserBlock[] }
   | { role: "assistant"; content: Array<TextBlock | ToolUseBlock> };
 
 export type ToolDefinition = {
