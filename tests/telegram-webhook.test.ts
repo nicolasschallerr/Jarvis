@@ -129,7 +129,7 @@ describe("webhook de Telegram", () => {
 describe("procesamiento de punta a punta", () => {
   it("el trabajador crea contacto, conversación, mensaje y crédito", async () => {
     expect((await send(body(5, "segundo mensaje"))).status).toBe(200);
-    const result = await processPendingMessages(admin, 50);
+    const result = await processPendingMessages(admin, 50, new Date(), null);
     expect(result.failed).toBe(0);
 
     const { data: identity } = await admin
@@ -158,7 +158,7 @@ describe("procesamiento de punta a punta", () => {
 
   it("un audio queda guardado como mensaje de tipo audio, sin texto", async () => {
     expect((await send(body(6, "", { text: undefined, voice: { file_id: "AwAD", duration: 3, mime_type: "audio/ogg" } }))).status).toBe(200);
-    await processPendingMessages(admin, 50);
+    await processPendingMessages(admin, 50, new Date(), null);
 
     const { data } = await admin
       .from("messages")

@@ -37,7 +37,7 @@ async function enqueue(messageId: string, timestamp: number, text?: string, name
 // una parte puede procesarla él. Por eso se espera a que no quede nada pendiente de esta organización
 // y las pruebas comprueban el ESTADO en la base, no cuántos eventos procesó esta llamada.
 async function drain() {
-  const result = await processPendingMessages(admin, 50);
+  const result = await processPendingMessages(admin, 50, new Date(), null);
   for (let attempt = 0; attempt < 30; attempt += 1) {
     const { data: pending } = await admin
       .from("webhook_events")

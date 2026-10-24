@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { sendTextMessage } from "@/lib/outbound/send";
+import { respondToMessage } from "@/lib/agent/attention";
+import { createAnthropicClient } from "@/lib/ai/anthropic-client";
+import type { ModelClient } from "@/lib/ai/types";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
 import { storeTelegramMedia } from "./media";
@@ -37,6 +39,7 @@ async function processMessageEvent(
   admin: SupabaseClient<Database>,
   event: ClaimedEvent,
   now: Date,
+  modelClient: ModelClient | null,
 ): Promise<boolean> {
   if (!event.organization_id) {
     throw new Error("Evento sin organización");
@@ -78,8 +81,8 @@ async function processMessageEvent(
   }
 
   const created = messageId !== null;
-  if (created) {
-    await echoIfEnabled(admin, event.organization_id, message);
+  if (created && modelClient) {
+    await replyWithAgent(admin, modelClient, messageId, now);
   }
 
   return created;
@@ -112,36 +115,32 @@ async function storeMessageMedia(
   });
 }
 
-// MODO ECO (temporal, solo para validar el circuito de envío en desarrollo): con
-// JARVIS_ECHO_MODE=true, cada texto recibido por Telegram se contesta repitiéndolo. Se elimina
-// cuando el agente de atención (Fase 6) pase a responder. Un fallo acá no invalida el mensaje
-// recibido, que ya quedó guardado.
-async function echoIfEnabled(
+// El agente de atención contesta el mensaje recién guardado. Un fallo acá no invalida el mensaje
+// recibido, que ya quedó guardado: se informa el motivo (nunca el contenido) y se sigue.
+async function replyWithAgent(
   admin: SupabaseClient<Database>,
-  organizationId: string,
-  message: NormalizedMessage,
+  modelClient: ModelClient,
+  messageId: string,
+  now: Date,
 ): Promise<void> {
-  if (process.env.JARVIS_ECHO_MODE !== "true") return;
-  if (message.channelType !== "telegram" || message.type !== "text" || !message.body) return;
-
   try {
-    const { data: stored } = await admin
-      .from("messages")
-      .select("conversation_id")
-      .eq("organization_id", organizationId)
-      .eq("external_id", message.externalId)
-      .maybeSingle();
-
+    const { data: stored } = await admin.from("messages").select("conversation_id").eq("id", messageId).maybeSingle();
     if (!stored) return;
 
-    await sendTextMessage(admin, {
-      conversationId: stored.conversation_id,
-      text: `Recibí tu mensaje: ${message.body}`.slice(0, 4000),
-      sender: "system",
-    });
+    const result = await respondToMessage(admin, modelClient, { conversationId: stored.conversation_id, messageId, now });
+    if (result.status === "failed") console.error("agente:", result.reason);
   } catch (error) {
-    // Solo el motivo, nunca el contenido del mensaje.
-    console.error("modo eco:", error instanceof Error ? error.message : "Error desconocido");
+    console.error("agente:", error instanceof Error ? error.message : "Error desconocido");
+  }
+}
+
+// Sin ANTHROPIC_API_KEY el sistema sigue recibiendo y guardando mensajes; solo no hay respuesta
+// automática. Así se puede desarrollar el resto sin la clave.
+function defaultModelClient(): ModelClient | null {
+  try {
+    return createAnthropicClient();
+  } catch {
+    return null;
   }
 }
 
@@ -152,6 +151,8 @@ export async function processPendingMessages(
   admin: SupabaseClient<Database>,
   limit = 20,
   now: Date = new Date(),
+  // undefined = el cliente real si hay clave; null = sin agente (las pruebas lo usan).
+  modelClient: ModelClient | null = defaultModelClient(),
 ): Promise<ProcessResult> {
   const result: ProcessResult = { claimed: 0, processed: 0, duplicates: 0, failed: 0 };
 
@@ -169,7 +170,7 @@ export async function processPendingMessages(
 
     for (const event of claimed ?? []) {
       try {
-        const created = await processMessageEvent(admin, event, now);
+        const created = await processMessageEvent(admin, event, now, modelClient);
         if (created) result.processed += 1;
         else result.duplicates += 1;
 
