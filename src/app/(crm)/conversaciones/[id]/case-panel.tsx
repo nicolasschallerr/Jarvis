@@ -2,6 +2,7 @@ import { dateTime, describeCaseEvent, PRIORITY_LABELS, STATUS_LABELS } from "@/l
 import type { CasePriority, CaseStatus } from "@/lib/crm/cases";
 import { createClient } from "@/lib/supabase/server";
 
+import { AreaAnswerForm } from "./area-answer-form";
 import { CaseControls, CreateCaseForm } from "./case-forms";
 import { ContactCard } from "./contact-card";
 import { NoteForm } from "./note-form";
@@ -62,6 +63,21 @@ export async function CasePanel({
         .order("created_at", { ascending: false })
         .limit(30)
     : { data: [] };
+
+  // Consultas que el agente le hizo a un sector sobre este caso, y a qué sectores pertenece quien mira
+  // (responde quien es del sector consultado o el superadmin).
+  const [{ data: queries }, { data: memberships }] = await Promise.all([
+    openCase
+      ? supabase
+          .from("area_queries")
+          .select("id, sector_id, question, status, answer, answered_by, answered_at, created_at")
+          .eq("case_id", openCase.id)
+          .order("created_at", { ascending: false })
+          .limit(20)
+      : Promise.resolve({ data: [] }),
+    supabase.from("sector_members").select("sector_id").eq("profile_id", currentUserId),
+  ]);
+  const mySectorIds = new Set((memberships ?? []).map((member) => member.sector_id));
 
   return (
     <SidePanel>
@@ -127,6 +143,36 @@ export async function CasePanel({
           />
         </>
       )}
+
+      {(queries ?? []).length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold">Consultas al área</h3>
+          <ul className="flex flex-col gap-3 text-sm">
+            {(queries ?? []).map((query) => {
+              const canAnswer =
+                query.status === "pending" && role !== "viewer" && (role === "superadmin" || mySectorIds.has(query.sector_id));
+              return (
+                <li key={query.id} className="flex flex-col gap-2 rounded-md bg-zinc-100 px-3 py-2 dark:bg-zinc-800">
+                  <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                    A {names.sectors.get(query.sector_id) ?? "un sector"} · {dateTime(query.created_at)} ·{" "}
+                    {query.status === "pending" ? "Pendiente" : query.status === "answered" ? "Respondida" : "Cerrada"}
+                  </span>
+                  <span className="whitespace-pre-wrap break-words">{query.question}</span>
+                  {query.answer ? (
+                    <span className="whitespace-pre-wrap break-words border-l-2 border-emerald-500 pl-2">
+                      {query.answer}
+                      <span className="block text-xs text-zinc-600 dark:text-zinc-400">
+                        {query.answered_by ? (names.profiles.get(query.answered_by) ?? "Operador") : "Persona eliminada"} · {dateTime(query.answered_at)}
+                      </span>
+                    </span>
+                  ) : null}
+                  {canAnswer ? <AreaAnswerForm conversationId={conversationId} queryId={query.id} /> : null}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-3">
         <h3 className="text-sm font-semibold">Notas internas</h3>
