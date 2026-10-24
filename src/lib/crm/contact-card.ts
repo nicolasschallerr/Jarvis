@@ -81,15 +81,16 @@ export async function updateContactCard(params: {
   if (!data?.length) return { ok: false, error: "No tenés permiso para editar este contacto." };
 
   // Dos fichas con el mismo documento suelen ser la misma persona escribiendo por dos canales. No se
-  // bloquea el guardado: se avisa. Unir contactos queda para la Fase 12 (omnicanal).
+  // bloquea el guardado: se avisa. Unirlas lo hace el superadmin desde la ficha (Fase 12, ver contact-merge.ts).
   let warning: string | null = null;
   if (documentNumber && changed.includes("document_number")) {
     const { count } = await params.userClient
       .from("contacts")
       .select("id", { count: "exact", head: true })
       .eq("document_number", documentNumber)
-      .neq("id", params.contactId);
-    if (count) warning = "Ya hay otra ficha con ese documento: puede ser la misma persona escribiendo por otro canal.";
+      .neq("id", params.contactId)
+      .is("merged_into", null);
+    if (count) warning = "Ya hay otra ficha con ese documento: puede ser la misma persona escribiendo por otro canal. Un superadministrador puede unirlas desde la ficha.";
   }
 
   return { ok: true, changed, warning };

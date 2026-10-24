@@ -1,7 +1,9 @@
 import { channelLabel, dateTime } from "@/lib/crm/format";
+import { findDuplicateContacts } from "@/lib/crm/contact-merge";
 import { createClient } from "@/lib/supabase/server";
 
 import { ContactForm } from "./contact-form";
+import { DuplicateContacts } from "./duplicate-contacts";
 
 // Ficha del asociado: sus datos editables y, de solo lectura, por dónde escribe y su consentimiento.
 // La lectura es abierta en la organización (ADR-016); editar lo permite RLS a superadmin y operadores.
@@ -9,10 +11,13 @@ export async function ContactCard({
   contactId,
   conversationId,
   canEdit,
+  canMerge = false,
 }: {
   contactId: string;
   conversationId: string;
   canEdit: boolean;
+  // Unir contactos es solo del superadmin.
+  canMerge?: boolean;
 }) {
   const supabase = await createClient();
 
@@ -26,6 +31,8 @@ export async function ContactCard({
   ]);
 
   if (!contact) return null;
+
+  const duplicates = canMerge ? await findDuplicateContacts({ userClient: supabase, contactId }) : [];
 
   return (
     <section className="flex flex-col gap-3">
@@ -67,6 +74,8 @@ export async function ContactCard({
           </dd>
         </div>
       </dl>
+
+      {canMerge ? <DuplicateContacts keepId={contactId} conversationId={conversationId} candidates={duplicates} /> : null}
     </section>
   );
 }

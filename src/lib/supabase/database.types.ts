@@ -905,6 +905,8 @@ export type Database = {
           document_number: string | null
           id: string
           locality: string | null
+          merged_at: string | null
+          merged_into: string | null
           notes: string | null
           opted_in_at: string | null
           opted_out_at: string | null
@@ -918,6 +920,8 @@ export type Database = {
           document_number?: string | null
           id?: string
           locality?: string | null
+          merged_at?: string | null
+          merged_into?: string | null
           notes?: string | null
           opted_in_at?: string | null
           opted_out_at?: string | null
@@ -931,6 +935,8 @@ export type Database = {
           document_number?: string | null
           id?: string
           locality?: string | null
+          merged_at?: string | null
+          merged_into?: string | null
           notes?: string | null
           opted_in_at?: string | null
           opted_out_at?: string | null
@@ -938,6 +944,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "contacts_merged_into_fkey"
+            columns: ["merged_into"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contacts_organization_id_fkey"
             columns: ["organization_id"]
@@ -1984,6 +1997,10 @@ export type Database = {
           p_type: Database["public"]["Enums"]["message_type"]
         }
         Returns: string
+      }
+      merge_contacts: {
+        Args: { p_keep: string; p_remove: string }
+        Returns: Json
       }
     }
     Enums: {

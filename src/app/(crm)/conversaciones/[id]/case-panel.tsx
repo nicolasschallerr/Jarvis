@@ -90,7 +90,7 @@ export async function CasePanel({
 
   return (
     <SidePanel>
-      <ContactCard contactId={contactId} conversationId={conversationId} canEdit={role !== "viewer"} />
+      <ContactCard contactId={contactId} conversationId={conversationId} canEdit={role !== "viewer"} canMerge={role === "superadmin"} />
 
       <h2 className="text-base font-semibold">Caso</h2>
 
