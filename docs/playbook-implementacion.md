@@ -54,7 +54,9 @@
 - Organización en Jarvis (`organization_id`), usuarios y perfiles del CRM.
 - Canal de WhatsApp (número y credenciales como configuración) y plantillas sometidas a Meta.
 - Programación del trabajador de mensajes: secretos `jarvis_app_url` y `jarvis_worker_secret` en Vault y variables de entorno en Vercel (se aplican solo a despliegues nuevos: redesplegar).
-- Usuarios del CRM con su rol (superadministrador, operador, consulta y reportes): el rol de consulta lee pero no responde. La visibilidad por sector se define en la Fase 5.
+- Usuarios del CRM con su rol (superadministrador, operador, consulta y reportes): el rol de consulta lee pero no responde.
+- Sectores, unidades y agentes (nombre y frase) desde `sectores-y-reglas.yaml` con `scripts/cargar-configuracion.mts`; después, el superadmin arma los equipos desde la pantalla Equipo.
+- Visibilidad (ADR-016): todos los operadores **leen** todo lo de su organización y **escriben** solo en lo asignado a ellos o a su sector. Acordarlo por escrito con el cliente, porque implica que un operador puede leer datos personales de afiliados de otros sectores.
 - Para desarrollar sin esperar a Meta: un bot de Telegram como canal de prueba (ADR-013).
 - Carga de la configuración del repo del cliente a la base (script pendiente, Fase 5).
 
@@ -62,6 +64,8 @@
 - [ ] Verificación de Meta iniciada / aprobada
 - [ ] Número registrado y webhook recibiendo mensajes
 - [ ] El trabajador corre solo (cron) y un mensaje de prueba llega, se guarda y se contesta
+- [ ] Sectores y agentes cargados; equipos armados y un caso de prueba creado, asignado, derivado y resuelto
+- [ ] Revisión de políticas RLS (`pg_policies`): toda política `ALL` o `INSERT` exige el rol en `WITH CHECK`
 - [ ] Plantillas aprobadas
 
 **Riesgos conocidos**

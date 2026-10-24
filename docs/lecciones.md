@@ -170,3 +170,65 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** el análisis de comillas del shell con muchos bloques y apóstrofes.
 - **Solución:** escribir cada archivo con la herramienta de escritura y usar el shell solo para comandos cortos.
 - **Cómo evitarlo:** un archivo, una herramienta de escritura; nada de documentos largos dentro de comandos.
+
+## Fase 05
+
+### 27. Una política `ALL` con `WITH CHECK` explícito dejaba pasar los `INSERT` sin rol
+- **Problema:** al probar el equipo por sector, un operador logró sumarse a un sector directamente en la base. Lo mismo valía para crear canales, sectores y unidades (seis tablas), incluso con un usuario de solo consulta.
+- **Causa real:** para un `INSERT` Postgres evalúa solo `WITH CHECK`, no `USING`. Las políticas exigían el rol únicamente en `USING` y su `WITH CHECK` solo miraba la organización.
+- **Solución:** repetir la condición de rol en `USING` y en `WITH CHECK` en las seis políticas, con una prueba de regresión por tabla.
+- **Cómo evitarlo:** probar el `INSERT` con cada rol en cada tabla nueva; revisar las políticas con `pg_policies` antes de producción (al cerrar la fase todas las `ALL` e `INSERT` ya tienen el rol en las dos condiciones).
+
+### 28. Un disparador con `text[] || 'texto'` bloqueó toda edición de contactos
+- **Problema:** guardar la ficha de un contacto fallaba con "malformed array literal".
+- **Causa real:** `arreglo || 'locality'` hace que Postgres lea el texto como un literal de arreglo. Como el disparador corría en cada `UPDATE`, también rompía las actualizaciones de la ingesta de mensajes.
+- **Solución:** `array_append(arreglo, 'locality'::text)` en una migración nueva (la anterior ya estaba aplicada).
+- **Cómo evitarlo:** probar todo disparador por cada camino de escritura (usuario y servidor); las pruebas de integración lo detectaron a los pocos minutos.
+
+### 29. `insert` múltiple de supabase-js manda NULL en las columnas que faltan
+- **Problema:** una prueba fallaba con "null value in column" al insertar cuatro casos con distintas columnas.
+- **Causa real:** en un `insert([...])` con objetos de claves distintas, las columnas ausentes van como `NULL` explícito y no toman el valor por defecto.
+- **Solución:** poner todas las columnas con valor en cada fila, o insertar de a una.
+- **Cómo evitarlo:** y revisar siempre `error` en la preparación de una prueba (`expect(inserted.error).toBeNull()`): un insert silenciosamente fallido da resultados engañosos.
+
+### 30. Un commit salió con una prueba fallida
+- **Problema:** una corrida completa tuvo una prueba rota y el comando hizo commit y push igual.
+- **Causa real:** los pasos estaban encadenados con `;`, que sigue pase lo que pase.
+- **Solución:** encadenar con `&&` y exigir en el log "N passed" sin "failed" antes de `git commit`.
+- **Cómo evitarlo:** el commit va siempre condicionado al resultado de las pruebas.
+
+### 31. Una prueba intermitente por carrera con el trabajador real
+- **Problema:** `descarta un evento tras 5 intentos fallidos` falló dos veces en la suite completa y pasó sola.
+- **Causa real (hipótesis):** el trabajador real (pg_cron → Vercel, cada 10 s) comparte la base con las pruebas y puede tocar un evento en medio de la prueba. Misma familia que la lección 19.
+- **Solución provisional:** repetir la suite; en las corridas siguientes pasó 3 de 3 sola y en la suite completa.
+- **Cómo evitarlo:** pausar el trabajador mientras corren las pruebas (por ejemplo, una función que lo active y desactive). Queda como deuda.
+
+### 32. Un navegador oculto no dibuja cuadros: ni la animación ni la hidratación avanzan
+- **Problema:** no se podían sacar capturas ni ver la bienvenida; la página de prueba nunca se hidrató.
+- **Causa real:** con la ventana minimizada no hay `requestAnimationFrame` (0 cuadros por segundo); React usa cuadros para completar la hidratación con streaming y las animaciones no avanzan.
+- **Solución:** probar la lógica con jsdom y relojes falsos (`@testing-library/react`), comprobar estilos y CSS compilado por JavaScript, y decir con claridad qué no se pudo ver.
+- **Cómo evitarlo:** no dar por visto lo visual; separar lo que se prueba automáticamente de lo que confirma una persona.
+
+### 33. La bienvenida "no aparecía" porque Windows tenía las animaciones desactivadas
+- **Problema:** la animación funcionaba en las pruebas y no se veía en el equipo del dueño.
+- **Causa real:** `prefers-reduced-motion: reduce` estaba activo (efectos de animación apagados en Windows) y la bienvenida lo respeta por diseño. Se confirmó midiendo `matchMedia` en el navegador de su PC.
+- **Solución:** selector "Animaciones" (automáticas, siempre activas o reducidas) que decide `data-motion` antes de pintar.
+- **Cómo evitarlo:** ante un "no se ve", medir primero el entorno (preferencias del sistema, despliegue, datos) antes de tocar código; y ofrecer control a quien tiene el movimiento apagado por rendimiento.
+
+### 34. `tsc` suelto falla sin la carpeta `.next`
+- **Problema:** tras borrar `.next`, `npx tsc --noEmit` daba `Cannot find name 'PageProps'`.
+- **Causa real:** Next genera esos tipos globales al compilar; sin ellos el chequeo suelto no los conoce. Refuerza la lección 23.
+- **Solución:** correr `npm run build` (que también chequea tipos) antes de `tsc`.
+- **Cómo evitarlo:** el orden de verificación es build, lint, tipos y pruebas.
+
+### 35. Los reemplazos con expresiones regulares en varios archivos son frágiles
+- **Problema:** un `perl` de varios reemplazos falló entero por la sintaxis y no cambió nada; otros dejaron clases a medias.
+- **Causa real:** patrones largos con comillas, saltos de línea y delimitadores en un comando de shell.
+- **Solución:** ediciones puntuales con la herramienta de edición y una verificación con `grep` después.
+- **Cómo evitarlo:** reservar `perl` y `sed` para cambios de una línea.
+
+### 36. Después de una interrupción, verificar el estado antes de repetir
+- **Problema:** una sesión se cortó a mitad de un comando que agregaba una prueba, corría la suite y podía subir.
+- **Causa real:** el resultado de la llamada se perdió y no se sabía qué había quedado hecho.
+- **Solución:** revisar `git status`, buscar el bloque agregado (una sola vez) y repetir la verificación completa antes del commit.
+- **Cómo evitarlo:** los pasos que agregan texto con `>>` no se repiten a ciegas: se comprueba primero si ya están.
