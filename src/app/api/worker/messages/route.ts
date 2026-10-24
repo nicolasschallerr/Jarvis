@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { deliverAreaAnswers } from "@/lib/agent/area-replies";
 import { anthropicClientFromEnv } from "@/lib/ai/anthropic-client";
+import { runFollowups } from "@/lib/followups/run";
 import { processPendingMessages } from "@/lib/inbound/process";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAuthorizedWorkerRequest } from "@/lib/worker-auth";
@@ -24,7 +25,12 @@ async function handle(request: NextRequest) {
     const modelClient = anthropicClientFromEnv();
     const result = await processPendingMessages(admin, 20, new Date(), modelClient);
     const areaReplies = modelClient ? await deliverAreaAnswers(admin, modelClient) : null;
-    return Response.json({ ...result, areaReplies });
+    // Los seguimientos no necesitan el modelo. Si fallan, los mensajes ya quedaron procesados: se informa y se sigue.
+    const followups = await runFollowups(admin).catch((error: unknown) => {
+      console.error("worker seguimientos:", error instanceof Error ? error.message : error);
+      return null;
+    });
+    return Response.json({ ...result, areaReplies, followups });
   } catch (error) {
     console.error("worker mensajes:", error instanceof Error ? error.message : error);
     return new Response("Error", { status: 500 });

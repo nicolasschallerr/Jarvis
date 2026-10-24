@@ -40,6 +40,11 @@ export function buildAttentionSettings(config: ClientConfig, knowledge: Record<s
       priority: topic.prioridad,
     })),
     knowledge,
+    followups: {
+      active: config.seguimientos?.activo ?? false,
+      hours: [...(config.seguimientos?.horas ?? [])].sort((a, b) => a - b),
+      text: config.textos_editables?.seguimiento ?? null,
+    },
     pricing: hasPricing
       ? { inputPerMTok: ia?.precio_entrada_usd_por_millon ?? 0, outputPerMTok: ia?.precio_salida_usd_por_millon ?? 0 }
       : null,

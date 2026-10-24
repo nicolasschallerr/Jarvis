@@ -46,6 +46,16 @@ const temaSensibleSchema = z.object({
   prioridad: z.string().default("normal"),
 });
 
+// Recordatorios automáticos cuando una gestión queda esperando al asociado. "plantilla" es la plantilla de
+// Meta para escribir fuera de la ventana de 24 h (se usa cuando estén aprobadas).
+const seguimientosSchema = z.object({
+  activo: z.boolean().default(false),
+  horas: z.array(z.number().int().positive()).default([]),
+  plantilla: z.string().optional(),
+});
+
+const textosEditablesSchema = z.object({ seguimiento: z.string().min(1).optional() }).loose();
+
 // Modelo y precios del agente de atención. Los precios son opcionales: sin ellos no se calcula el costo.
 const iaSchema = z.object({
   modelo_atencion: z.string().min(1).optional(),
@@ -61,6 +71,8 @@ export const clientConfigSchema = z
     horario_atencion: horarioSchema.optional(),
     temas_sensibles: z.array(temaSensibleSchema).optional(),
     ia: iaSchema.optional(),
+    seguimientos: seguimientosSchema.optional(),
+    textos_editables: textosEditablesSchema.optional(),
     unidades: z.array(unidadSchema).min(1, "tiene que haber al menos una unidad"),
     sectores: z.array(sectorSchema).min(1, "tiene que haber al menos un sector"),
     derivacion: z.object({ sector_por_defecto: slug }).loose().optional(),

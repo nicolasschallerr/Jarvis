@@ -19,6 +19,10 @@ export const attentionSettingsSchema = z.object({
   ),
   // Un documento de conocimiento por unidad (id de la unidad → texto).
   knowledge: z.record(z.string(), z.string()),
+  // Recordatorios cuando el caso espera al asociado: horas desde que quedó esperando y texto a enviar.
+  followups: z
+    .object({ active: z.boolean(), hours: z.array(z.number()), text: z.string().nullable() })
+    .default({ active: false, hours: [], text: null }),
   // Precios en USD por millón de tokens, solo si el cliente los configura: nunca se asumen.
   pricing: z.object({ inputPerMTok: z.number(), outputPerMTok: z.number() }).nullable().default(null),
 });
