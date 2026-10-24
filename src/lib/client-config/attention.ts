@@ -11,6 +11,13 @@ export const DEFAULT_ATTENTION_MODEL = "claude-sonnet-5-5";
 
 const DEFAULT_TIME_ZONE = "America/Argentina/Buenos_Aires";
 
+const STORE_BY_DESTINATION = {
+  caso: "case",
+  contacto_nombre: "contact_name",
+  contacto_documento: "contact_document",
+  contacto_localidad: "contact_locality",
+} as const;
+
 export type AttentionFiles = {
   // Contenido de agente-prompt.md.
   prompt: string;
@@ -30,7 +37,7 @@ export function buildAttentionSettings(config: ClientConfig, knowledge: Record<s
     agentName: config.agentes?.find((agent) => agent.tipo === "atencion")?.nombre ?? config.organizacion.nombre_agente ?? "Asistente",
     timeZone: config.organizacion.zona_horaria ?? DEFAULT_TIME_ZONE,
     businessHours: hours ? { days: hours.dias, from: hours.desde, to: hours.hasta, holidays: hours.feriados } : null,
-    units: config.unidades.map((unit) => ({ id: unit.id, name: unit.nombre, sector: unit.sector })),
+    units: config.unidades.map((unit) => ({ id: unit.id, name: unit.nombre, sector: unit.sector, handoffMessage: unit.mensaje_derivacion ?? null })),
     sectors: config.sectores.map((sector) => ({ id: sector.id, name: sector.nombre })),
     defaultSector: config.derivacion?.sector_por_defecto ?? null,
     sensitiveTopics: (config.temas_sensibles ?? []).map((topic) => ({
@@ -40,6 +47,19 @@ export function buildAttentionSettings(config: ClientConfig, knowledge: Record<s
       priority: topic.prioridad,
     })),
     knowledge,
+    menuText: config.textos_editables?.menu_principal ?? null,
+    handoffMessage: config.textos_editables?.mensaje_derivacion ?? null,
+    fields: (config.campos ?? []).map((field) => ({
+      id: field.id,
+      label: field.etiqueta,
+      regex: field.regex ?? null,
+      help: field.ayuda ?? null,
+      clean: field.limpiar === "digitos" ? "digits" : null,
+      store: STORE_BY_DESTINATION[field.guardar_en],
+      units: field.unidades ?? null,
+      required: field.obligatorio,
+    })),
+    maxFieldRetries: config.validacion?.reintentos_por_campo ?? 3,
     followups: {
       active: config.seguimientos?.activo ?? false,
       hours: [...(config.seguimientos?.horas ?? [])].sort((a, b) => a - b),

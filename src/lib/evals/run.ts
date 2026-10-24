@@ -1,36 +1,15 @@
 import { buildSystemPrompt, type AttentionSettings } from "@/lib/agent/context";
 import { runAgentLoop } from "@/lib/agent/loop";
-import { createAttentionTools, type CaseBackend } from "@/lib/agent/tools";
+import { createAttentionTools } from "@/lib/agent/tools";
 import type { ChatMessage, ModelClient } from "@/lib/ai/types";
 
 import { judge, type CriterionResult } from "./judge";
+import { createMemoryBackend, type RecordedAction } from "./memory-backend";
 import type { EvalAction, EvalCase } from "./schema";
 
-// Lo que el agente pidió hacer sobre el caso, en orden. En los evals no se escribe en ninguna base: las
-// herramientas del agente anotan el pedido y listo.
-export type RecordedAction =
-  | { kind: "save_data"; unit: string; data: Record<string, string | number | boolean> }
-  | { kind: "handoff"; sector: string; summary: string }
-  | { kind: "ask_area"; sector: string; question: string };
-
-function recordingBackend(actions: RecordedAction[]): CaseBackend {
-  return {
-    async saveCaseData(input) {
-      actions.push({ kind: "save_data", unit: input.unit, data: input.data });
-      return null;
-    },
-    async handoff(input) {
-      actions.push({ kind: "handoff", sector: input.sector, summary: input.summary });
-      return null;
-    },
-    async askArea(input) {
-      actions.push({ kind: "ask_area", sector: input.sector, question: input.question });
-      return null;
-    },
-  };
-}
-
 export type ObservedAction = "derivar" | "consultar_area" | "sin_escalar";
+
+export type { RecordedAction };
 
 export type EvalCaseResult = {
   id: string;
@@ -77,6 +56,7 @@ function transcriptOf(messages: string[], replies: string[], actions: RecordedAc
   if (actions.length === 0) lines.push("(ninguna)");
   for (const action of actions) {
     if (action.kind === "save_data") lines.push(`- Guardó datos (${action.unit || "sin unidad"}): ${JSON.stringify(action.data)}`);
+    else if (action.kind === "save_contact") lines.push(`- Guardó datos del asociado: ${Object.keys(action.data).join(", ")}`);
     else if (action.kind === "handoff") lines.push(`- Derivó al sector ${action.sector}. Resumen: ${action.summary}`);
     else lines.push(`- Consultó al sector ${action.sector}: ${action.question}`);
   }
@@ -122,9 +102,11 @@ export async function runEvalCase(params: EvalRunParams, evalCase: EvalCase): Pr
   };
 
   try {
-    const tools = createAttentionTools(recordingBackend(actions), {
+    const tools = createAttentionTools(createMemoryBackend(actions), {
       unitSlugs: params.settings.units.map((unit) => unit.id),
       sectorSlugs: params.settings.sectors.map((sector) => sector.id),
+      fields: params.settings.fields,
+      maxFieldRetries: params.settings.maxFieldRetries,
     });
     const system = buildSystemPrompt(params.prompt, params.settings, params.now ?? new Date());
     const history: ChatMessage[] = [];

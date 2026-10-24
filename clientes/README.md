@@ -24,6 +24,12 @@ acuerdos de confidencialidad. Ver [ADR-005](../docs/decisiones/005-config-de-cli
    unidades, agentes y la configuración del agente de atención (`agente-prompt.md`, `conocimiento/`,
    horario, temas sensibles y `ia`) como una versión nueva solo si algo cambió. El resto de las
    secciones se cargan cuando las use el agente (Fase 9).
+
+   El conocimiento de cada unidad (por ejemplo, cada "rama" de atención) va en `conocimiento/<unidad>.md` o,
+   si es largo, en una carpeta `conocimiento/<unidad>/` con varios `.md` (información, datos a juntar,
+   mensajes fijos); se unen en orden alfabético. Los datos que el agente junta se definen en `campos` del YAML
+   (con su regex, ayuda y dónde se guardan), y los textos que el sistema envía tal cual, como el menú y la
+   derivación, en `textos_editables`. Ver [ADR-022](../docs/decisiones/022-ramas-datos-validados-y-menu.md).
 3. En producción el agente y el CRM leen la configuración **desde la base**. Los textos que el
    cliente puede editar (saludos, mensajes) se editan desde el CRM; los cambios estructurales
    (sectores, reglas, prompt) se hacen en la carpeta y se vuelven a cargar.

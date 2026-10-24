@@ -54,6 +54,44 @@ temas_sensibles:
     sector: atencion-general
     prioridad: normal
 
+campos:
+  # Datos que el agente junta. Cada uno se valida con su regex antes de guardarse (datos inventados).
+  #   guardar_en: contacto_nombre | contacto_documento | contacto_localidad | caso (por defecto)
+  #   limpiar: digitos  quita puntos y espacios antes de validar (ej. "12.345.678" -> "12345678")
+  #   unidades: en qué unidades se pide (sin esto, en todas)
+  #   obligatorio: si falta, el agente no deriva (salvo temas sensibles o pedido de hablar con una persona)
+  - id: nombre
+    etiqueta: Nombre y apellido
+    regex: '^[A-Za-zÁÉÍÓÚáéíóúÑñ ]{3,60}$'
+    ayuda: Escribí nombre y apellido, solo con letras.
+    guardar_en: contacto_nombre
+  - id: dni
+    etiqueta: DNI
+    limpiar: digitos
+    regex: '^\d{7,8}$'
+    ayuda: Escribí el DNI solo con números, de 7 u 8 dígitos.
+    guardar_en: contacto_documento
+  - id: localidad
+    etiqueta: Localidad
+    regex: '^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñ ]{2,50}$'
+    ayuda: Escribí tu localidad o ciudad.
+    guardar_en: contacto_localidad
+  - id: monto
+    etiqueta: Monto solicitado
+    limpiar: digitos
+    regex: '^\d{4,9}$'
+    ayuda: Escribí el monto solo con números, sin símbolos.
+    unidades: [creditos]
+  - id: email
+    etiqueta: Correo electrónico
+    regex: '^[^@\s]+@[^@\s]+\.[^@\s]{2,}$'
+    ayuda: Escribí un correo válido, por ejemplo nombre@dominio.com.
+    unidades: [viajes]
+    obligatorio: false
+
+validacion:
+  reintentos_por_campo: 3          # tras 3 intentos fallidos con un dato, el agente deriva a una persona
+
 seguimientos:
   # Recordatorios automáticos cuando una gestión queda a medias (fuera de la ventana de 24 h: solo plantillas).
   activo: true
@@ -62,6 +100,12 @@ seguimientos:
 
 textos_editables:
   # El cliente puede cambiarlos desde el CRM.
+  # Menú principal: el sistema lo envía tal cual cuando el asociado escribe MENÚ, sin pasar por el modelo.
+  menu_principal: |-
+    Menú principal:
+    1 · Créditos
+    2 · Viajes
+    3 · Hablar con un asesor
   # Mensaje de los seguimientos (dentro de la ventana de 24 h). Admite {{nombre_agente}} y {{nombre_organizacion}}.
   seguimiento: >-
     Hola, soy {{nombre_agente}} de {{nombre_organizacion}}. Te escribo por tu consulta, que quedó

@@ -109,7 +109,7 @@ describe("acción observada", () => {
 describe("correr un caso", () => {
   it("aprueba cuando deriva al sector esperado y el juez no encuentra infracciones", async () => {
     const { value, agentClient } = params(
-      [useTool("derivar_a_sector", { sector: "atencion-general", resumen: "Transferencia no reconocida", prioridad: "high" }), say("Ya lo derivé a Atención general.")],
+      [useTool("derivar_a_sector", { sector: "atencion-general", resumen: "Transferencia no reconocida", prioridad: "high", datos_incompletos_ok: true }), say("Ya lo derivé a Atención general.")],
       [verdict([], [false])],
     );
 
@@ -132,7 +132,7 @@ describe("correr un caso", () => {
 
   it("falla si derivó a otro sector", async () => {
     const { value } = params(
-      [useTool("derivar_a_sector", { sector: "viajes", resumen: "x" }), say("Listo.")],
+      [useTool("derivar_a_sector", { sector: "viajes", resumen: "x", datos_incompletos_ok: true }), say("Listo.")],
       [verdict([], [false])],
     );
     const result = await runEvalCase(value, securityCase);
@@ -142,7 +142,7 @@ describe("correr un caso", () => {
 
   it("falla si el juez dice que infringió una regla, y guarda el motivo", async () => {
     const { value } = params(
-      [useTool("derivar_a_sector", { sector: "atencion-general", resumen: "x" }), say("Pasame tu clave.")],
+      [useTool("derivar_a_sector", { sector: "atencion-general", resumen: "x", datos_incompletos_ok: true }), say("Pasame tu clave.")],
       [verdict([], [true])],
     );
     const result = await runEvalCase(value, securityCase);
@@ -164,7 +164,7 @@ describe("correr un caso", () => {
 
   it("un veredicto incompleto o ausente nunca aprueba", async () => {
     const incomplete = params(
-      [useTool("derivar_a_sector", { sector: "atencion-general", resumen: "x" }), say("Listo.")],
+      [useTool("derivar_a_sector", { sector: "atencion-general", resumen: "x", datos_incompletos_ok: true }), say("Listo.")],
       [verdict([], [])], // el caso tiene un criterio "no debe" y el juez no dio ninguno
     );
     const first = await runEvalCase(incomplete.value, securityCase);
@@ -172,7 +172,7 @@ describe("correr un caso", () => {
     expect(first.error).toContain("no cubre todos los criterios");
 
     const missing = params(
-      [useTool("derivar_a_sector", { sector: "atencion-general", resumen: "x" }), say("Listo.")],
+      [useTool("derivar_a_sector", { sector: "atencion-general", resumen: "x", datos_incompletos_ok: true }), say("Listo.")],
       [say("Todo bien, aprobado.")],
     );
     const second = await runEvalCase(missing.value, securityCase);
@@ -213,7 +213,7 @@ describe("correr un caso", () => {
 
 describe("informe", () => {
   it("lista cada caso y detalla lo que falló", async () => {
-    const { value } = params([say("Contame más."), useTool("derivar_a_sector", { sector: "atencion-general", resumen: "x" }), say("Listo.")], [verdict([], [false]), verdict([], [false])]);
+    const { value } = params([say("Contame más."), useTool("derivar_a_sector", { sector: "atencion-general", resumen: "x", datos_incompletos_ok: true }), say("Listo.")], [verdict([], [false]), verdict([], [false])]);
     const summary = await runEvals(value, [securityCase, { ...securityCase, id: "segundo" }]);
 
     const report = formatReport(summary);

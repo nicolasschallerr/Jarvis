@@ -1,21 +1,49 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import type { AttentionFiles } from "./attention";
 
-// Lee de la carpeta de un cliente el prompt del agente (agente-prompt.md) y su conocimiento
-// (conocimiento/<unidad>.md). Es para scripts: usa el disco, no se importa desde la aplicación web.
-// Devuelve null si no hay prompt.
+function markdownFiles(directory: string): string[] {
+  return readdirSync(directory)
+    .filter((name) => name.endsWith(".md"))
+    .sort((a, b) => a.localeCompare(b, "es"));
+}
+
+// Lee de la carpeta de un cliente el prompt del agente (agente-prompt.md) y su conocimiento. El
+// conocimiento de cada unidad (o "rama") puede estar de dos formas, y se pueden mezclar:
+//   conocimiento/<unidad>.md           un solo archivo
+//   conocimiento/<unidad>/*.md         una carpeta con varios archivos (información, datos a juntar,
+//                                      mensajes fijos...), que se unen en orden alfabético
+// Si existen las dos, primero va el archivo suelto y después la carpeta.
+//
+// Es para scripts: usa el disco, no se importa desde la aplicación web. Devuelve null si no hay prompt.
 export function readAttentionFiles(directory: string): AttentionFiles | null {
   const promptFile = join(directory, "agente-prompt.md");
   if (!existsSync(promptFile)) return null;
 
-  const knowledge: Record<string, string> = {};
+  const pieces = new Map<string, string[]>();
+  const add = (unit: string, text: string) => pieces.set(unit, [...(pieces.get(unit) ?? []), text.trim()]);
+
   const knowledgeDir = join(directory, "conocimiento");
   if (existsSync(knowledgeDir)) {
-    for (const name of readdirSync(knowledgeDir)) {
-      if (name.endsWith(".md")) knowledge[name.slice(0, -3)] = readFileSync(join(knowledgeDir, name), "utf8");
+    const entries = readdirSync(knowledgeDir).sort((a, b) => a.localeCompare(b, "es"));
+
+    // Primero los archivos sueltos, después las carpetas.
+    for (const name of entries) {
+      const path = join(knowledgeDir, name);
+      if (name.endsWith(".md") && statSync(path).isFile()) add(name.slice(0, -3), readFileSync(path, "utf8"));
     }
+    for (const name of entries) {
+      const path = join(knowledgeDir, name);
+      if (!statSync(path).isDirectory()) continue;
+      for (const file of markdownFiles(path)) add(name, readFileSync(join(path, file), "utf8"));
+    }
+  }
+
+  const knowledge: Record<string, string> = {};
+  for (const [unit, texts] of pieces) {
+    const joined = texts.filter(Boolean).join("\n\n");
+    if (joined) knowledge[unit] = joined;
   }
 
   return { prompt: readFileSync(promptFile, "utf8"), knowledge };

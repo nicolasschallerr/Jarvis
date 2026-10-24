@@ -223,7 +223,7 @@ describe("agente de atención", () => {
     const client = createScriptedClient([
       {
         content: [
-          { type: "tool_use", id: "a", name: "guardar_datos_del_caso", input: { unidad: "creditos", titulo: "Solicitud de crédito", datos: { monto: 500000 } } },
+          { type: "tool_use", id: "a", name: "guardar_datos_del_caso", input: { unidad: "creditos", titulo: "Solicitud de crédito", datos: { nombre: "Ana Prueba", dni: "12.345.678", localidad: "Villa Ejemplo", monto: "$ 500.000" } } },
           { type: "tool_use", id: "b", name: "derivar_a_sector", input: { sector: "creditos", resumen: "Ana Prueba pide un crédito de $500.000." } },
         ],
         stopReason: "tool_use",
@@ -233,13 +233,17 @@ describe("agente de atención", () => {
     ]);
 
     const result = await respondToMessage(admin, client, { conversationId, messageId, now: monday, fetchImpl: fakeTelegram() });
-    expect(result).toEqual({ status: "replied", text: "Listo, le pasé tu consulta al equipo de Créditos." });
+    // El modelo escribe su mensaje y el sistema agrega el mensaje oficial de derivación del cliente.
+    const official = "Listo, ya le pasé tu consulta al equipo de Créditos. Te van a responder por acá.";
+    expect(result).toEqual({ status: "replied", text: `Listo, le pasé tu consulta al equipo de Créditos.
+
+${official}` });
 
     // El caso quedó armado y derivado.
     const { data: caso } = await admin.from("cases").select("id, title, summary, collected_data, status, sectors(slug), business_units(slug)").eq("conversation_id", conversationId).single();
     expect(caso).toMatchObject({
       title: "Solicitud de crédito",
-      collected_data: { monto: 500000 },
+      collected_data: { monto: "500000" },
       status: "new",
       sectors: { slug: "creditos" },
       business_units: { slug: "creditos" },
@@ -251,8 +255,14 @@ describe("agente de atención", () => {
     expect(events?.every((event) => event.actor_type === "agent")).toBe(true);
 
     // La respuesta se guardó como del agente.
-    const { data: reply } = await admin.from("messages").select("sender, status").eq("conversation_id", conversationId).eq("direction", "outbound").single();
-    expect(reply).toMatchObject({ sender: "agent", status: "sent" });
+    const { data: replies } = await admin.from("messages").select("sender, status, body").eq("conversation_id", conversationId).eq("direction", "outbound").order("created_at");
+    expect(replies).toHaveLength(2);
+    expect(replies?.every((reply) => reply.sender === "agent" && reply.status === "sent")).toBe(true);
+    expect(replies?.[1]?.body).toBe(official);
+
+    // Los datos del asociado quedaron en su ficha, ya limpios.
+    const { data: contact } = await admin.from("contacts").select("display_name, document_number, locality").eq("organization_id", organizationId).limit(1).single();
+    expect(contact).toEqual({ display_name: "Ana Prueba", document_number: "12345678", locality: "Villa Ejemplo" });
 
     // Trazabilidad: dos llamadas al modelo y dos herramientas.
     const { data: calls } = await admin.from("ai_calls").select("id, input_tokens, cost_usd, decision").eq("organization_id", organizationId);

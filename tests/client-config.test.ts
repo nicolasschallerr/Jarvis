@@ -104,7 +104,9 @@ describe("carga de sectores y unidades en la base", () => {
   });
 
   it("lo que se saca del archivo se desactiva, no se borra", async () => {
+    // El dato "email" se pide solo en viajes: al sacar esa unidad hay que sacarlo también.
     const withoutTravel = templateText
+      .replace(/  - id: email\n(?:    .*\n)+/, "")
       .replace(/  - id: viajes\n    nombre: Viajes\n    sector: viajes\n/, "")
       .replace(/  - id: viajes\n    nombre: Viajes\n    responsables:\n      - nombre: Responsable Ficticio Dos\n        email: viajes@ejemplo.test\n/, "");
 

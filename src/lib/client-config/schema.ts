@@ -22,6 +22,8 @@ const unidadSchema = z.object({
   id: slug,
   nombre: z.string().trim().min(1, "falta el nombre"),
   sector: slug,
+  // Mensaje oficial de derivación propio de esta unidad (si no, se usa el general). Ver ADR-022.
+  mensaje_derivacion: z.string().trim().min(1).optional(),
 });
 
 // Cómo se llaman y qué frase tienen los agentes de este cliente. "atencion" es el que conversa con los
@@ -54,7 +56,45 @@ const seguimientosSchema = z.object({
   plantilla: z.string().optional(),
 });
 
-const textosEditablesSchema = z.object({ seguimiento: z.string().min(1).optional() }).loose();
+// Textos fijos que el SISTEMA envía tal cual, sin pasar por el modelo: el menú principal (se envía cuando
+// el asociado escribe MENÚ) y el mensaje de derivación (admite {{sector}}).
+const textosEditablesSchema = z
+  .object({
+    seguimiento: z.string().min(1).optional(),
+    menu_principal: z.string().min(1).optional(),
+    mensaje_derivacion: z.string().min(1).optional(),
+  })
+  .loose();
+
+// Un dato que el agente junta (DNI, email, monto...). "regex" valida lo que escribe el asociado; sin regex
+// se acepta cualquier texto. "limpiar: digitos" quita puntos y espacios antes de validar. "guardar_en" dice
+// dónde queda: en la ficha del asociado (nombre, documento, localidad) o en los datos del caso.
+// "unidades" limita en qué ramas se pide; sin ella se pide en todas. Ver ADR-022.
+export const CAMPO_DESTINOS = ["caso", "contacto_nombre", "contacto_documento", "contacto_localidad"] as const;
+
+const campoSchema = z.object({
+  id: z.string().regex(/^[a-z0-9_]{1,40}$/, "usá minúsculas, números y guion bajo (ej. email)"),
+  etiqueta: z.string().trim().min(1, "falta la etiqueta"),
+  regex: z
+    .string()
+    .optional()
+    .refine((value) => {
+      if (value === undefined) return true;
+      try {
+        new RegExp(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }, "la expresión regular no es válida"),
+  ayuda: z.string().optional(),
+  limpiar: z.enum(["digitos"]).optional(),
+  guardar_en: z.enum(CAMPO_DESTINOS).default("caso"),
+  unidades: z.array(slug).optional(),
+  obligatorio: z.boolean().default(true),
+});
+
+const validacionSchema = z.object({ reintentos_por_campo: z.number().int().min(1).max(10).default(3) });
 
 // Modelo y precios del agente de atención. Los precios son opcionales: sin ellos no se calcula el costo.
 const iaSchema = z.object({
@@ -71,6 +111,8 @@ export const clientConfigSchema = z
     horario_atencion: horarioSchema.optional(),
     temas_sensibles: z.array(temaSensibleSchema).optional(),
     ia: iaSchema.optional(),
+    campos: z.array(campoSchema).optional(),
+    validacion: validacionSchema.optional(),
     seguimientos: seguimientosSchema.optional(),
     textos_editables: textosEditablesSchema.optional(),
     unidades: z.array(unidadSchema).min(1, "tiene que haber al menos una unidad"),
@@ -93,6 +135,24 @@ export const clientConfigSchema = z
     unitIds.forEach((id, index) => {
       if (unitIds.indexOf(id) !== index) {
         ctx.addIssue({ code: "custom", path: ["unidades", index, "id"], message: `la unidad "${id}" está repetida` });
+      }
+    });
+
+    const fieldIds = (config.campos ?? []).map((field) => field.id);
+    (config.campos ?? []).forEach((field, index) => {
+      if (fieldIds.indexOf(field.id) !== index) {
+        ctx.addIssue({ code: "custom", path: ["campos", index, "id"], message: `el campo "${field.id}" está repetido` });
+      }
+      for (const unit of field.unidades ?? []) {
+        if (!unitIds.includes(unit)) {
+          ctx.addIssue({ code: "custom", path: ["campos", index, "unidades"], message: `el campo "${field.id}" apunta a la unidad "${unit}", que no está en la lista de unidades` });
+        }
+      }
+      if (field.guardar_en !== "caso") {
+        const other = (config.campos ?? []).findIndex((candidate) => candidate.guardar_en === field.guardar_en);
+        if (other !== index) {
+          ctx.addIssue({ code: "custom", path: ["campos", index, "guardar_en"], message: `hay más de un campo que se guarda en "${field.guardar_en}"` });
+        }
       }
     });
 

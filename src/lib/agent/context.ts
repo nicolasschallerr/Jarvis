@@ -11,7 +11,7 @@ export const attentionSettingsSchema = z.object({
   businessHours: z
     .object({ days: z.array(z.string()), from: z.string(), to: z.string(), holidays: z.array(z.string()) })
     .nullable(),
-  units: z.array(z.object({ id: z.string(), name: z.string(), sector: z.string() })),
+  units: z.array(z.object({ id: z.string(), name: z.string(), sector: z.string(), handoffMessage: z.string().nullable().default(null) })),
   sectors: z.array(z.object({ id: z.string(), name: z.string() })),
   defaultSector: z.string().nullable(),
   sensitiveTopics: z.array(
@@ -19,6 +19,26 @@ export const attentionSettingsSchema = z.object({
   ),
   // Un documento de conocimiento por unidad (id de la unidad → texto).
   knowledge: z.record(z.string(), z.string()),
+  // Textos fijos que envía el sistema sin pasar por el modelo (null = no configurado).
+  menuText: z.string().nullable().default(null),
+  handoffMessage: z.string().nullable().default(null),
+  // Datos que se juntan, con su validación y dónde se guardan (ver ADR-022). Cuántos intentos fallidos
+  // se toleran por dato antes de pasar a una persona.
+  fields: z
+    .array(
+      z.object({
+        id: z.string(),
+        label: z.string(),
+        regex: z.string().nullable(),
+        help: z.string().nullable(),
+        clean: z.enum(["digits"]).nullable(),
+        store: z.enum(["case", "contact_name", "contact_document", "contact_locality"]),
+        units: z.array(z.string()).nullable(),
+        required: z.boolean(),
+      }),
+    )
+    .default([]),
+  maxFieldRetries: z.number().default(3),
   // Recordatorios cuando el caso espera al asociado: horas desde que quedó esperando y texto a enviar.
   followups: z
     .object({ active: z.boolean(), hours: z.array(z.number()), text: z.string().nullable() })
@@ -93,6 +113,22 @@ export function buildSystemPrompt(prompt: string, settings: AttentionSettings, n
     );
   }
 
+  if (settings.fields.length > 0) {
+    const describeField = (field: AttentionSettings["fields"][number]) =>
+      `- \`${field.id}\`: ${field.label}${field.required ? "" : " (opcional)"}${field.help ? `. ${field.help}` : ""}`;
+    const common = settings.fields.filter((field) => field.units === null);
+    const lines = [
+      "## Datos a juntar (usá estos nombres exactos en guardar_datos_del_caso)",
+      "Pedí los datos obligatorios de a uno por mensaje, en el orden de la lista, y guardalos apenas el asociado los dé. Si un dato es inválido, explicale cómo escribirlo y pedí solo ese. Tras superar los intentos permitidos con un dato, derivá a una persona.",
+    ];
+    if (common.length > 0) lines.push("", "En todas las áreas:", ...common.map(describeField));
+    for (const unit of settings.units) {
+      const own = settings.fields.filter((field) => field.units?.includes(unit.id));
+      if (own.length > 0) lines.push("", `Solo en ${unit.name} (\`${unit.id}\`):`, ...own.map(describeField));
+    }
+    sections.push(lines.join("\n"));
+  }
+
   for (const unit of settings.units) {
     const text = settings.knowledge[unit.id];
     if (text) sections.push(`## Base de conocimiento: ${unit.name}\n\n${text.trim()}`);
@@ -158,4 +194,36 @@ export function buildHistory(rows: HistoryRow[]): ChatMessage[] {
       ? { role: "user", content: turn.text }
       : { role: "assistant", content: [{ type: "text", text: turn.text }] },
   );
+}
+
+// Comando universal MENÚ: en cualquier momento, escribir esa palabra (con o sin tilde, en mayúsculas o
+// minúsculas, con puntuación alrededor) vuelve al menú principal.
+export function isMenuCommand(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const normalized = text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z]/g, "");
+  return normalized === "menu";
+}
+
+// El historial que ve el agente empieza en el último MENÚ del asociado: lo anterior ya no cuenta. El MENÚ
+// y la respuesta con el menú se conservan, así el agente entiende un "3" que contesta ese menú.
+export function sinceLastMenu<T extends HistoryRow>(rows: T[]): T[] {
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const row = rows[index];
+    if (row && row.direction === "inbound" && row.type === "text" && isMenuCommand(row.body)) return rows.slice(index);
+  }
+  return rows;
+}
+
+// Mensaje oficial de derivación: el de la unidad si lo tiene, si no el general. Lo envía el sistema tal
+// cual (reemplazando {{sector}}), así sale idéntico siempre. null si el cliente no lo configuró.
+export function handoffText(settings: AttentionSettings, sectorId: string, unitId: string | null): string | null {
+  const unit = unitId ? settings.units.find((candidate) => candidate.id === unitId) : undefined;
+  const template = unit?.handoffMessage ?? settings.handoffMessage;
+  if (!template) return null;
+  const sectorName = settings.sectors.find((sector) => sector.id === sectorId)?.name ?? sectorId;
+  return template.replace(/\{\{sector\}\}/g, sectorName).trim();
 }

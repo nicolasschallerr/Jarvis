@@ -4,7 +4,7 @@ import type { ModelClient } from "@/lib/ai/types";
 import { sendTextMessage } from "@/lib/outbound/send";
 import type { Database } from "@/lib/supabase/database.types";
 
-import { buildHistory, buildSystemPrompt } from "./context";
+import { buildHistory, buildSystemPrompt, handoffText, isMenuCommand, sinceLastMenu } from "./context";
 import { loadAttentionAgent, loadHistoryRows } from "./load";
 import { runAgentLoop } from "./loop";
 import { recordAiCalls } from "./record";
@@ -61,7 +61,20 @@ export async function respondToMessage(
   // Si lo último no es del asociado, ya se le contestó (o escribió un operador): no se responde dos veces.
   if (!latest || latest.direction !== "inbound") return skipped("ya_respondido");
 
-  const history = buildHistory(ordered);
+  // Comando MENÚ: el sistema contesta el menú principal sin llamar al modelo y reinicia los reintentos.
+  if (settings.menuText && latest.type === "text" && isMenuCommand(latest.body)) {
+    await admin.rpc("agent_reset_attempts", { p_conversation_id: params.conversationId });
+    await sendTextMessage(admin, {
+      conversationId: params.conversationId,
+      text: settings.menuText.slice(0, 4000),
+      sender: "agent",
+      now,
+      fetchImpl: params.fetchImpl,
+    });
+    return { status: "replied", text: settings.menuText };
+  }
+
+  const history = buildHistory(sinceLastMenu(ordered));
   if (history.length === 0) return skipped("sin_mensajes_para_responder");
 
   await admin.from("agents").update({ status: "working" }).eq("id", agentId);
@@ -70,6 +83,8 @@ export async function respondToMessage(
     const tools = createAttentionTools(createSupabaseBackend(admin, params.conversationId), {
       unitSlugs: settings.units.map((unit) => unit.id),
       sectorSlugs: settings.sectors.map((sector) => sector.id),
+      fields: settings.fields,
+      maxFieldRetries: settings.maxFieldRetries,
     });
 
     const record = {
@@ -99,7 +114,18 @@ export async function respondToMessage(
 
     await recordAiCalls(admin, { ...record, steps: result.steps });
 
-    if (!result.text) return skipped("el_modelo_no_escribio_respuesta");
+    // Mensaje oficial de derivación: lo manda el sistema, no el modelo, para que salga idéntico siempre.
+    const handoff = result.steps
+      .flatMap((step) => step.toolCalls)
+      .filter((call) => call.decision?.action === "handoff" && !call.isError)
+      .at(-1)?.decision;
+    const official =
+      handoff && typeof handoff.sector === "string"
+        ? handoffText(settings, handoff.sector, typeof handoff.unit === "string" ? handoff.unit : null)
+        : null;
+
+    const texts = [result.text, official].filter((text): text is string => Boolean(text));
+    if (texts.length === 0) return skipped("el_modelo_no_escribio_respuesta");
 
     // Si mientras el modelo pensaba llegó otro mensaje del asociado, esa otra ejecución responde con
     // el contexto completo; contestar acá dejaría dos respuestas cruzadas.
@@ -114,15 +140,17 @@ export async function respondToMessage(
       .maybeSingle();
     if (newest && newest.id !== latest.id) return skipped("llego_un_mensaje_mas_nuevo");
 
-    await sendTextMessage(admin, {
-      conversationId: params.conversationId,
-      text: result.text.slice(0, 4000),
-      sender: "agent",
-      now,
-      fetchImpl: params.fetchImpl,
-    });
+    for (const text of texts) {
+      await sendTextMessage(admin, {
+        conversationId: params.conversationId,
+        text: text.slice(0, 4000),
+        sender: "agent",
+        now,
+        fetchImpl: params.fetchImpl,
+      });
+    }
 
-    return { status: "replied", text: result.text };
+    return { status: "replied", text: texts.join("\n\n") };
   } catch (error) {
     return { status: "failed", reason: error instanceof Error ? error.message : "Error desconocido" };
   } finally {
