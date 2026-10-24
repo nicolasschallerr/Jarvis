@@ -20,20 +20,25 @@ export async function listCases(params: {
   userId: string;
   sectorId?: string | null;
   includeResolved?: boolean;
+  // Solo los resueltos (el tablero muestra los últimos). Tiene prioridad sobre includeResolved.
+  resolvedOnly?: boolean;
+  limit?: number;
 }) {
   if (params.view === "sector" && !params.sectorId) return [];
 
   let query = params.userClient.from("cases").select(SELECT);
 
-  if (!params.includeResolved) query = query.neq("status", "resolved");
+  if (params.resolvedOnly) query = query.eq("status", "resolved");
+  else if (!params.includeResolved) query = query.neq("status", "resolved");
   if (params.view === "mine") query = query.eq("assigned_to", params.userId);
   if (params.view === "unassigned") query = query.is("assigned_to", null);
   if (params.view === "sector" && params.sectorId) query = query.eq("sector_id", params.sectorId);
 
-  const { data, error } = await query
-    .order("priority", { ascending: false })
+  // Los resueltos, del más reciente al más viejo; el resto, lo más urgente primero.
+  const ordered = params.resolvedOnly ? query : query.order("priority", { ascending: false });
+  const { data, error } = await ordered
     .order("updated_at", { ascending: false })
-    .limit(CASE_LIST_LIMIT);
+    .limit(params.limit ?? CASE_LIST_LIMIT);
 
   if (error) throw new Error(`No se pudieron listar los casos: ${error.message}`);
   return data ?? [];

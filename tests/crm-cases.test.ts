@@ -249,3 +249,20 @@ describe("asignación, derivación y listas", () => {
     expect(all.every((item) => item.id !== undefined)).toBe(true);
   });
 });
+
+describe("listas para el tablero: resueltos recientes", () => {
+  it("'solo resueltos' trae únicamente los resueltos y respeta el límite", async () => {
+    const resolved = await listCases({ userClient: viewer.client, view: "all", userId: viewer.id, resolvedOnly: true, limit: 1 });
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]?.status).toBe("resolved");
+  });
+
+  it("la lista normal no mezcla resueltos y la de resueltos no trae abiertos", async () => {
+    const open = await listCases({ userClient: viewer.client, view: "all", userId: viewer.id });
+    expect(open.length).toBeGreaterThan(0);
+    expect(open.every((item) => item.status !== "resolved")).toBe(true);
+
+    const resolved = await listCases({ userClient: viewer.client, view: "all", userId: viewer.id, resolvedOnly: true });
+    expect(resolved.every((item) => item.status === "resolved")).toBe(true);
+  });
+});
