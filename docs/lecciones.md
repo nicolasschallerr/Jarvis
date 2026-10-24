@@ -232,3 +232,23 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** el resultado de la llamada se perdió y no se sabía qué había quedado hecho.
 - **Solución:** revisar `git status`, buscar el bloque agregado (una sola vez) y repetir la verificación completa antes del commit.
 - **Cómo evitarlo:** los pasos que agregan texto con `>>` no se repiten a ciegas: se comprueba primero si ya están.
+
+## Fase 06
+
+### 37. Un disparador no sabe quién escribe si el servidor entra sin usuario
+- **Problema:** el historial de casos anotaba como "sistema" todo lo que hacía el agente, porque el servidor usa la clave de servicio y no hay usuario en la sesión.
+- **Causa real:** el disparador deducía el actor solo de `auth.uid()`; con la clave de servicio ese valor es nulo.
+- **Solución:** el agente no escribe las tablas: llama funciones de la base que fijan `jarvis.actor = 'agent'` solo dentro de su transacción (`set_config(..., true)`), y el disparador lo lee.
+- **Cómo evitarlo:** cuando importe distinguir quién hizo un cambio, pasar esa señal por la misma transacción que escribe; no depender de lo que "se acuerde" de anotar cada llamada.
+
+### 38. Un valor por defecto que toma el recurso real hace que las pruebas puedan gastar
+- **Problema:** al conectar el agente al procesador, las pruebas existentes que lo llaman podían terminar usando el cliente real de Claude si `.env.local` tenía una clave.
+- **Causa real:** el parámetro nuevo tenía como valor por defecto el cliente real (cómodo en producción, peligroso en pruebas).
+- **Solución:** las pruebas pasan `null` explícito (sin agente) y el motor se prueba con el cliente simulado; sin clave el sistema solo guarda mensajes.
+- **Cómo evitarlo:** todo servicio que cuesta dinero se inyecta; los tests lo reemplazan de forma explícita y lo único que usa el recurso real es un script manual.
+
+### 39. Probar con un modelo simulado no prueba la calidad de la atención
+- **Problema:** las 14 pruebas del motor pasan sin llamar a Claude; eso demuestra el circuito (herramientas, historial, actor, trazabilidad), no que el agente conteste bien.
+- **Causa real:** el cliente simulado devuelve lo que se le escribió de antemano.
+- **Solución:** declarar la fase como no cerrada hasta correr una conversación real y, en la Fase 8, evaluar con casos fijos.
+- **Cómo evitarlo:** separar "el circuito funciona" de "el agente atiende bien", y no dar la segunda por cierta con pruebas de la primera.
