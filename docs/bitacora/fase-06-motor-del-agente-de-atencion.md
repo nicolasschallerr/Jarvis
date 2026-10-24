@@ -19,8 +19,9 @@ junte datos, derive al sector con un resumen o consulte al área, y deje todo re
 | 6.7 | El sector responde las consultas del agente desde el panel del caso | `src/lib/crm/area-queries.ts`, `conversaciones/[id]/area-*` (`7df15da`) |
 | 6.8 | El agente le transmite al asociado la respuesta del área por el mismo chat | `src/lib/agent/area-replies.ts`, `src/lib/agent/load.ts`, ruta del trabajador (`0e43cc8`, `2e40125`) |
 | 6.9 | Avisos al sector cuando el agente deriva o consulta, visibles en Inicio | migración `…20261024110000`, `src/lib/crm/notifications.ts`, `(crm)/page.tsx` |
+| 6.10 | Adelanto de la Fase 8: runner de evals con juez, probado con modelo simulado | `src/lib/evals/*`, `scripts/correr-evals.mts`, ADR-020 |
 
-Pruebas: **227** en 30 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
+Pruebas: **241** en 31 archivos con el modelo simulado (189 al cierre de la Fase 5). `build`, `lint` y tipos sin errores.
 
 ## Cómo se resolvió
 1. El modelo nunca toca las tablas: sus herramientas llaman funciones de la base que validan y fijan el actor (ADR-019, lección 37).

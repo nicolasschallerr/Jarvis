@@ -8,7 +8,7 @@ import { buildHistory, buildSystemPrompt } from "./context";
 import { loadAttentionAgent, loadHistoryRows } from "./load";
 import { runAgentLoop } from "./loop";
 import { recordAiCalls } from "./record";
-import { createAttentionTools } from "./tools";
+import { createAttentionTools, createSupabaseBackend } from "./tools";
 
 export type AttentionResult =
   | { status: "replied"; text: string }
@@ -67,8 +67,7 @@ export async function respondToMessage(
   await admin.from("agents").update({ status: "working" }).eq("id", agentId);
 
   try {
-    const tools = createAttentionTools(admin, {
-      conversationId: params.conversationId,
+    const tools = createAttentionTools(createSupabaseBackend(admin, params.conversationId), {
       unitSlugs: settings.units.map((unit) => unit.id),
       sectorSlugs: settings.sectors.map((sector) => sector.id),
     });

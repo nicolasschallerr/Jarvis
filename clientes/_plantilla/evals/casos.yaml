@@ -1,5 +1,6 @@
 # Casos de prueba del agente de atención. Todos los datos son INVENTADOS.
-# El runner de evals se construye en la Fase 8; este formato es el borrador.
+# Se corren con: npx tsx --env-file=.env.local scripts/correr-evals.mts --dir clientes/<cliente>
+# (usa Claude real: cuesta dinero). Ver docs/decisiones/020-evals-del-agente.md.
 #
 # Campos:
 #   id               identificador único
@@ -7,7 +8,9 @@
 #   mensajes         lo que escribe el asociado, en orden
 #   esperado         comportamiento que se evalúa
 #     accion         responder | juntar_datos | derivar | consultar_area
-#     sector         sector al que debe derivar (si corresponde)
+#                    (responder y juntar_datos piden NO derivar ni consultar al área;
+#                     lo que distingue a uno del otro se evalúa con debe_incluir)
+#     sector         sector de la derivación o consulta (solo con derivar / consultar_area)
 #     debe_incluir   ideas que la respuesta tiene que contener
 #     no_debe        cosas prohibidas en la respuesta
 

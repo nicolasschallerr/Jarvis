@@ -1,10 +1,11 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
 import { createClient } from "@supabase/supabase-js";
 
 import { syncAttentionConfig } from "../src/lib/client-config/attention";
+import { readAttentionFiles } from "../src/lib/client-config/read-dir";
 import { parseClientConfig, syncAgents, syncSectorsAndUnits } from "../src/lib/client-config/load";
 import type { Database } from "../src/lib/supabase/database.types";
 
@@ -75,28 +76,17 @@ const agents = await syncAgents(admin, organization.id, parsed.config);
 console.log("Agentes:", agents);
 
 // Prompt y conocimiento del agente de atención (agente-prompt.md y conocimiento/<unidad>.md).
-const promptFile = join(directory, "agente-prompt.md");
-if (existsSync(promptFile)) {
-  const knowledge: Record<string, string> = {};
-  const knowledgeDir = join(directory, "conocimiento");
-  if (existsSync(knowledgeDir)) {
-    for (const name of readdirSync(knowledgeDir)) {
-      if (name.endsWith(".md")) knowledge[name.slice(0, -3)] = readFileSync(join(knowledgeDir, name), "utf8");
-    }
-  }
-
+const files = readAttentionFiles(directory);
+if (files) {
   const unitIds = parsed.config.unidades.map((unit) => unit.id);
-  for (const id of Object.keys(knowledge)) {
+  for (const id of Object.keys(files.knowledge)) {
     if (!unitIds.includes(id)) console.warn(`Aviso: conocimiento/${id}.md no corresponde a ninguna unidad del YAML.`);
   }
   for (const id of unitIds) {
-    if (!(id in knowledge)) console.warn(`Aviso: la unidad "${id}" no tiene conocimiento/${id}.md.`);
+    if (!(id in files.knowledge)) console.warn(`Aviso: la unidad "${id}" no tiene conocimiento/${id}.md.`);
   }
 
-  const attention = await syncAttentionConfig(admin, organization.id, parsed.config, {
-    prompt: readFileSync(promptFile, "utf8"),
-    knowledge,
-  });
+  const attention = await syncAttentionConfig(admin, organization.id, parsed.config, files);
   console.log("Agente de atención:", attention);
 } else {
   console.warn("Aviso: no hay agente-prompt.md; el agente de atención no tendrá configuración.");

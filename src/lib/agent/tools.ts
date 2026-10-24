@@ -6,10 +6,50 @@ import type { Database, Json } from "@/lib/supabase/database.types";
 import type { AgentTool } from "./loop";
 
 export type ToolContext = {
-  conversationId: string;
   unitSlugs: string[];
   sectorSlugs: string[];
 };
+
+// Dónde se guardan los efectos de las herramientas. En producción es la base (funciones que fijan el
+// actor "agente"); en los evals es una memoria que solo anota qué se pidió. Cada operación devuelve
+// null si salió bien o el motivo del error.
+export type CaseBackend = {
+  saveCaseData(input: { unit: string; title: string; data: Record<string, string | number | boolean> }): Promise<string | null>;
+  handoff(input: { sector: string; summary: string; priority: "low" | "normal" | "high" | "urgent" }): Promise<string | null>;
+  askArea(input: { sector: string; question: string }): Promise<string | null>;
+};
+
+// Backend de producción: llama a las funciones de la base de la conversación indicada.
+export function createSupabaseBackend(admin: SupabaseClient<Database>, conversationId: string): CaseBackend {
+  return {
+    async saveCaseData(input) {
+      const { error } = await admin.rpc("agent_save_case_data", {
+        p_conversation_id: conversationId,
+        p_unit_slug: input.unit,
+        p_title: input.title,
+        p_data: input.data as Json,
+      });
+      return error?.message ?? null;
+    },
+    async handoff(input) {
+      const { error } = await admin.rpc("agent_handoff_case", {
+        p_conversation_id: conversationId,
+        p_sector_slug: input.sector,
+        p_summary: input.summary,
+        p_priority: input.priority,
+      });
+      return error?.message ?? null;
+    },
+    async askArea(input) {
+      const { error } = await admin.rpc("agent_ask_area", {
+        p_conversation_id: conversationId,
+        p_sector_slug: input.sector,
+        p_question: input.question,
+      });
+      return error?.message ?? null;
+    },
+  };
+}
 
 const saveSchema = z.object({
   unidad: z.string().optional(),
@@ -32,10 +72,10 @@ function invalid(error: z.ZodError): { output: string; isError: true } {
   return { output: `Datos inválidos: ${error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`, isError: true };
 }
 
-// Herramientas del agente de atención. Todas escriben por funciones de la base que fijan el actor
-// "agente" en el historial; el modelo nunca toca las tablas directamente. Los sectores y unidades
-// válidos salen de la configuración del cliente, no están escritos en el código.
-export function createAttentionTools(admin: SupabaseClient<Database>, context: ToolContext): AgentTool[] {
+// Herramientas del agente de atención. El modelo nunca toca las tablas: sus pedidos pasan por el
+// backend, que valida y registra. Los sectores y unidades válidos salen de la configuración del
+// cliente, no están escritos en el código.
+export function createAttentionTools(backend: CaseBackend, context: ToolContext): AgentTool[] {
   return [
     {
       name: "guardar_datos_del_caso",
@@ -54,13 +94,12 @@ export function createAttentionTools(admin: SupabaseClient<Database>, context: T
         const parsed = saveSchema.safeParse(input);
         if (!parsed.success) return invalid(parsed.error);
 
-        const { error } = await admin.rpc("agent_save_case_data", {
-          p_conversation_id: context.conversationId,
-          p_unit_slug: parsed.data.unidad ?? "",
-          p_title: parsed.data.titulo ?? "",
-          p_data: parsed.data.datos as Json,
+        const failure = await backend.saveCaseData({
+          unit: parsed.data.unidad ?? "",
+          title: parsed.data.titulo ?? "",
+          data: parsed.data.datos,
         });
-        if (error) return { output: `No se pudo guardar: ${error.message}`, isError: true };
+        if (failure) return { output: `No se pudo guardar: ${failure}`, isError: true };
         return { output: "Datos guardados." };
       },
     },
@@ -81,13 +120,12 @@ export function createAttentionTools(admin: SupabaseClient<Database>, context: T
         const parsed = handoffSchema.safeParse(input);
         if (!parsed.success) return invalid(parsed.error);
 
-        const { error } = await admin.rpc("agent_handoff_case", {
-          p_conversation_id: context.conversationId,
-          p_sector_slug: parsed.data.sector,
-          p_summary: parsed.data.resumen,
-          p_priority: parsed.data.prioridad,
+        const failure = await backend.handoff({
+          sector: parsed.data.sector,
+          summary: parsed.data.resumen,
+          priority: parsed.data.prioridad,
         });
-        if (error) return { output: `No se pudo derivar: ${error.message}`, isError: true };
+        if (failure) return { output: `No se pudo derivar: ${failure}`, isError: true };
         return {
           output: "Caso derivado.",
           decision: { action: "handoff", sector: parsed.data.sector, priority: parsed.data.prioridad },
@@ -110,12 +148,8 @@ export function createAttentionTools(admin: SupabaseClient<Database>, context: T
         const parsed = askSchema.safeParse(input);
         if (!parsed.success) return invalid(parsed.error);
 
-        const { error } = await admin.rpc("agent_ask_area", {
-          p_conversation_id: context.conversationId,
-          p_sector_slug: parsed.data.sector,
-          p_question: parsed.data.pregunta,
-        });
-        if (error) return { output: `No se pudo consultar: ${error.message}`, isError: true };
+        const failure = await backend.askArea({ sector: parsed.data.sector, question: parsed.data.pregunta });
+        if (failure) return { output: `No se pudo consultar: ${failure}`, isError: true };
         return { output: "Consulta enviada al área.", decision: { action: "ask_area", sector: parsed.data.sector } };
       },
     },
