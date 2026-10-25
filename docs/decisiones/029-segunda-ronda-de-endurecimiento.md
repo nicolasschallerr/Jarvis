@@ -32,6 +32,6 @@ los casos que una persona podía cambiar saltándose la pantalla.
 ## Consecuencias
 
 - Respuestas del área y seguimientos no se pierden: se demoran hasta que se puedan enviar.
-- Pendiente de esa revisión (rendimiento con miles de conversaciones): guardar el último mensaje en la conversación
-  en vez de calcularlo en la vista, contar la bandeja con índices, programar seguimientos en una sola consulta y que
-  el agente analítico agregue en SQL en vez de traer filas.
+- El rendimiento con miles de conversaciones se resolvió en el ADR-032 (último mensaje guardado en la conversación e
+  índices). Sigue pendiente, si hiciera falta: programar seguimientos en una sola consulta y que el agente analítico
+  agregue en SQL.

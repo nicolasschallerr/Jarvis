@@ -7,7 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 
 const REFRESH_DELAY_MS = 400;
 
-type Scope = { organizationId: string } | { conversationId: string };
+// `agents`: también recargar cuando cambia el estado de un agente (solo el Inicio lo muestra). El agente escribe su
+// estado en cada turno, así que en la bandeja o en casos provocaría recargas que no cambian nada.
+type Scope = { organizationId: string; agents?: boolean } | { conversationId: string };
 
 // Mantiene la pantalla al día sin recargar: escucha los cambios de la base (Supabase Realtime) y
 // pide a Next que vuelva a leer los datos de la página. Realtime respeta RLS con la sesión del
@@ -16,6 +18,7 @@ export function LiveRefresh(props: Scope) {
   const router = useRouter();
   const conversationId = "conversationId" in props ? props.conversationId : null;
   const organizationId = "organizationId" in props ? props.organizationId : null;
+  const watchAgents = "agents" in props && props.agents === true;
 
   useEffect(() => {
     const supabase = createClient();
@@ -46,7 +49,7 @@ export function LiveRefresh(props: Scope) {
 
     // Las listas también cambian cuando se crea o actualiza una conversación o un caso.
     if (organizationId) {
-      for (const table of ["conversations", "cases", "agents"]) {
+      for (const table of watchAgents ? ["conversations", "cases", "agents"] : ["conversations", "cases"]) {
         channel.on(
           "postgres_changes",
           { event: "*", schema: "public", table, filter: `organization_id=eq.${organizationId}` },
@@ -76,7 +79,7 @@ export function LiveRefresh(props: Scope) {
       document.removeEventListener("visibilitychange", onVisible);
       void supabase.removeChannel(channel);
     };
-  }, [router, conversationId, organizationId]);
+  }, [router, conversationId, organizationId, watchAgents]);
 
   return null;
 }

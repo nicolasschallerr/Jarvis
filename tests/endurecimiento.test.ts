@@ -201,6 +201,58 @@ describe("segunda ronda (ADR-029)", () => {
   });
 });
 
+describe("último mensaje guardado en la conversación (ADR-032)", () => {
+  const lastOf = async () => {
+    const { data } = await admin.from("conversations").select("last_body, last_direction, last_sender").eq("id", telegramConversation).single();
+    return data;
+  };
+
+  it("sale del mensaje más reciente y se actualiza al guardar otro", async () => {
+    expect(await lastOf()).toMatchObject({ last_body: "hola", last_direction: "inbound", last_sender: "contact" });
+
+    const [orgA = ""] = orgIds;
+    const { error } = await admin.from("messages").insert({
+      organization_id: orgA,
+      conversation_id: telegramConversation,
+      direction: "outbound",
+      sender: "agent",
+      type: "text",
+      body: "Hola, te ayudo",
+      status: "sent",
+      provider_timestamp: new Date().toISOString(),
+    });
+    expect(error).toBeNull();
+    expect(await lastOf()).toMatchObject({ last_body: "Hola, te ayudo", last_direction: "outbound", last_sender: "agent" });
+  });
+
+  it("un envío que falló deja de ser el último", async () => {
+    const [orgA = ""] = orgIds;
+    const { data: failed } = await admin
+      .from("messages")
+      .insert({
+        organization_id: orgA,
+        conversation_id: telegramConversation,
+        direction: "outbound",
+        sender: "operator",
+        type: "text",
+        body: "no salió",
+        status: "queued",
+        provider_timestamp: new Date(Date.now() + 1000).toISOString(),
+      })
+      .select("id")
+      .single();
+    expect((await lastOf())?.last_body).toBe("no salió");
+
+    await admin.from("messages").update({ status: "failed" }).eq("id", failed?.id ?? "");
+    expect((await lastOf())?.last_body).toBe("Hola, te ayudo");
+  });
+
+  it("una persona no puede escribir esas columnas", async () => {
+    const { error } = await superadmin.client.from("conversations").update({ last_body: "falso" }).eq("id", telegramConversation);
+    expect(error?.message).toContain("solo el sistema");
+  });
+});
+
 describe("turno del agente por conversación", () => {
   it("una sola ejecución a la vez; al soltarlo se puede volver a tomar", async () => {
     const first = await admin.rpc("claim_agent_turn", { p_conversation_id: telegramConversation });

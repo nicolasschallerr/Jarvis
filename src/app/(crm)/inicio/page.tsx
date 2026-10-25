@@ -75,7 +75,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
           line: welcomeLine(agent.kind, summary.counts),
         }))}
       />
-      <LiveRefresh organizationId={profile.organizationId} />
+      <LiveRefresh organizationId={profile.organizationId} agents />
 
       <header className="rise-in relative flex flex-col gap-1 overflow-hidden rounded-2xl border border-line bg-surface p-5 sm:p-6">
         <div

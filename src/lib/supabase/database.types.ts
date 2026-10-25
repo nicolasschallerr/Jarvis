@@ -1124,8 +1124,15 @@ export type Database = {
           contact_id: string
           created_at: string
           id: string
+          last_body: string | null
+          last_direction:
+            | Database["public"]["Enums"]["message_direction"]
+            | null
           last_inbound_at: string | null
           last_message_at: string | null
+          last_message_id: string | null
+          last_sender: Database["public"]["Enums"]["message_sender"] | null
+          last_type: Database["public"]["Enums"]["message_type"] | null
           organization_id: string
           updated_at: string
         }
@@ -1137,8 +1144,15 @@ export type Database = {
           contact_id: string
           created_at?: string
           id?: string
+          last_body?: string | null
+          last_direction?:
+            | Database["public"]["Enums"]["message_direction"]
+            | null
           last_inbound_at?: string | null
           last_message_at?: string | null
+          last_message_id?: string | null
+          last_sender?: Database["public"]["Enums"]["message_sender"] | null
+          last_type?: Database["public"]["Enums"]["message_type"] | null
           organization_id: string
           updated_at?: string
         }
@@ -1150,8 +1164,15 @@ export type Database = {
           contact_id?: string
           created_at?: string
           id?: string
+          last_body?: string | null
+          last_direction?:
+            | Database["public"]["Enums"]["message_direction"]
+            | null
           last_inbound_at?: string | null
           last_message_at?: string | null
+          last_message_id?: string | null
+          last_sender?: Database["public"]["Enums"]["message_sender"] | null
+          last_type?: Database["public"]["Enums"]["message_type"] | null
           organization_id?: string
           updated_at?: string
         }
@@ -1471,7 +1492,7 @@ export type Database = {
           id: string
           organization_id: string
           pricing: Json | null
-          provider_timestamp: string | null
+          provider_timestamp: string
           raw: Json | null
           sender: Database["public"]["Enums"]["message_sender"]
           sender_profile_id: string | null
@@ -1493,7 +1514,7 @@ export type Database = {
           id?: string
           organization_id: string
           pricing?: Json | null
-          provider_timestamp?: string | null
+          provider_timestamp?: string
           raw?: Json | null
           sender: Database["public"]["Enums"]["message_sender"]
           sender_profile_id?: string | null
@@ -1515,7 +1536,7 @@ export type Database = {
           id?: string
           organization_id?: string
           pricing?: Json | null
-          provider_timestamp?: string | null
+          provider_timestamp?: string
           raw?: Json | null
           sender?: Database["public"]["Enums"]["message_sender"]
           sender_profile_id?: string | null
