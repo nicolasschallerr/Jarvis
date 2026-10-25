@@ -14,7 +14,7 @@ está escrita en ningún documento del repositorio: se listan por tema.
 | 3 | Recepción y envío de mensajes (Telegram de desarrollo; recepción de WhatsApp) |
 | 4 | Bandeja del CRM |
 | 5 | Sectores, casos y rediseño |
-| 12 | Unir contactos duplicados |
+| 12 | Unir contactos duplicados (tag `fase-12`, 2026-10-25) |
 
 ## Construidas, falta una o dos tareas para cerrar
 
