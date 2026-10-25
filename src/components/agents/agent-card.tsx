@@ -22,7 +22,13 @@ export type AgentView = {
 // Tarjeta de un agente: su mascota, su rol, su estado en vivo y una frase suya. La frase es de
 // personalidad (la configura el cliente): no cuenta cosas que el agente no hizo.
 export function AgentCard({ agent, blinkDelay = 0 }: { agent: AgentView; blinkDelay?: number }) {
-  const status = STATUS[agent.status];
+  // "En pausa" en la base significa "no está trabajando ahora": un agente encendido en reposo está disponible, y uno
+  // apagado, apagado.
+  const status = !agent.isEnabled
+    ? { label: "Apagado", dot: "bg-zinc-400" }
+    : agent.status === "paused"
+      ? { label: "Disponible", dot: "bg-success/60" }
+      : STATUS[agent.status];
   const accent = agent.kind === "attention" ? "bg-agent-jarvis" : "bg-agent-sinapsis";
 
   return (

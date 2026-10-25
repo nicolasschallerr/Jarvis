@@ -86,5 +86,5 @@ Escaneo completo de las fases, la interfaz y el CRM, con tres revisiones (interf
   (datos inventados) para mostrar el producto. Las credenciales quedan en `.env.local`.
 - **Pruebas nuevas:** `tests/endurecimiento.test.ts`, `tests/crm-inbox.test.ts` y casos nuevos en `crm-reply` y
   `agent-fields`.
-- **Pendiente de esta auditoría:** respuestas rápidas, "cargar mensajes anteriores" en conversaciones largas y editar la
-  ficha desde la página del contacto.
+- **Pendientes de la auditoría, ya hechos (2026-10-25):** respuestas rápidas, "cargar mensajes anteriores", ficha editable
+  desde Contactos y estado "Disponible" del agente (ADR-028).

@@ -47,5 +47,9 @@ tomara una conversación y Jarvis dejara de responder, ni búsqueda, filtros, pa
 
 - Un color nuevo se agrega como token, no como clase suelta.
 - El agente respeta `ai_enabled` en cada turno: una conversación tomada no recibe respuestas de Jarvis hasta devolverla.
-- Falta: respuestas rápidas guardadas, "cargar mensajes anteriores" (hoy se ven los últimos 200) y editar la ficha desde
-  la página del contacto.
+- **Respuestas rápidas** (tabla `quick_replies`): textos que el equipo guarda y reusa al contestar. Leen todos de la
+  organización; crean y borran superadmin y operadores (RLS, probado saltando la pantalla).
+- **Cargar mensajes anteriores:** la conversación muestra los últimos 100 y un botón suma 100 más (tope 2000), por la URL.
+- **Ficha editable desde Contactos**, con el mismo formulario que la conversación.
+- **Estado del agente:** un agente encendido que no trabaja ahora se ve "Disponible"; uno apagado, "Apagado".
+- Falta: editar o renombrar una respuesta rápida (hoy se borra y se vuelve a crear).

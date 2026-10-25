@@ -28,6 +28,7 @@ export async function updateContactAction(
 
   if (!result.ok) return { error: result.error, warning: null, savedAt: null };
 
-  revalidatePath(`/conversaciones/${conversationId}`);
+  if (conversationId) revalidatePath(`/conversaciones/${conversationId}`);
+  revalidatePath(`/contactos/${contactId}`);
   return { error: null, warning: result.warning, savedAt: Date.now() };
 }

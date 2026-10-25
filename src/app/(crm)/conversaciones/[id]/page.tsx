@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeftIcon, BotIcon } from "@/components/ui/icons";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { channelLabel, dayHeading, dayKeyOf, timeOnly, typeLabel } from "@/lib/crm/format";
+import { listQuickReplies } from "@/lib/crm/quick-replies";
 import { createClient } from "@/lib/supabase/server";
 
 import type { ChannelType } from "@/lib/inbound/types";
@@ -21,8 +22,13 @@ import { ReplyForm } from "./reply-form";
 import { ScrollToEnd } from "./scroll-to-end";
 import { OpenSidePanelButton } from "./side-panel";
 
-const MESSAGE_LIMIT = 200;
+const MESSAGE_PAGE = 100;
+const MESSAGE_MAX = 2000;
 const SIGNED_URL_SECONDS = 3600;
+
+function first(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
 
 // Lee la sesión: bloquea en el servidor hasta tenerla (ver el layout del CRM).
 export const instant = false;
@@ -47,11 +53,13 @@ function whenOf(message: MessageRow): string {
 
 export const metadata = { title: "Conversación" };
 
-export default async function ConversacionPage({ params }: PageProps<"/conversaciones/[id]">) {
+export default async function ConversacionPage({ params, searchParams }: PageProps<"/conversaciones/[id]">) {
   // Página por pedido: lee la sesión y la hora actual (ver la nota de `instant` en el layout del CRM).
   await connection();
   const profile = await getCurrentProfile();
   const { id } = await params;
+  const requested = Number(first((await searchParams).mensajes));
+  const limit = Number.isInteger(requested) && requested > 0 ? Math.min(requested, MESSAGE_MAX) : MESSAGE_PAGE;
   const now = new Date();
 
   const supabase = await createClient();
@@ -71,8 +79,10 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
     .eq("conversation_id", id)
     .order("provider_timestamp", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
-    .limit(MESSAGE_LIMIT);
-  const messages: MessageRow[] = [...(latest ?? [])].reverse();
+    .limit(limit + 1);
+  // Se pide uno más para saber si hay mensajes anteriores.
+  const hasOlder = (latest?.length ?? 0) > limit;
+  const messages: MessageRow[] = [...(latest ?? []).slice(0, limit)].reverse();
 
   // Nombres de quienes respondieron a mano, para firmar cada burbuja.
   const operatorIds = [...new Set(messages.map((message) => message.sender_profile_id).filter((value): value is string => !!value))];
@@ -99,6 +109,7 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
     if (url) mediaByMessage.set(file.message_id, { url, mimeType: file.mime_type });
   }
 
+  const quickReplies = profile.role === "viewer" ? [] : await listQuickReplies(supabase);
   const channel = (conversation.channel_type ?? "whatsapp") as ChannelType;
   const contactName = conversation.contact_name || "Sin nombre";
   const aiEnabled = conversation.ai_enabled ?? false;
@@ -151,6 +162,13 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
         </header>
 
         <ol className="flex flex-1 flex-col gap-2 overflow-y-auto px-4 py-4 sm:px-6" aria-label="Mensajes">
+          {hasOlder ? (
+            <li className="flex justify-center pb-2">
+              <Link href={`/conversaciones/${id}?mensajes=${limit + MESSAGE_PAGE}`} scroll={false} className="btn-secondary !py-1 text-xs">
+                Cargar mensajes anteriores
+              </Link>
+            </li>
+          ) : null}
           {messages.length === 0 ? <li className="m-auto text-sm text-muted">Esta conversación todavía no tiene mensajes.</li> : null}
           {messages.map((message, index) => {
             const when = whenOf(message);
@@ -168,7 +186,7 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
               />
             );
           })}
-          <ScrollToEnd count={messages.length} />
+          <ScrollToEnd lastId={messages.at(-1)?.id ?? null} />
         </ol>
         <LiveRefresh conversationId={conversation.id ?? id} />
 
@@ -180,7 +198,7 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
             (disponible más adelante).
           </p>
         ) : (
-          <ReplyForm conversationId={conversation.id ?? id} aiEnabled={aiEnabled} />
+          <ReplyForm conversationId={conversation.id ?? id} aiEnabled={aiEnabled} quickReplies={quickReplies} />
         )}
       </main>
       <Suspense fallback={<aside className="hidden w-80 shrink-0 border-l border-line p-4 lg:block xl:w-96" aria-busy="true"><div className="skeleton h-40" /></aside>}>

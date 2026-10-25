@@ -11,6 +11,8 @@ import { channelLabel, dateTime, messagePreview, shortDate } from "@/lib/crm/for
 import { lastSenderPrefix } from "@/lib/crm/inbox";
 import { createClient } from "@/lib/supabase/server";
 
+import { ContactForm } from "../../conversaciones/[id]/contact-form";
+
 export const metadata = { title: "Contacto" };
 
 // Lee la sesión: bloquea en el servidor hasta tenerla (ver el layout del CRM).
@@ -20,7 +22,7 @@ export const instant = false;
 // conversación (ahí están los formularios); esta página es para ver a la persona completa de un vistazo.
 export default async function ContactoPage({ params }: PageProps<"/contactos/[id]">) {
   await connection();
-  await getCurrentProfile();
+  const profile = await getCurrentProfile();
   const { id } = await params;
 
   const history = await getContactHistory({ userClient: await createClient(), contactId: id });
@@ -131,20 +133,20 @@ export default async function ContactoPage({ params }: PageProps<"/contactos/[id
             <h2 id="ficha" className="font-semibold">
               Ficha
             </h2>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
-              <dt className="text-muted">Documento</dt>
-              <dd>{contact.document_number ?? "—"}</dd>
-              <dt className="text-muted">Localidad</dt>
-              <dd>{contact.locality ?? "—"}</dd>
-              <dt className="text-muted">Envíos</dt>
-              <dd>{contact.opted_out_at ? "No quiere recibir" : contact.opted_in_at ? "Aceptó recibir" : "Sin registrar"}</dd>
-            </dl>
-            {contact.notes ? <p className="whitespace-pre-wrap break-words rounded-lg bg-zinc-100 p-3 dark:bg-zinc-800/60">{contact.notes}</p> : null}
-            {conversations[0]?.id ? (
-              <Link href={`/conversaciones/${conversations[0].id}`} className="btn-secondary text-center">
-                Editar en la conversación
-              </Link>
-            ) : null}
+            <ContactForm
+              contactId={contact.id}
+              conversationId=""
+              canEdit={profile.role !== "viewer"}
+              values={{
+                displayName: contact.display_name ?? "",
+                documentNumber: contact.document_number ?? "",
+                locality: contact.locality ?? "",
+                notes: contact.notes ?? "",
+              }}
+            />
+            <p className="text-xs text-muted">
+              Envíos: {contact.opted_out_at ? "no quiere recibir" : contact.opted_in_at ? "aceptó recibir" : "sin registrar"}
+            </p>
           </section>
 
           <section aria-labelledby="canales" className="card flex flex-col gap-2 p-4 text-sm">
