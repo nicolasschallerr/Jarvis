@@ -305,6 +305,8 @@ export type Database = {
           id: string
           organization_id: string
           question: string
+          reply_attempts: number
+          reply_error: string | null
           reply_sent_at: string | null
           sector_id: string
           status: Database["public"]["Enums"]["area_query_status"]
@@ -321,6 +323,8 @@ export type Database = {
           id?: string
           organization_id: string
           question: string
+          reply_attempts?: number
+          reply_error?: string | null
           reply_sent_at?: string | null
           sector_id: string
           status?: Database["public"]["Enums"]["area_query_status"]
@@ -337,6 +341,8 @@ export type Database = {
           id?: string
           organization_id?: string
           question?: string
+          reply_attempts?: number
+          reply_error?: string | null
           reply_sent_at?: string | null
           sector_id?: string
           status?: Database["public"]["Enums"]["area_query_status"]
@@ -1108,6 +1114,7 @@ export type Database = {
       }
       conversations: {
         Row: {
+          agent_lock_until: string | null
           ai_enabled: boolean
           assigned_to: string | null
           channel_id: string
@@ -1120,6 +1127,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agent_lock_until?: string | null
           ai_enabled?: boolean
           assigned_to?: string | null
           channel_id: string
@@ -1132,6 +1140,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agent_lock_until?: string | null
           ai_enabled?: boolean
           assigned_to?: string | null
           channel_id?: string
@@ -1834,10 +1843,12 @@ export type Database = {
           assigned_to: string | null
           case_assigned_to: string | null
           case_priority: Database["public"]["Enums"]["case_priority"] | null
+          case_sector_id: string | null
           case_status: Database["public"]["Enums"]["case_status"] | null
           channel_id: string | null
           channel_name: string | null
           channel_type: Database["public"]["Enums"]["channel_type"] | null
+          contact_document: string | null
           contact_id: string | null
           contact_name: string | null
           id: string | null
@@ -1847,6 +1858,7 @@ export type Database = {
             | null
           last_inbound_at: string | null
           last_message_at: string | null
+          last_sender: Database["public"]["Enums"]["message_sender"] | null
           last_type: Database["public"]["Enums"]["message_type"] | null
           organization_id: string | null
           window_open: boolean | null
@@ -1857,6 +1869,13 @@ export type Database = {
             columns: ["case_assigned_to"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cases_sector_id_fkey"
+            columns: ["case_sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
             referencedColumns: ["id"]
           },
           {
@@ -1938,6 +1957,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      claim_agent_turn: {
+        Args: { p_conversation_id: string; p_seconds?: number }
+        Returns: boolean
+      }
       claim_webhook_events: {
         Args: { p_limit?: number; p_prefix: string }
         Returns: {
@@ -2001,6 +2024,10 @@ export type Database = {
       merge_contacts: {
         Args: { p_keep: string; p_remove: string }
         Returns: Json
+      }
+      release_agent_turn: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
       }
       set_worker_active: { Args: { p_active?: boolean }; Returns: boolean }
     }

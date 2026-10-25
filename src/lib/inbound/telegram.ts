@@ -37,7 +37,8 @@ export function extractTelegramEvents(update: unknown, botId: string): InboundEv
     {
       channelType: "telegram",
       channelExternalId: botId,
-      dedupeKey: `tg:${updateId}`,
+      // update_id es único por bot, no entre bots: la clave lleva el bot para que dos bots no choquen.
+      dedupeKey: `tg:${botId}:${updateId}`,
       payload: { botId, message } as Json,
     },
   ];

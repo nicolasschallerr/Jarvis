@@ -72,7 +72,9 @@ export async function loadHistoryRows(
     .from("messages")
     .select("id, direction, type, body, transcription, media_files(storage_path, mime_type, size_bytes)")
     .eq("conversation_id", conversationId)
-    .order("provider_timestamp", { ascending: false })
+    // Un mensaje que no se pudo enviar no lo recibió el asociado: no forma parte de la conversación.
+    .neq("status", "failed")
+    .order("provider_timestamp", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(HISTORY_LIMIT);
   if (error) return null;

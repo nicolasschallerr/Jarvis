@@ -66,7 +66,7 @@ describe("mensaje oficial de derivación", () => {
 
 const admin = adminClient();
 const runId = randomId();
-const tokenVar = `ZZ_TEST_TOKEN_${runId}`;
+const tokenVar = `CHANNEL_TOKEN_ZZTEST_${runId.toUpperCase()}`;
 let organizationId = "";
 let channelId = "";
 let counter = 1200;

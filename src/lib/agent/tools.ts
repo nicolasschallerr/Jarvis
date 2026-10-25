@@ -116,6 +116,11 @@ function invalid(error: z.ZodError): { output: string; isError: true } {
   return { output: `Datos inválidos: ${error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`, isError: true };
 }
 
+// Límites de los datos libres (los que no están definidos en la configuración del cliente).
+const FREE_KEY = /^[a-zA-Z0-9_]{1,40}$/;
+const MAX_FREE_FIELDS = 30;
+const MAX_FREE_VALUE_LENGTH = 500;
+
 // Texto que se guarda de un valor: sin espacios de más y, si el dato lo pide, solo con dígitos.
 export function cleanValue(field: FieldDefinition, value: string | number | boolean): string {
   const text = String(value).trim();
@@ -195,9 +200,18 @@ export function createAttentionTools(backend: CaseBackend, context: ToolContext)
         for (const [key, value] of Object.entries(parsed.data.datos)) {
           const field = context.fields.find((candidate) => candidate.id === key);
 
-          // Dato libre (no definido en la configuración): se guarda tal cual.
+          // Dato libre (no definido en la configuración): se guarda tal cual, con límites. Las claves que empiezan
+          // con "_" son internas del sistema (por ejemplo, el contador de intentos) y no se aceptan del modelo.
           if (!field) {
-            caseData[key] = value;
+            if (!FREE_KEY.test(key) || key.startsWith("_")) {
+              rejected.push(`"${key}": nombre de dato no válido`);
+              continue;
+            }
+            if (Object.keys(caseData).length >= MAX_FREE_FIELDS) {
+              rejected.push(`"${key}": demasiados datos en un solo pedido`);
+              continue;
+            }
+            caseData[key] = typeof value === "string" ? value.slice(0, MAX_FREE_VALUE_LENGTH) : value;
             continue;
           }
 

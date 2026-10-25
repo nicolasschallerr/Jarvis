@@ -101,6 +101,17 @@ export async function syncAttentionConfig(
   const model = config.ia?.modelo_atencion ?? DEFAULT_ATTENTION_MODEL;
   const settings = buildAttentionSettings(config, files.knowledge) as unknown as Json;
 
+  // La zona horaria también la usan el consumo y el agente analítico (leen organizations.timezone): se
+  // mantiene igual a la del archivo del cliente. Una zona inválida corta acá, antes de guardar nada.
+  const timeZone = config.organizacion.zona_horaria ?? DEFAULT_TIME_ZONE;
+  try {
+    new Intl.DateTimeFormat("es-AR", { timeZone });
+  } catch {
+    throw new Error(`La zona horaria "${timeZone}" no es válida (ejemplo: America/Argentina/Buenos_Aires).`);
+  }
+  const { error: timeZoneError } = await admin.from("organizations").update({ timezone: timeZone }).eq("id", organizationId).neq("timezone", timeZone);
+  if (timeZoneError) throw new Error(`No se pudo guardar la zona horaria: ${timeZoneError.message}`);
+
   const { data: versions, error } = await admin
     .from("agent_configs")
     .select("id, version, model, prompt, settings, is_active")

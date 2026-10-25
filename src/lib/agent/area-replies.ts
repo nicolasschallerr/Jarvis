@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ChatMessage, ModelClient } from "@/lib/ai/types";
-import { OutsideWindowError } from "@/lib/outbound/errors";
-import { sendTextMessage } from "@/lib/outbound/send";
+import { ChannelSendError } from "@/lib/outbound/errors";
+import { checkSendable, sendTextMessage } from "@/lib/outbound/send";
 import type { Database } from "@/lib/supabase/database.types";
 
 import { buildHistory, buildSystemPrompt } from "./context";
@@ -45,7 +45,8 @@ export function appendNotice(history: ChatMessage[], notice: string): ChatMessag
 //
 // Para no mandar dos veces la misma respuesta si dos ejecuciones del trabajador coinciden, cada
 // respuesta se reserva marcando reply_sent_at ANTES de enviar; si algo falla, la marca se borra y se
-// reintenta en la próxima pasada.
+// reintenta en otra pasada, hasta MAX_REPLY_ATTEMPTS veces (ADR-027): cada intento paga el modelo.
+// Antes de llamar al modelo se comprueba que el mensaje pueda salir (canal con envío, ventana abierta).
 export async function deliverAreaAnswers(
   admin: SupabaseClient<Database>,
   client: ModelClient,
@@ -56,14 +57,18 @@ export async function deliverAreaAnswers(
 
   const { data: pending, error } = await admin
     .from("area_queries")
-    .select("id, organization_id, conversation_id, question, answer, sectors(name)")
+    .select("id, organization_id, conversation_id, question, answer, reply_attempts, sectors(name)")
     .eq("status", "answered")
     .is("reply_sent_at", null)
+    .lt("reply_attempts", MAX_REPLY_ATTEMPTS)
     .order("answered_at", { ascending: true })
-    .limit(params.limit ?? 10);
+    // Se leen más de las que se procesan: las que hoy no pueden salir se saltean sin costo y no tapan a las demás.
+    .limit(50);
   if (error) throw new Error(`No se pudieron leer las respuestas del área: ${error.message}`);
 
+  const maxModelCalls = params.limit ?? 10;
   for (const query of pending ?? []) {
+    if (result.delivered + result.failed >= maxModelCalls) break;
     const outcome = await deliverOne(admin, client, query, now, params.fetchImpl);
     result[outcome] += 1;
   }
@@ -71,12 +76,15 @@ export async function deliverAreaAnswers(
   return result;
 }
 
+export const MAX_REPLY_ATTEMPTS = 3;
+
 type PendingAnswer = {
   id: string;
   organization_id: string;
   conversation_id: string | null;
   question: string;
   answer: string | null;
+  reply_attempts: number;
   sectors: { name: string } | null;
 };
 
@@ -94,6 +102,10 @@ async function deliverOne(
   const { data: conversation } = await admin.from("conversations").select("ai_enabled").eq("id", conversationId).maybeSingle();
   if (!conversation?.ai_enabled) return "skipped";
 
+  // Si hoy no puede salir (canal sin envío o fuera de la ventana), no se paga el modelo: queda a la vista en el caso.
+  const sendable = await checkSendable(admin, conversationId, now);
+  if (!sendable.ok) return "skipped";
+
   const loaded = await loadAttentionAgent(admin, query.organization_id);
   if (!loaded.ok) return loaded.status === "skipped" ? "skipped" : "failed";
   const { agentId, config, settings } = loaded.agent;
@@ -107,11 +119,20 @@ async function deliverOne(
   // Otra ejecución la tomó primero.
   if (!claimed?.length) return "skipped";
 
-  const release = () => admin.from("area_queries").update({ reply_sent_at: null }).eq("id", query.id);
+  // Se libera para otro intento y se cuenta. Un rechazo definitivo del canal agota los intentos de una vez.
+  const release = (reason: string, permanent = false) =>
+    admin
+      .from("area_queries")
+      .update({
+        reply_sent_at: null,
+        reply_attempts: permanent ? MAX_REPLY_ATTEMPTS : query.reply_attempts + 1,
+        reply_error: reason.slice(0, 300),
+      })
+      .eq("id", query.id);
 
   const rows = await loadHistoryRows(admin, conversationId);
   if (!rows) {
-    await release();
+    await release("No se pudo leer el historial");
     return "failed";
   }
 
@@ -128,6 +149,7 @@ async function deliverOne(
     pricing: settings.pricing,
   };
 
+  let modelRecorded = false;
   try {
     const run = await runAgentLoop({
       client,
@@ -137,21 +159,20 @@ async function deliverOne(
       tools: [],
     });
     await recordAiCalls(admin, { ...record, steps: run.steps });
+    modelRecorded = true;
 
     if (!run.text) {
-      await release();
+      await release("El modelo no escribió una respuesta");
       return "failed";
     }
 
     await sendTextMessage(admin, { conversationId, text: run.text.slice(0, 4000), sender: "agent", now, fetchImpl });
     return "delivered";
   } catch (error) {
-    await release();
-    // Fuera de la ventana de 24 h de WhatsApp solo se puede escribir con plantillas (Fase 9): queda
-    // pendiente, a la vista en el caso.
-    if (error instanceof OutsideWindowError) return "skipped";
     const reason = error instanceof Error ? error.message : "Error desconocido";
-    await recordAiCalls(admin, { ...record, steps: [], error: reason });
+    await release(reason, error instanceof ChannelSendError && !error.retryable);
+    // Si el modelo ya respondió (falló el envío), sus llamadas ya están registradas.
+    if (!modelRecorded) await recordAiCalls(admin, { ...record, steps: [], error: reason });
     console.error("respuesta del área:", reason);
     return "failed";
   } finally {

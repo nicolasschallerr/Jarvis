@@ -21,7 +21,7 @@ describe("extracción de eventos de Telegram", () => {
   it("convierte un mensaje de texto en un evento con clave tg:<update_id>", () => {
     const events = extractTelegramEvents(update({ text: "hola" }, 4242), BOT_ID);
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ channelType: "telegram", channelExternalId: BOT_ID, dedupeKey: "tg:4242" });
+    expect(events[0]).toMatchObject({ channelType: "telegram", channelExternalId: BOT_ID, dedupeKey: `tg:${BOT_ID}:4242` });
   });
 
   it("ignora grupos, canales, bots, mensajes editados y datos incompletos", () => {

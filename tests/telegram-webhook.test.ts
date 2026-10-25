@@ -77,7 +77,7 @@ describe("webhook de Telegram", () => {
   it("rechaza un secreto incorrecto o ausente y no guarda nada", async () => {
     expect((await send(body(1, "hola"), "otro-secreto")).status).toBe(401);
     expect((await send(body(1, "hola"), null)).status).toBe(401);
-    expect(await countEvents("tg:1")).toBe(0);
+    expect(await countEvents(`tg:${botId}:1`)).toBe(0);
   });
 
   it("rechaza un cuerpo que no es JSON", async () => {
@@ -89,12 +89,12 @@ describe("webhook de Telegram", () => {
     expect((await send(payload)).status).toBe(200);
     expect((await send(payload)).status).toBe(200);
     expect((await send(payload)).status).toBe(200);
-    expect(await countEvents("tg:2")).toBe(1);
+    expect(await countEvents(`tg:${botId}:2`)).toBe(1);
 
     const { data } = await admin
       .from("webhook_events")
       .select("organization_id, processed_at")
-      .eq("dedupe_key", "tg:2")
+      .eq("dedupe_key", `tg:${botId}:2`)
       .eq("channel_type", "telegram")
       .single();
     expect(data?.organization_id).toBe(organizationId);
@@ -107,7 +107,7 @@ describe("webhook de Telegram", () => {
       message: { message_id: 3, from: { id: 1, is_bot: false, first_name: "X" }, chat: { id: -5, type: "group" }, date: 1, text: "x" },
     });
     expect((await send(group)).status).toBe(200);
-    expect(await countEvents("tg:3")).toBe(0);
+    expect(await countEvents(`tg:${botId}:3`)).toBe(0);
   });
 
   it("guarda pero marca como procesado un bot sin canal registrado", async () => {
@@ -117,7 +117,7 @@ describe("webhook de Telegram", () => {
     const { data } = await admin
       .from("webhook_events")
       .select("organization_id, processed_at, error")
-      .eq("dedupe_key", "tg:4")
+      .eq("dedupe_key", `tg:${unknown}:4`)
       .eq("channel_type", "telegram")
       .is("organization_id", null)
       .single();

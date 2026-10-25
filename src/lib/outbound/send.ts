@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database, Json } from "@/lib/supabase/database.types";
 
+import { channelToken } from "./channel-token";
 import { ChannelSendError, OutsideWindowError } from "./errors";
 import { canSendFreeText } from "./rules";
 import { sendTelegramText, type SentMessage } from "./telegram";
@@ -47,19 +48,22 @@ export async function sendTextMessage(
     throw new OutsideWindowError();
   }
 
+  // Un contacto puede tener más de una identidad en el mismo canal (por ejemplo, tras unir dos contactos que
+  // escribían desde dos números): se usa la más reciente.
   const { data: identity, error: identityError } = await admin
     .from("contact_identities")
     .select("identifier")
     .eq("contact_id", conversation.contact_id)
     .eq("channel_type", channel.type)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (identityError) throw new Error(`No se pudo consultar la identidad del contacto: ${identityError.message}`);
   if (!identity) throw new Error("El contacto no tiene identidad en este canal");
 
   // El token no está en la base: el canal guarda solo el NOMBRE de la variable de entorno.
-  const token = channel.secret_ref ? process.env[channel.secret_ref] : undefined;
-  if (!token) throw new Error(`Falta la variable de entorno del canal (${channel.secret_ref ?? "sin secret_ref"})`);
+  const token = channelToken(channel.secret_ref);
 
   const { data: queued, error: queueError } = await admin
     .from("messages")
@@ -72,6 +76,9 @@ export async function sendTextMessage(
       type: "text",
       body: params.text,
       status: "queued",
+      // Con hora desde el principio: si el envío falla, el mensaje queda en su lugar de la conversación en vez de
+      // quedar "sin hora" (y primero al ordenar), lo que hacía creer al agente que ya había respondido.
+      provider_timestamp: now.toISOString(),
     })
     .select("id")
     .single();
@@ -125,4 +132,20 @@ async function sendByChannel(
 
   // WhatsApp se conecta en la Fase 14, cuando exista el número de producción verificado.
   throw new Error(`El envío por ${type} todavía no está implementado`);
+}
+
+// Canales por los que hoy se puede enviar texto (WhatsApp saliente llega en la Fase 14).
+export const SENDABLE_CHANNELS: ReadonlyArray<Database["public"]["Enums"]["channel_type"]> = ["telegram"];
+
+export type Sendability = { ok: true } | { ok: false; reason: "canal_sin_envio" | "fuera_de_ventana" | "sin_conversacion" };
+
+// ¿Se puede escribir ahora en esta conversación? Sirve para no pagar el modelo redactando algo que después no
+// va a poder salir (canal sin envío o fuera de la ventana de 24 h de WhatsApp).
+export async function checkSendable(admin: SupabaseClient<Database>, conversationId: string, now: Date): Promise<Sendability> {
+  const { data } = await admin.from("conversations").select("last_inbound_at, channels(type)").eq("id", conversationId).maybeSingle();
+  if (!data?.channels) return { ok: false, reason: "sin_conversacion" };
+  if (!SENDABLE_CHANNELS.includes(data.channels.type)) return { ok: false, reason: "canal_sin_envio" };
+  const lastInbound = data.last_inbound_at ? new Date(data.last_inbound_at) : null;
+  if (!canSendFreeText(data.channels.type, lastInbound, now)) return { ok: false, reason: "fuera_de_ventana" };
+  return { ok: true };
 }

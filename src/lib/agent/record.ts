@@ -20,6 +20,27 @@ type RecordParams = {
   error?: string;
 };
 
+// Lo que se guarda de la entrada de una herramienta. La trazabilidad sirve para entender qué hizo el agente, no
+// para duplicar datos personales: de lo que dijo el asociado se guardan los NOMBRES de los datos, no sus valores,
+// y los textos libres (resumen, pregunta) quedan en el caso o la consulta, no acá (minimización, Ley 25.326).
+export function redactToolInput(toolName: string, input: unknown): Json {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const value = input as Record<string, unknown>;
+
+  if (toolName === "guardar_datos_del_caso") {
+    const data = value.datos && typeof value.datos === "object" ? Object.keys(value.datos as object) : [];
+    return { unidad: (value.unidad as Json) ?? null, titulo: (value.titulo as Json) ?? null, datos: data };
+  }
+  if (toolName === "derivar_a_sector") {
+    return { sector: (value.sector as Json) ?? null, prioridad: (value.prioridad as Json) ?? null, datos_incompletos_ok: (value.datos_incompletos_ok as Json) ?? null };
+  }
+  if (toolName === "consultar_al_area") {
+    return { sector: (value.sector as Json) ?? null };
+  }
+  // Las herramientas del analista no reciben datos personales: se guarda la entrada tal cual.
+  return value as Json;
+}
+
 // Costo en USD solo si el cliente configuró los precios; sin precios queda null (no se inventa).
 export function computeCostUsd(
   pricing: AttentionSettings["pricing"],
@@ -76,7 +97,7 @@ export async function recordAiCalls(admin: SupabaseClient<Database>, params: Rec
             organization_id: params.organizationId,
             ai_call_id: call.id,
             tool_name: tool.name,
-            input: tool.input as Json,
+            input: redactToolInput(tool.name, tool.input),
             output: { text: tool.output } as Json,
             is_error: tool.isError,
             duration_ms: tool.durationMs,

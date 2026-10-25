@@ -28,9 +28,26 @@ function skipped(reason: string): AttentionResult {
   return { status: "skipped", reason };
 }
 
+// Cuántas veces una misma ejecución vuelve a empezar si llegan mensajes nuevos mientras piensa.
+const MAX_CATCH_UP = 3;
+
+type TurnContext = {
+  admin: SupabaseClient<Database>;
+  client: ModelClient;
+  conversationId: string;
+  organizationId: string;
+  agent: Extract<Awaited<ReturnType<typeof loadAttentionAgent>>, { ok: true }>["agent"];
+  now: Date;
+  fetchImpl?: Params["fetchImpl"];
+};
+
 // Responde a un mensaje del asociado: arma el contexto, deja trabajar al modelo con sus herramientas
 // y envía la respuesta por el mismo canal. Nunca lanza: devuelve el resultado, porque el mensaje
 // recibido ya está guardado y un fallo de la IA no debe invalidarlo.
+//
+// Una sola ejecución responde a la vez en cada conversación (turno con vencimiento, ADR-027): las pasadas del
+// trabajador pueden superponerse y, sin turno, dos ejecuciones contestaban el mismo chat (o ninguna). Si
+// mientras el modelo pensaba llegó otro mensaje, la misma ejecución vuelve a empezar con el contexto completo.
 export async function respondToMessage(
   admin: SupabaseClient<Database>,
   client: ModelClient,
@@ -48,13 +65,46 @@ export async function respondToMessage(
   // Interruptor de IA: si un operador tomó el chat o el agente está apagado, no se responde.
   if (!conversation.ai_enabled) return skipped("ia_apagada_en_la_conversacion");
 
-  const organizationId = conversation.organization_id;
-
-  const loaded = await loadAttentionAgent(admin, organizationId);
+  const loaded = await loadAttentionAgent(admin, conversation.organization_id);
   if (!loaded.ok) return { status: loaded.status, reason: loaded.reason };
-  const { agentId, config, settings } = loaded.agent;
 
-  const ordered = await loadHistoryRows(admin, params.conversationId);
+  const { data: claimed } = await admin.rpc("claim_agent_turn", { p_conversation_id: params.conversationId });
+  // Otra ejecución está respondiendo esta conversación: ella va a ver este mensaje al terminar.
+  if (!claimed) return skipped("otra_ejecucion_en_curso");
+
+  await admin.from("agents").update({ status: "working" }).eq("id", loaded.agent.agentId);
+
+  const context: TurnContext = {
+    admin,
+    client,
+    conversationId: params.conversationId,
+    organizationId: conversation.organization_id,
+    agent: loaded.agent,
+    now,
+    fetchImpl: params.fetchImpl,
+  };
+
+  try {
+    for (let round = 0; round < MAX_CATCH_UP; round += 1) {
+      const outcome = await respondOnce(context);
+      if (outcome !== "newer-message") return outcome;
+    }
+    return skipped("llegan_mensajes_sin_parar");
+  } catch (error) {
+    return { status: "failed", reason: error instanceof Error ? error.message : "Error desconocido" };
+  } finally {
+    await admin.rpc("release_agent_turn", { p_conversation_id: params.conversationId });
+    await admin.from("agents").update({ status: "paused" }).eq("id", loaded.agent.agentId);
+  }
+}
+
+// Un intento de respuesta con el historial de este momento. Devuelve "newer-message" si mientras tanto llegó
+// otro mensaje del asociado (y entonces no envía nada: hay que volver a empezar con todo el contexto).
+async function respondOnce(context: TurnContext): Promise<AttentionResult | "newer-message"> {
+  const { admin, conversationId, now } = context;
+  const { config, settings } = context.agent;
+
+  const ordered = await loadHistoryRows(admin, conversationId);
   if (!ordered) return { status: "failed", reason: "No se pudo leer el historial" };
 
   const latest = ordered[ordered.length - 1];
@@ -63,14 +113,8 @@ export async function respondToMessage(
 
   // Comando MENÚ: el sistema contesta el menú principal sin llamar al modelo y reinicia los reintentos.
   if (settings.menuText && latest.type === "text" && isMenuCommand(latest.body)) {
-    await admin.rpc("agent_reset_attempts", { p_conversation_id: params.conversationId });
-    await sendTextMessage(admin, {
-      conversationId: params.conversationId,
-      text: settings.menuText.slice(0, 4000),
-      sender: "agent",
-      now,
-      fetchImpl: params.fetchImpl,
-    });
+    await admin.rpc("agent_reset_attempts", { p_conversation_id: conversationId });
+    await sendTextMessage(admin, { conversationId, text: settings.menuText.slice(0, 4000), sender: "agent", now, fetchImpl: context.fetchImpl });
     return { status: "replied", text: settings.menuText };
   }
 
@@ -78,84 +122,64 @@ export async function respondToMessage(
   const history = buildHistory(visible, await loadInlineMedia(admin, visible));
   if (history.length === 0) return skipped("sin_mensajes_para_responder");
 
-  await admin.from("agents").update({ status: "working" }).eq("id", agentId);
+  const tools = createAttentionTools(createSupabaseBackend(admin, conversationId), {
+    unitSlugs: settings.units.map((unit) => unit.id),
+    sectorSlugs: settings.sectors.map((sector) => sector.id),
+    fields: settings.fields,
+    maxFieldRetries: settings.maxFieldRetries,
+  });
 
+  const record = {
+    organizationId: context.organizationId,
+    conversationId,
+    messageId: latest.id,
+    agentConfigId: config.id,
+    model: config.model,
+    pricing: settings.pricing,
+  };
+
+  let result;
   try {
-    const tools = createAttentionTools(createSupabaseBackend(admin, params.conversationId), {
-      unitSlugs: settings.units.map((unit) => unit.id),
-      sectorSlugs: settings.sectors.map((sector) => sector.id),
-      fields: settings.fields,
-      maxFieldRetries: settings.maxFieldRetries,
-    });
-
-    const record = {
-      organizationId,
-      conversationId: params.conversationId,
-      messageId: params.messageId,
-      agentConfigId: config.id,
-      model: config.model,
-      pricing: settings.pricing,
-    };
-
-    let result;
-    try {
-      result = await runAgentLoop({
-        client,
-        model: config.model,
-        system: buildSystemPrompt(config.prompt, settings, now),
-        history,
-        tools,
-      });
-    } catch (error) {
-      // Solo el motivo, nunca el contenido de la conversación.
-      const reason = error instanceof Error ? error.message : "Error desconocido";
-      await recordAiCalls(admin, { ...record, steps: [], error: reason });
-      return { status: "failed", reason };
-    }
-
-    await recordAiCalls(admin, { ...record, steps: result.steps });
-
-    // Mensaje oficial de derivación: lo manda el sistema, no el modelo, para que salga idéntico siempre.
-    const handoff = result.steps
-      .flatMap((step) => step.toolCalls)
-      .filter((call) => call.decision?.action === "handoff" && !call.isError)
-      .at(-1)?.decision;
-    const official =
-      handoff && typeof handoff.sector === "string"
-        ? handoffText(settings, handoff.sector, typeof handoff.unit === "string" ? handoff.unit : null)
-        : null;
-
-    const texts = [result.text, official].filter((text): text is string => Boolean(text));
-    if (texts.length === 0) return skipped("el_modelo_no_escribio_respuesta");
-
-    // Si mientras el modelo pensaba llegó otro mensaje del asociado, esa otra ejecución responde con
-    // el contexto completo; contestar acá dejaría dos respuestas cruzadas.
-    const { data: newest } = await admin
-      .from("messages")
-      .select("id")
-      .eq("conversation_id", params.conversationId)
-      .eq("direction", "inbound")
-      .order("provider_timestamp", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (newest && newest.id !== latest.id) return skipped("llego_un_mensaje_mas_nuevo");
-
-    // Todo en un solo mensaje: la respuesta del agente y, si derivó, el mensaje oficial a continuación.
-    // Menos mensajes seguidos se sienten más como hablar con una persona.
-    const reply = texts.join("\n\n");
-    await sendTextMessage(admin, {
-      conversationId: params.conversationId,
-      text: reply.slice(0, 4000),
-      sender: "agent",
-      now,
-      fetchImpl: params.fetchImpl,
-    });
-
-    return { status: "replied", text: reply };
+    result = await runAgentLoop({ client: context.client, model: config.model, system: buildSystemPrompt(config.prompt, settings, now), history, tools });
   } catch (error) {
-    return { status: "failed", reason: error instanceof Error ? error.message : "Error desconocido" };
-  } finally {
-    await admin.from("agents").update({ status: "paused" }).eq("id", agentId);
+    // Solo el motivo, nunca el contenido de la conversación.
+    const reason = error instanceof Error ? error.message : "Error desconocido";
+    await recordAiCalls(admin, { ...record, steps: [], error: reason });
+    return { status: "failed", reason };
   }
+
+  await recordAiCalls(admin, { ...record, steps: result.steps });
+
+  // Mensaje oficial de derivación: lo manda el sistema, no el modelo, para que salga idéntico siempre.
+  const handoff = result.steps
+    .flatMap((step) => step.toolCalls)
+    .filter((call) => call.decision?.action === "handoff" && !call.isError)
+    .at(-1)?.decision;
+  const official =
+    handoff && typeof handoff.sector === "string"
+      ? handoffText(settings, handoff.sector, typeof handoff.unit === "string" ? handoff.unit : null)
+      : null;
+
+  // Si mientras el modelo pensaba llegó otro mensaje del asociado, se vuelve a empezar con el contexto completo
+  // (las herramientas ya guardaron lo que correspondía; la respuesta se arma de nuevo).
+  const { data: newest } = await admin
+    .from("messages")
+    .select("id")
+    .eq("conversation_id", conversationId)
+    .eq("direction", "inbound")
+    .order("provider_timestamp", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (newest && newest.id !== latest.id) return "newer-message";
+
+  const texts = [result.text, official].filter((text): text is string => Boolean(text));
+  if (texts.length === 0) return skipped("el_modelo_no_escribio_respuesta");
+
+  // Todo en un solo mensaje: la respuesta del agente y, si derivó, el mensaje oficial a continuación.
+  // Menos mensajes seguidos se sienten más como hablar con una persona.
+  const reply = texts.join("\n\n");
+  await sendTextMessage(admin, { conversationId, text: reply.slice(0, 4000), sender: "agent", now, fetchImpl: context.fetchImpl });
+
+  return { status: "replied", text: reply };
 }

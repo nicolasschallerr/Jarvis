@@ -28,7 +28,7 @@ describe("texto del seguimiento", () => {
 
 const admin = adminClient();
 const runId = randomId();
-const tokenVar = `ZZ_TEST_TOKEN_${runId}`;
+const tokenVar = `CHANNEL_TOKEN_ZZTEST_${runId.toUpperCase()}`;
 let organizationId = "";
 let channelId = "";
 let counter = 700;

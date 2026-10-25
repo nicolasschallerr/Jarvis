@@ -75,6 +75,8 @@ async function schedule(
     .select("id, organization_id, contact_id, conversation_id, created_at")
     .eq("status", "waiting_contact")
     .not("conversation_id", "is", null)
+    // Los que quedaron esperando más recientemente primero: un lote fijo siempre avanza sobre los nuevos.
+    .order("updated_at", { ascending: false })
     .limit(BATCH);
   if (error) throw new Error(`No se pudieron leer los casos en espera: ${error.message}`);
 
@@ -162,8 +164,10 @@ async function sendDue(
 ): Promise<void> {
   const { data: due, error } = await admin
     .from("followups")
-    .select("id, organization_id, conversation_id, conversations(ai_enabled)")
+    .select("id, organization_id, conversation_id, conversations!inner(ai_enabled)")
     .eq("status", "pending")
+    // Los de chats tomados por un operador no salen: se dejan afuera para que no tapen al resto de la cola.
+    .eq("conversations.ai_enabled", true)
     .lte("due_at", now.toISOString())
     .order("due_at", { ascending: true })
     .limit(20);

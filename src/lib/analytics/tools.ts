@@ -9,9 +9,10 @@ import type { Database } from "@/lib/supabase/database.types";
 // sesión de quien pregunta (RLS decide qué ve) y ninguna recibe SQL del modelo. Devuelven números y nombres de
 // sectores, unidades o personas del equipo; nunca datos personales de asociados (nombres, documentos, mensajes).
 
-// Tope de filas que se leen por consulta. Si se alcanza, la respuesta lo avisa para no presentar un recuento
-// parcial como si fuera total.
-export const ROW_LIMIT = 5000;
+// Tope de filas que se leen por consulta. Coincide con el máximo que devuelve la API de la base
+// (supabase/config.toml, max_rows = 1000): pedir más no trae más. Si se alcanza, la respuesta lo avisa para no
+// presentar un recuento parcial como si fuera total.
+export const ROW_LIMIT = 1000;
 
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "usá el formato AAAA-MM-DD");
 
@@ -266,6 +267,7 @@ export function createAnalystTools(context: AnalystContext): AgentTool[] {
           desde: range.fromDate,
           hasta: range.toDate,
           total: rows.length,
+          ...(rows.length >= ROW_LIMIT ? { aviso: `Se leyeron solo ${ROW_LIMIT} consultas: el total puede ser mayor.` } : {}),
           por_sector: [...grouped.entries()]
             .map(([sector, items]) => {
               const waits = items.filter((item) => item.answered_at !== null).map((item) => hours(item.created_at, item.answered_at ?? item.created_at));

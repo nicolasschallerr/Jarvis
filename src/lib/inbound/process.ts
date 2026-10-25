@@ -4,6 +4,7 @@ import { respondToMessage } from "@/lib/agent/attention";
 import { anthropicClientFromEnv } from "@/lib/ai/anthropic-client";
 import { transcriptionClientFromEnv, type TranscriptionClient } from "@/lib/ai/transcription";
 import type { ModelClient } from "@/lib/ai/types";
+import { channelToken } from "@/lib/outbound/channel-token";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
 import { storeTelegramMedia } from "./media";
@@ -90,11 +91,21 @@ async function processMessageEvent(
   }
 
   const created = messageId !== null;
-  if (created && modelClient) {
-    await replyWithAgent(admin, modelClient, messageId, now);
+
+  // El agente responde también al reprocesar: si una corrida se cortó entre guardar el mensaje y responder, el
+  // reintento ve el mensaje como duplicado y el asociado se quedaba sin respuesta. respondToMessage no contesta
+  // dos veces: solo responde si lo último de la conversación sigue siendo del asociado.
+  if (modelClient) {
+    const replyTo = messageId ?? (await findMessageId(admin, event.organization_id, message.externalId));
+    if (replyTo) await replyWithAgent(admin, modelClient, replyTo, now);
   }
 
   return created;
+}
+
+async function findMessageId(admin: SupabaseClient<Database>, organizationId: string, externalId: string): Promise<string | null> {
+  const { data } = await admin.from("messages").select("id").eq("organization_id", organizationId).eq("external_id", externalId).maybeSingle();
+  return data?.id ?? null;
 }
 
 async function storeMessageMedia(
@@ -104,8 +115,7 @@ async function storeMessageMedia(
   media: MediaRef,
   secretRef: string | null,
 ): Promise<string> {
-  const token = secretRef ? process.env[secretRef] : undefined;
-  if (!token) throw new Error(`Falta la variable de entorno del canal (${secretRef ?? "sin secret_ref"})`);
+  const token = channelToken(secretRef);
 
   const { data: stored, error } = await admin
     .from("messages")
@@ -202,6 +212,16 @@ export async function processPendingMessages(
         await admin.from("webhook_events").update({ error: reason }).eq("id", event.id);
       }
     }
+  }
+
+  // Estados de entrega de WhatsApp (enviado, entregado, leído): se procesan en la Fase 14. Mientras tanto se
+  // marcan como vistos para que no queden pendientes para siempre ni frenen la bandeja.
+  const { data: statuses } = await admin.rpc("claim_webhook_events", { p_prefix: "status:%", p_limit: limit });
+  if (statuses && statuses.length > 0) {
+    await admin
+      .from("webhook_events")
+      .update({ processed_at: new Date().toISOString(), error: null })
+      .in("id", statuses.map((event) => event.id));
   }
 
   return result;

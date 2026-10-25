@@ -136,6 +136,19 @@ describe("validación de datos", () => {
     await run("guardar_datos_del_caso", { datos: { plazo_deseado: "12 meses" } });
     expect(backend.state.data.plazo_deseado).toBe("12 meses");
   });
+
+  it("no acepta nombres de datos raros ni internos, y recorta los valores muy largos", async () => {
+    const { backend, run } = tools();
+    const result = await run("guardar_datos_del_caso", {
+      datos: { "con espacio": "x", _reintentos: "99", "a.b": "x", nota_larga: "y".repeat(800) },
+    });
+    expect(result.isError).toBe(true);
+    expect(result.output).toContain("nombre de dato no válido");
+    expect(backend.state.data["con espacio"]).toBeUndefined();
+    expect(backend.state.data._reintentos).toBeUndefined();
+    expect(backend.state.data["a.b"]).toBeUndefined();
+    expect(String(backend.state.data.nota_larga)).toHaveLength(500);
+  });
 });
 
 describe("guardián de datos antes de derivar", () => {
