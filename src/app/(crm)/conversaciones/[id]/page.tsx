@@ -1,45 +1,83 @@
+import { connection } from "next/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeftIcon, BotIcon } from "@/components/ui/icons";
 import { getCurrentProfile } from "@/lib/auth/profile";
-import { channelLabel, dateTime, senderLabel } from "@/lib/crm/format";
+import { channelLabel, dayHeading, dayKeyOf, timeOnly, typeLabel } from "@/lib/crm/format";
 import { createClient } from "@/lib/supabase/server";
 
 import type { ChannelType } from "@/lib/inbound/types";
 import { canSendFreeText } from "@/lib/outbound/rules";
 
+import { AiSwitch } from "./ai-switch";
 import { CasePanel } from "./case-panel";
 import { MessageMedia, type MediaItem } from "./message-media";
 import { LiveRefresh } from "../../live-refresh";
 import { ReplyForm } from "./reply-form";
 import { ScrollToEnd } from "./scroll-to-end";
+import { OpenSidePanelButton } from "./side-panel";
 
 const MESSAGE_LIMIT = 200;
 const SIGNED_URL_SECONDS = 3600;
 
+// Lee la sesión: bloquea en el servidor hasta tenerla (ver el layout del CRM).
+export const instant = false;
+
+type MessageRow = {
+  id: string;
+  direction: string;
+  sender: string;
+  sender_profile_id: string | null;
+  type: string;
+  body: string | null;
+  transcription: string | null;
+  status: string;
+  created_at: string;
+  provider_timestamp: string | null;
+};
+
+// Cuándo pasó el mensaje: la hora del canal si la hay (el orden real de la charla), si no la de registro.
+function whenOf(message: MessageRow): string {
+  return message.provider_timestamp ?? message.created_at;
+}
+
+export const metadata = { title: "Conversación" };
+
 export default async function ConversacionPage({ params }: PageProps<"/conversaciones/[id]">) {
+  // Página por pedido: lee la sesión y la hora actual (ver la nota de `instant` en el layout del CRM).
+  await connection();
   const profile = await getCurrentProfile();
   const { id } = await params;
+  const now = new Date();
 
   const supabase = await createClient();
 
   // RLS limita todo a la organización del usuario: un id ajeno simplemente no existe.
   const { data: conversation } = await supabase
     .from("conversation_summaries")
-    .select("id, contact_id, contact_name, channel_type, window_open, last_inbound_at")
+    .select("id, contact_id, contact_name, contact_document, channel_type, last_inbound_at, ai_enabled")
     .eq("id", id)
     .maybeSingle();
   if (!conversation) notFound();
 
-  // Los últimos mensajes, mostrados del más viejo al más nuevo.
+  // Los últimos mensajes en el orden en que ocurrieron, mostrados del más viejo al más nuevo.
   const { data: latest } = await supabase
     .from("messages")
-    .select("id, direction, sender, type, body, transcription, status, created_at")
+    .select("id, direction, sender, sender_profile_id, type, body, transcription, status, created_at, provider_timestamp")
     .eq("conversation_id", id)
+    .order("provider_timestamp", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(MESSAGE_LIMIT);
-  const messages = [...(latest ?? [])].reverse();
+  const messages: MessageRow[] = [...(latest ?? [])].reverse();
+
+  // Nombres de quienes respondieron a mano, para firmar cada burbuja.
+  const operatorIds = [...new Set(messages.map((message) => message.sender_profile_id).filter((value): value is string => !!value))];
+  const { data: operators } = operatorIds.length ? await supabase.from("profiles").select("id, full_name").in("id", operatorIds) : { data: [] };
+  const operatorNames = new Map((operators ?? []).map((operator) => [operator.id, operator.full_name]));
 
   // Archivos adjuntos: la política de Storage deja firmar solo los de la propia organización.
   const messageIds = messages.map((message) => message.id);
@@ -61,89 +99,169 @@ export default async function ConversacionPage({ params }: PageProps<"/conversac
     if (url) mediaByMessage.set(file.message_id, { url, mimeType: file.mime_type });
   }
 
+  const channel = (conversation.channel_type ?? "whatsapp") as ChannelType;
+  const contactName = conversation.contact_name || "Sin nombre";
+  const aiEnabled = conversation.ai_enabled ?? false;
+
   // Qué se le muestra al usuario debajo de los mensajes. La autorización real está en la acción.
-  const freeTextAllowed = canSendFreeText(
-    (conversation.channel_type ?? "whatsapp") as ChannelType,
-    conversation.last_inbound_at ? new Date(conversation.last_inbound_at) : null,
-    new Date(),
-  );
+  const freeTextAllowed = canSendFreeText(channel, conversation.last_inbound_at ? new Date(conversation.last_inbound_at) : null, now);
 
   return (
     <div className="flex min-h-0 flex-1">
-    <main className="flex min-w-0 flex-1 flex-col">
-      <header className="flex flex-col gap-1 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-        <Link href="/conversaciones" className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">
-          ← Conversaciones
-        </Link>
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold tracking-tight">{conversation.contact_name || "Sin nombre"}</h1>
-          <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-            {channelLabel(conversation.channel_type ?? "")}
-          </span>
-          {conversation.window_open ? (
-            <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-              Ventana abierta
-            </span>
-          ) : null}
-        </div>
-      </header>
+      <main className="flex min-w-0 flex-1 flex-col">
+        <header className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3 sm:px-6">
+          <Link href="/conversaciones" className="btn-secondary !p-2" aria-label="Volver a las conversaciones">
+            <ArrowLeftIcon />
+          </Link>
+          <Avatar name={contactName} size="lg" />
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-lg font-semibold tracking-tight">
+              {conversation.contact_id ? (
+                <Link href={`/contactos/${conversation.contact_id}`} className="underline-offset-2 hover:underline" title="Ver todo el historial del contacto">
+                  {contactName}
+                </Link>
+              ) : (
+                contactName
+              )}
+            </h1>
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
+              <Badge>{channelLabel(channel)}</Badge>
+              <Badge tone={aiEnabled ? "agent" : "warning"} dot>
+                {aiEnabled ? "Atiende Jarvis" : "Atiende una persona"}
+              </Badge>
+              {conversation.contact_document ? <span>Doc. {conversation.contact_document}</span> : null}
+              {/* La ventana de 24 h es una regla de WhatsApp: en los demás canales no aplica. */}
+              {channel === "whatsapp" ? (
+                freeTextAllowed ? (
+                  <Badge tone="success" dot>
+                    Ventana de 24 h abierta
+                  </Badge>
+                ) : (
+                  <Badge tone="warning" dot>
+                    Ventana de 24 h cerrada
+                  </Badge>
+                )
+              ) : null}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <AiSwitch conversationId={conversation.id ?? id} aiEnabled={aiEnabled} canChange={profile.role !== "viewer"} />
+            <OpenSidePanelButton />
+          </div>
+        </header>
 
-      <ol className="flex flex-1 flex-col gap-3 overflow-y-auto px-6 py-4">
-        {messages.length === 0 ? (
-          <li className="text-sm text-zinc-600 dark:text-zinc-400">Esta conversación todavía no tiene mensajes.</li>
-        ) : null}
-        {messages.map((message) => {
-          const outbound = message.direction === "outbound";
-          const media = mediaByMessage.get(message.id);
+        <ol className="flex flex-1 flex-col gap-2 overflow-y-auto px-4 py-4 sm:px-6" aria-label="Mensajes">
+          {messages.length === 0 ? <li className="m-auto text-sm text-muted">Esta conversación todavía no tiene mensajes.</li> : null}
+          {messages.map((message, index) => {
+            const when = whenOf(message);
+            const previous = messages[index - 1];
+            const newDay = !previous || dayKeyOf(whenOf(previous)) !== dayKeyOf(when);
 
-          return (
-            <li key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`flex max-w-[75%] flex-col gap-1 rounded-lg px-3 py-2 text-sm ${
-                  outbound ? "bg-blue-100 dark:bg-blue-950" : "bg-zinc-100 dark:bg-zinc-900"
-                }`}
-              >
-                <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                  {senderLabel(message.sender, conversation.contact_name)}
-                </p>
-                {media ? <MessageMedia type={message.type} media={media} /> : null}
-                {message.type !== "text" && !media ? (
-                  <p className="italic text-zinc-600 dark:text-zinc-400">[{message.type}] sin archivo disponible</p>
-                ) : null}
-                {message.body ? <p className="whitespace-pre-wrap break-words">{message.body}</p> : null}
-                {message.transcription ? (
-                  <p className="whitespace-pre-wrap break-words italic text-zinc-700 dark:text-zinc-300">
-                    Transcripción: {message.transcription}
-                  </p>
-                ) : null}
-                <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                  {dateTime(message.created_at)}
-                  {outbound && message.status === "failed" ? " · no se pudo enviar" : ""}
-                </p>
-              </div>
-            </li>
-          );
-        })}
-        <ScrollToEnd count={messages.length} />
-      </ol>
-      <LiveRefresh conversationId={conversation.id ?? id} />
+            return (
+              <MessageItem
+                key={message.id}
+                message={message}
+                when={when}
+                dayLabel={newDay ? dayHeading(when, now) : null}
+                media={mediaByMessage.get(message.id)}
+                operatorName={message.sender_profile_id ? operatorNames.get(message.sender_profile_id) : undefined}
+              />
+            );
+          })}
+          <ScrollToEnd count={messages.length} />
+        </ol>
+        <LiveRefresh conversationId={conversation.id ?? id} />
 
-      {profile.role === "viewer" ? (
-        <p className="border-t border-zinc-200 px-6 py-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
-          Tu rol es de consulta: podés leer la conversación pero no responder.
-        </p>
-      ) : !freeTextAllowed ? (
-        <p className="border-t border-zinc-200 px-6 py-4 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
-          Pasaron más de 24 horas desde el último mensaje del contacto: solo se pueden enviar plantillas
-          aprobadas (disponible más adelante).
-        </p>
-      ) : (
-        <ReplyForm conversationId={conversation.id ?? id} />
-      )}
-    </main>
-    <Suspense fallback={<aside className="hidden w-80 shrink-0 border-l border-zinc-200 p-4 text-sm text-zinc-600 lg:block dark:border-zinc-800 dark:text-zinc-400">Cargando caso...</aside>}>
-      <CasePanel conversationId={conversation.id ?? id} contactId={conversation.contact_id ?? ""} role={profile.role} currentUserId={profile.id} />
-    </Suspense>
+        {profile.role === "viewer" ? (
+          <p className="border-t border-line px-6 py-4 text-sm text-muted">Tu rol es de consulta: podés leer la conversación pero no responder.</p>
+        ) : !freeTextAllowed ? (
+          <p className="border-t border-line bg-warning-soft px-6 py-4 text-sm text-warning">
+            Pasaron más de 24 horas desde el último mensaje del contacto: WhatsApp solo deja enviar plantillas aprobadas
+            (disponible más adelante).
+          </p>
+        ) : (
+          <ReplyForm conversationId={conversation.id ?? id} aiEnabled={aiEnabled} />
+        )}
+      </main>
+      <Suspense fallback={<aside className="hidden w-80 shrink-0 border-l border-line p-4 lg:block xl:w-96" aria-busy="true"><div className="skeleton h-40" /></aside>}>
+        <CasePanel conversationId={conversation.id ?? id} contactId={conversation.contact_id ?? ""} role={profile.role} currentUserId={profile.id} />
+      </Suspense>
     </div>
+  );
+}
+
+// Una burbuja. Cada autor tiene su estilo: el contacto a la izquierda; Jarvis y el equipo a la derecha (Jarvis
+// en tono suave con su marca, una persona del equipo en el color fuerte); los avisos del sistema, al centro.
+function MessageItem({
+  message,
+  when,
+  dayLabel,
+  media,
+  operatorName,
+}: {
+  message: MessageRow;
+  when: string;
+  dayLabel: string | null;
+  media: MediaItem | undefined;
+  operatorName: string | undefined;
+}) {
+  const separator = dayLabel ? (
+    <li className="my-2 flex items-center gap-3 text-xs font-medium text-muted" aria-label={dayLabel}>
+      <span className="h-px flex-1 bg-line" aria-hidden="true" />
+      {dayLabel}
+      <span className="h-px flex-1 bg-line" aria-hidden="true" />
+    </li>
+  ) : null;
+
+  if (message.sender === "system") {
+    return (
+      <>
+        {separator}
+        <li className="mx-auto max-w-[85%] rounded-full bg-zinc-200/60 px-3 py-1 text-center text-xs text-muted dark:bg-zinc-800">
+          {message.body} · {timeOnly(when)}
+        </li>
+      </>
+    );
+  }
+
+  const fromContact = message.sender === "contact";
+  const fromAgent = message.sender === "agent";
+  const failed = message.status === "failed";
+
+  const bubble = fromContact
+    ? "rounded-bl-sm border border-line bg-surface"
+    : fromAgent
+      ? "rounded-br-sm bg-accent-soft"
+      : "rounded-br-sm bg-accent text-accent-foreground";
+  const meta = fromContact || fromAgent ? "text-muted" : "text-accent-foreground/80";
+
+  return (
+    <>
+      {separator}
+      <li className={`flex ${fromContact ? "justify-start" : "justify-end"}`}>
+        <div className={`flex max-w-[85%] flex-col gap-1 rounded-2xl px-3.5 py-2 text-sm shadow-xs sm:max-w-[70%] ${bubble} ${failed ? "ring-2 ring-danger" : ""}`}>
+          {fromAgent ? (
+            <p className="flex items-center gap-1 text-xs font-semibold text-accent">
+              <BotIcon className="size-3.5" />
+              Jarvis
+            </p>
+          ) : !fromContact ? (
+            <p className={`text-xs font-semibold ${meta}`}>{operatorName ?? "Equipo"}</p>
+          ) : null}
+          {media ? <MessageMedia type={message.type} media={media} /> : null}
+          {message.type !== "text" && !media ? (
+            <p className={`text-xs italic ${meta}`}>{typeLabel(message.type)} · el archivo no está disponible</p>
+          ) : null}
+          {message.body ? <p className="whitespace-pre-wrap break-words">{message.body}</p> : null}
+          {message.transcription ? (
+            <p className={`whitespace-pre-wrap break-words border-l-2 border-current/30 pl-2 text-[13px] italic ${meta}`}>
+              Transcripción: {message.transcription}
+            </p>
+          ) : null}
+          <p className={`self-end text-[11px] ${meta}`}>{timeOnly(when)}</p>
+        </div>
+      </li>
+      {failed ? <li className="-mt-1 self-end text-xs font-medium text-danger">No se pudo enviar este mensaje.</li> : null}
+    </>
   );
 }

@@ -8,7 +8,7 @@ import { adminClient, createTestUser, randomId, type TestUser } from "./helpers/
 
 const admin = adminClient();
 const runId = randomId();
-const tokenVar = `ZZ_TEST_TOKEN_${runId}`;
+const tokenVar = `CHANNEL_TOKEN_ZZTEST_${runId.toUpperCase()}`;
 const orgIds: string[] = [];
 const userIds: string[] = [];
 
@@ -89,9 +89,13 @@ function reply(user: TestUser, role: "operator" | "viewer", conversationId: stri
 }
 
 describe("respuesta del operador desde el CRM", () => {
-  it("guarda y envía la respuesta firmada por el operador", async () => {
+  it("guarda y envía la respuesta firmada por el operador, y al responder toma el chat", async () => {
     const result = await reply(operator, "operator", telegramConversation, "  Hola Ana, te ayudo  ");
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, aiPaused: true });
+
+    // Jarvis queda en pausa en esta conversación y el chat, asignado a quien respondió.
+    const { data: conversation } = await admin.from("conversations").select("ai_enabled, assigned_to").eq("id", telegramConversation).single();
+    expect(conversation).toEqual({ ai_enabled: false, assigned_to: operator.id });
 
     const { data } = await admin
       .from("messages")
@@ -106,6 +110,11 @@ describe("respuesta del operador desde el CRM", () => {
       status: "sent",
       direction: "outbound",
     });
+  });
+
+  it("si Jarvis ya estaba en pausa, responder no cambia nada más", async () => {
+    const result = await reply(operator, "operator", telegramConversation, "Sigo yo");
+    expect(result).toEqual({ ok: true, aiPaused: false });
   });
 
   it("el rol de consulta no puede responder y no se envía nada", async () => {

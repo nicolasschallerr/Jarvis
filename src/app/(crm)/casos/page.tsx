@@ -1,26 +1,36 @@
+import { connection } from "next/server";
 import Link from "next/link";
 
 import { Board, type BoardCase } from "@/components/kanban/board";
+import { Avatar } from "@/components/ui/avatar";
+import { PriorityBadge, StatusBadge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { CaseIcon } from "@/components/ui/icons";
+import { LinkTabs, SegmentedLinks } from "@/components/ui/link-tabs";
+import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentProfile } from "@/lib/auth/profile";
-import { CASE_LIST_LIMIT, CASE_LIST_VIEWS, listCases, type CaseListView } from "@/lib/crm/case-list";
+import {
+  CASE_LIST_LIMIT,
+  CASE_LIST_VIEWS,
+  CASE_PRIORITIES,
+  defaultCaseView,
+  listCases,
+  type CaseListView,
+  type CasePriorityFilter,
+} from "@/lib/crm/case-list";
 import type { CaseStatus } from "@/lib/crm/cases";
-import { PRIORITY_LABELS, shortDate, STATUS_LABELS } from "@/lib/crm/format";
+import { PRIORITY_LABELS, shortDate } from "@/lib/crm/format";
 import { createClient } from "@/lib/supabase/server";
 
 import { LiveRefresh } from "../live-refresh";
+
+export const metadata = { title: "Casos" };
 
 const VIEW_LABELS: Record<CaseListView, string> = {
   mine: "Mis casos",
   unassigned: "Sin asignar",
   sector: "Por sector",
   all: "Todos",
-};
-
-const PRIORITY_STYLES: Record<string, string> = {
-  low: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-  normal: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  high: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300",
-  urgent: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
 };
 
 function first(value: string | string[] | undefined): string | undefined {
@@ -32,24 +42,35 @@ type Mode = "tablero" | "lista";
 // Cuántos casos resueltos recientes muestra la última columna del tablero.
 const BOARD_RESOLVED_LIMIT = 15;
 
-function href(view: CaseListView, sector: string | undefined, resolved: boolean, mode: Mode): string {
-  const params = new URLSearchParams({ vista: view, modo: mode });
-  if (view === "sector" && sector) params.set("sector", sector);
-  if (resolved) params.set("resueltos", "1");
+type Filters = { view: CaseListView; sector?: string; resolved: boolean; mode: Mode; priority: CasePriorityFilter | null };
+
+function href(filters: Filters): string {
+  const params = new URLSearchParams({ vista: filters.view, modo: filters.mode });
+  if (filters.view === "sector" && filters.sector) params.set("sector", filters.sector);
+  if (filters.resolved) params.set("resueltos", "1");
+  if (filters.priority) params.set("prioridad", filters.priority);
   return `/casos?${params.toString()}`;
 }
 
+// Lee la sesión: bloquea en el servidor hasta tenerla (ver el layout del CRM).
+export const instant = false;
+
 export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
+  // Página por pedido: lee la sesión y la hora actual (ver la nota de `instant` en el layout del CRM).
+  await connection();
   const profile = await getCurrentProfile();
   const query = await searchParams;
 
   const requestedView = first(query.vista);
-  const view: CaseListView = CASE_LIST_VIEWS.find((candidate) => candidate === requestedView) ?? "mine";
+  const view: CaseListView = CASE_LIST_VIEWS.find((candidate) => candidate === requestedView) ?? defaultCaseView(profile.role);
   const sectorId = first(query.sector);
   const mode: Mode = first(query.modo) === "lista" ? "lista" : "tablero";
   const board = mode === "tablero";
+  const requestedPriority = first(query.prioridad);
+  const priority = CASE_PRIORITIES.find((candidate) => candidate === requestedPriority) ?? null;
   // El tablero ya trae los resueltos recientes en su última columna.
   const includeResolved = !board && first(query.resueltos) === "1";
+  const filters: Filters = { view, sector: sectorId, resolved: includeResolved, mode, priority };
 
   const supabase = await createClient();
   const { data: sectors } = await supabase.from("sectors").select("id, name").eq("is_active", true).order("name");
@@ -57,7 +78,7 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
   let cases: Awaited<ReturnType<typeof listCases>> = [];
   let failed = false;
   try {
-    cases = await listCases({ userClient: supabase, view, userId: profile.id, sectorId, includeResolved });
+    cases = await listCases({ userClient: supabase, view, userId: profile.id, sectorId, includeResolved, priority });
     if (board) {
       const resolved = await listCases({
         userClient: supabase,
@@ -65,6 +86,7 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
         userId: profile.id,
         sectorId,
         resolvedOnly: true,
+        priority,
         limit: BOARD_RESOLVED_LIMIT,
       });
       cases = [...cases, ...resolved];
@@ -90,60 +112,62 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
   return (
     <main className="flex flex-1 flex-col">
       <LiveRefresh organizationId={profile.organizationId} />
-      <header className="flex flex-col gap-3 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-        <h1 className="text-xl font-semibold tracking-tight">Casos</h1>
-
-        <nav aria-label="Vistas de casos" className="flex flex-wrap items-center gap-2">
-          {CASE_LIST_VIEWS.map((candidate) => (
-            <Link
-              key={candidate}
-              href={href(candidate, sectorId, includeResolved, mode)}
-              aria-current={candidate === view ? "page" : undefined}
-              className={`rounded-md px-3 py-1.5 text-sm ${
-                candidate === view
-                  ? "bg-zinc-200 font-medium dark:bg-zinc-800"
-                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
-              }`}
-            >
-              {VIEW_LABELS[candidate]}
-            </Link>
-          ))}
-          <div className="ml-auto flex items-center gap-3">
+      <PageHeader
+        title="Casos"
+        description="Cada gestión que abre Jarvis o el equipo, con su estado, sector y responsable."
+        actions={
+          <SegmentedLinks
+            label="Forma de ver los casos"
+            items={(["tablero", "lista"] as const).map((option) => ({
+              href: href({ ...filters, mode: option }),
+              label: option === "tablero" ? "Tablero" : "Lista",
+              active: option === mode,
+            }))}
+          />
+        }
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <LinkTabs
+            label="Vistas de casos"
+            items={CASE_LIST_VIEWS.map((candidate) => ({
+              href: href({ ...filters, view: candidate }),
+              label: VIEW_LABELS[candidate],
+              active: candidate === view,
+            }))}
+          />
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <form method="get" action="/casos" className="flex items-center gap-2">
+              <input type="hidden" name="vista" value={view} />
+              <input type="hidden" name="modo" value={mode} />
+              {view === "sector" && sectorId ? <input type="hidden" name="sector" value={sectorId} /> : null}
+              {includeResolved ? <input type="hidden" name="resueltos" value="1" /> : null}
+              <select name="prioridad" defaultValue={priority ?? ""} aria-label="Prioridad" className="field !w-auto !py-1.5 text-sm">
+                <option value="">Todas las prioridades</option>
+                {CASE_PRIORITIES.map((option) => (
+                  <option key={option} value={option}>
+                    {PRIORITY_LABELS[option]}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" className="btn-secondary !py-1.5 text-sm">
+                Filtrar
+              </button>
+            </form>
             {board ? null : (
-              <Link href={href(view, sectorId, !includeResolved, mode)} className="text-sm text-zinc-600 underline dark:text-zinc-400">
+              <Link href={href({ ...filters, resolved: !includeResolved })} className="text-sm text-muted underline-offset-2 hover:text-foreground hover:underline">
                 {includeResolved ? "Ocultar resueltos" : "Incluir resueltos"}
               </Link>
             )}
-            <div role="group" aria-label="Forma de ver los casos" className="flex rounded-lg border border-zinc-300 p-0.5 dark:border-zinc-700">
-              {(["tablero", "lista"] as const).map((option) => (
-                <Link
-                  key={option}
-                  href={href(view, sectorId, includeResolved, option)}
-                  aria-current={option === mode ? "page" : undefined}
-                  className={`rounded-md px-3 py-1 text-sm ${
-                    option === mode
-                      ? "bg-accent text-accent-foreground"
-                      : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                  }`}
-                >
-                  {option === "tablero" ? "Tablero" : "Lista"}
-                </Link>
-              ))}
-            </div>
           </div>
-        </nav>
+        </div>
 
         {view === "sector" ? (
           <form method="get" action="/casos" className="flex items-center gap-2">
             <input type="hidden" name="vista" value="sector" />
             <input type="hidden" name="modo" value={mode} />
             {includeResolved ? <input type="hidden" name="resueltos" value="1" /> : null}
-            <select
-              name="sector"
-              defaultValue={sectorId ?? ""}
-              aria-label="Sector"
-              className="field !py-1.5"
-            >
+            {priority ? <input type="hidden" name="prioridad" value={priority} /> : null}
+            <select name="sector" defaultValue={sectorId ?? ""} aria-label="Sector" className="field !w-auto !py-1.5">
               <option value="" disabled>
                 Elegí un sector...
               </option>
@@ -153,45 +177,48 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
                 </option>
               ))}
             </select>
-            <button type="submit" className="btn-primary">
+            <button type="submit" className="btn-primary !py-1.5">
               Ver
             </button>
           </form>
         ) : null}
-      </header>
+      </PageHeader>
 
       {failed ? (
-        <p className="p-6 text-sm text-red-600 dark:text-red-400">No se pudieron cargar los casos. Probá recargar la página.</p>
+        <p role="alert" className="p-6 text-sm text-danger">
+          No se pudieron cargar los casos. Probá recargar la página.
+        </p>
       ) : view === "sector" && !sectorId ? (
-        <p className="p-6 text-sm text-zinc-600 dark:text-zinc-400">Elegí un sector para ver sus casos.</p>
+        <EmptyState icon={<CaseIcon className="size-6" />} title="Elegí un sector" description="Vas a ver los casos abiertos de ese sector." />
       ) : board ? (
         <div className="py-4">
           <Board cases={boardCases} canEdit={profile.role !== "viewer"} />
         </div>
       ) : cases.length === 0 ? (
-        <p className="p-6 text-sm text-zinc-600 dark:text-zinc-400">No hay casos en esta vista.</p>
+        <EmptyState
+          icon={<CaseIcon className="size-6" />}
+          title="No hay casos en esta vista"
+          description={view === "mine" ? "Cuando te asignen un caso, aparece acá." : "Probá con otra vista o quitá los filtros."}
+        />
       ) : (
         <>
-          <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <ul className="divide-y divide-line">
             {cases.map((item) => {
               const content = (
                 <>
+                  <Avatar name={item.contacts?.display_name} size="sm" />
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate font-medium">{item.title}</p>
-                      <span className={`rounded px-1.5 py-0.5 text-xs ${PRIORITY_STYLES[item.priority] ?? ""}`}>
-                        {PRIORITY_LABELS[item.priority]}
-                      </span>
-                      <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                        {STATUS_LABELS[item.status]}
-                      </span>
-                    </div>
-                    <p className="truncate text-sm text-zinc-600 dark:text-zinc-400">
+                    <p className="truncate font-medium">{item.title}</p>
+                    <p className="truncate text-sm text-muted">
                       {item.contacts?.display_name || "Sin nombre"} · {item.sectors?.name ?? "Sin sector"} ·{" "}
                       {item.assignee?.full_name ? `Asignado a ${item.assignee.full_name}` : "Sin asignar"}
                     </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      <StatusBadge status={item.status} />
+                      <PriorityBadge priority={item.priority} />
+                    </div>
                   </div>
-                  <time className="shrink-0 text-xs text-zinc-600 dark:text-zinc-400" dateTime={item.updated_at}>
+                  <time className="shrink-0 text-xs text-muted" dateTime={item.updated_at}>
                     {shortDate(item.updated_at, now)}
                   </time>
                 </>
@@ -200,19 +227,17 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
               return (
                 <li key={item.id}>
                   {item.conversation_id ? (
-                    <Link href={`/conversaciones/${item.conversation_id}`} className="flex items-start gap-4 px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-900">
+                    <Link href={`/conversaciones/${item.conversation_id}`} className="flex items-start gap-3 px-4 py-3 transition hover:bg-zinc-100 sm:px-6 dark:hover:bg-zinc-900">
                       {content}
                     </Link>
                   ) : (
-                    <div className="flex items-start gap-4 px-6 py-4">{content}</div>
+                    <div className="flex items-start gap-3 px-4 py-3 sm:px-6">{content}</div>
                   )}
                 </li>
               );
             })}
           </ul>
-          {cases.length >= CASE_LIST_LIMIT ? (
-            <p className="px-6 py-3 text-xs text-zinc-600 dark:text-zinc-400">Se muestran los primeros {CASE_LIST_LIMIT} casos.</p>
-          ) : null}
+          {cases.length >= CASE_LIST_LIMIT ? <p className="px-6 py-3 text-xs text-muted">Se muestran los primeros {CASE_LIST_LIMIT} casos.</p> : null}
         </>
       )}
     </main>

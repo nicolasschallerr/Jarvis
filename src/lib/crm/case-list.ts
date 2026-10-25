@@ -8,6 +8,15 @@ export const CASE_LIST_VIEWS: CaseListView[] = ["mine", "unassigned", "sector", 
 
 export const CASE_LIST_LIMIT = 200;
 
+export type CasePriorityFilter = Database["public"]["Enums"]["case_priority"];
+
+export const CASE_PRIORITIES: CasePriorityFilter[] = ["urgent", "high", "normal", "low"];
+
+// Vista por defecto: quien atiende ve primero lo suyo; superadmin y consulta, todo.
+export function defaultCaseView(role: "superadmin" | "operator" | "viewer"): CaseListView {
+  return role === "operator" ? "mine" : "all";
+}
+
 const SELECT =
   "id, title, status, priority, sector_id, assigned_to, conversation_id, opened_at, updated_at, contacts(display_name), sectors(name), assignee:profiles!cases_assigned_to_fkey(full_name)";
 
@@ -22,11 +31,15 @@ export async function listCases(params: {
   includeResolved?: boolean;
   // Solo los resueltos (el tablero muestra los últimos). Tiene prioridad sobre includeResolved.
   resolvedOnly?: boolean;
+  // Solo una prioridad (por ejemplo, los urgentes desde el Inicio).
+  priority?: CasePriorityFilter | null;
   limit?: number;
 }) {
   if (params.view === "sector" && !params.sectorId) return [];
 
   let query = params.userClient.from("cases").select(SELECT);
+
+  if (params.priority) query = query.eq("priority", params.priority);
 
   if (params.resolvedOnly) query = query.eq("status", "resolved");
   else if (!params.includeResolved) query = query.neq("status", "resolved");

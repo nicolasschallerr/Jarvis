@@ -1,20 +1,24 @@
+import { connection } from "next/server";
+import { EmptyState, NoAccess } from "@/components/ui/empty-state";
+import { TeamIcon } from "@/components/ui/icons";
+import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { createClient } from "@/lib/supabase/server";
 
 import { SectorCard, type SectorView } from "./sector-card";
 
+export const metadata = { title: "Equipo" };
+
+// Lee la sesión: bloquea en el servidor hasta tenerla (ver el layout del CRM).
+export const instant = false;
+
 export default async function EquipoPage() {
+  // Página por pedido: lee la sesión y la hora actual (ver la nota de `instant` en el layout del CRM).
+  await connection();
   const profile = await getCurrentProfile();
 
   if (profile.role !== "superadmin") {
-    return (
-      <main className="p-6">
-        <h1 className="text-xl font-semibold tracking-tight">Equipo</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Solo un superadministrador puede ver y cambiar los equipos por sector.
-        </p>
-      </main>
-    );
+    return <NoAccess title="Equipo" reason="Solo un superadministrador puede ver y cambiar los equipos por sector." />;
   }
 
   const supabase = await createClient();
@@ -51,19 +55,23 @@ export default async function EquipoPage() {
 
   return (
     <main className="flex flex-1 flex-col">
-      <header className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-        <h1 className="text-xl font-semibold tracking-tight">Equipo</h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">Quién trabaja en cada sector.</p>
-      </header>
+      <PageHeader
+        title="Equipo"
+        description="Quién trabaja en cada sector. Jarvis deriva cada caso al sector que corresponde y avisa a su equipo."
+      />
 
       {error ? (
-        <p className="p-6 text-sm text-red-600 dark:text-red-400">No se pudieron cargar los sectores. Probá recargar.</p>
-      ) : views.length === 0 ? (
-        <p className="p-6 text-sm text-zinc-600 dark:text-zinc-400">
-          Todavía no hay sectores. Se cargan con el script de configuración del cliente.
+        <p role="alert" className="p-6 text-sm text-danger">
+          No se pudieron cargar los sectores. Probá recargar.
         </p>
+      ) : views.length === 0 ? (
+        <EmptyState
+          icon={<TeamIcon className="size-6" />}
+          title="Todavía no hay sectores"
+          description="Se cargan con el script de configuración del cliente."
+        />
       ) : (
-        <div className="grid gap-4 p-6 md:grid-cols-2">
+        <div className="grid gap-4 p-4 sm:p-6 md:grid-cols-2 2xl:grid-cols-3">
           {views.map((view) => (
             <SectorCard key={view.id} sector={view} />
           ))}

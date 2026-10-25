@@ -19,7 +19,8 @@ import { useOptimistic, useState, useTransition } from "react";
 
 import { moveCaseAction, type MoveState } from "@/app/(crm)/casos/actions";
 import { CASE_STATUSES, type CaseStatus } from "@/lib/crm/cases";
-import { PRIORITY_LABELS, shortDate, STATUS_LABELS } from "@/lib/crm/format";
+import { PriorityBadge } from "@/components/ui/badge";
+import { shortDate, STATUS_LABELS } from "@/lib/crm/format";
 
 export type BoardCase = {
   id: string;
@@ -31,13 +32,6 @@ export type BoardCase = {
   contactName: string | null;
   conversationId: string | null;
   updatedAt: string;
-};
-
-const PRIORITY_STYLES: Record<string, string> = {
-  low: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-  normal: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  high: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300",
-  urgent: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
 };
 
 const isStatus = (value: unknown): value is CaseStatus => CASE_STATUSES.includes(value as CaseStatus);
@@ -53,14 +47,14 @@ function CardBody({ item, now }: { item: BoardCase; now: Date }) {
         ) : (
           <p className="min-w-0 text-sm font-medium">{item.title}</p>
         )}
-        <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${PRIORITY_STYLES[item.priority] ?? ""}`}>
-          {PRIORITY_LABELS[item.priority]}
+        <span className="shrink-0">
+          <PriorityBadge priority={item.priority} />
         </span>
       </div>
-      <p className="text-xs text-zinc-600 dark:text-zinc-400">
+      <p className="text-xs text-muted">
         {item.contactName || "Sin nombre"} · {item.sectorName ?? "Sin sector"}
       </p>
-      <p className="text-xs text-zinc-600 dark:text-zinc-400">
+      <p className="text-xs text-muted">
         {item.assigneeName ? `Asignado a ${item.assigneeName}` : "Sin asignar"} · {shortDate(item.updatedAt, now)}
       </p>
     </>
@@ -98,7 +92,7 @@ function CaseCard({ item, now, canEdit, onMove }: { item: BoardCase; now: Date; 
               <circle cx="11" cy="13" r="1.3" />
             </svg>
           </button>
-          <label className="flex min-w-0 flex-1 items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+          <label className="flex min-w-0 flex-1 items-center gap-1 text-xs text-muted">
             <span className="sr-only">Mover a</span>
             <select
               aria-label={`Mover el caso ${item.title} a otro estado`}
@@ -133,7 +127,7 @@ function Column({ status, items, now, canEdit, onMove }: { status: CaseStatus; i
         <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium dark:bg-zinc-800">{items.length}</span>
       </h2>
       {items.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-zinc-300 p-4 text-center text-xs text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
+        <p className="rounded-lg border border-dashed border-line p-4 text-center text-xs text-muted">
           {canEdit ? "Soltá un caso acá" : "Sin casos"}
         </p>
       ) : (
@@ -209,7 +203,7 @@ export function Board({ cases, canEdit }: { cases: BoardCase[]; canEdit: boolean
   return (
     <div className="flex flex-col gap-3">
       {error ? (
-        <p role="alert" className="mx-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+        <p role="alert" className="mx-4 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
           {error}
         </p>
       ) : null}

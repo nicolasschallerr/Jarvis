@@ -1,79 +1,172 @@
 import Link from "next/link";
+import { connection } from "next/server";
 
+import { Avatar } from "@/components/ui/avatar";
+import { Badge, PriorityBadge, StatusBadge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ChatIcon, PauseIcon, SearchIcon } from "@/components/ui/icons";
+import { LinkTabs, SegmentedLinks } from "@/components/ui/link-tabs";
+import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentProfile } from "@/lib/auth/profile";
-import { channelLabel, messagePreview, shortDate, STATUS_LABELS } from "@/lib/crm/format";
+import { channelLabel, messagePreview, shortDate } from "@/lib/crm/format";
+import { inboxQueryFrom, lastSenderPrefix, listInbox, type InboxFilter, type InboxQuery } from "@/lib/crm/inbox";
 import { createClient } from "@/lib/supabase/server";
 
 import { LiveRefresh } from "../live-refresh";
 
-export default async function ConversacionesPage() {
-  // Verifica la sesión y el perfil; la lista la filtra RLS por organización.
+export const metadata = { title: "Conversaciones" };
+
+// Lee la sesión: bloquea en el servidor hasta tenerla (ver el layout del CRM).
+export const instant = false;
+
+const TAB_LABELS: Record<InboxFilter, string> = {
+  todas: "Todas",
+  esperando: "Esperando respuesta",
+  mias: "Mías",
+  "sin-asignar": "Sin asignar",
+  "ia-pausada": "IA en pausa",
+};
+
+// Arma la URL de la bandeja conservando los demás parámetros.
+function inboxHref(query: InboxQuery, changes: Partial<{ filtro: string; canal: string | null; q: string; ver: number }>): string {
+  const params = new URLSearchParams();
+  const filtro = changes.filtro ?? query.filter;
+  const canal = changes.canal === undefined ? query.channel : changes.canal;
+  const q = changes.q ?? query.search;
+  if (filtro !== "todas") params.set("filtro", filtro);
+  if (canal) params.set("canal", canal);
+  if (q) params.set("q", q);
+  if (changes.ver) params.set("ver", String(changes.ver));
+  const text = params.toString();
+  return text ? `/conversaciones?${text}` : "/conversaciones";
+}
+
+export default async function ConversacionesPage({ searchParams }: PageProps<"/conversaciones">) {
+  // Página por pedido: lee la sesión y la hora actual (ver la nota de `instant` en el layout del CRM).
+  await connection();
   const profile = await getCurrentProfile();
+  const query = inboxQueryFrom(await searchParams);
 
-  const supabase = await createClient();
-  const { data: conversations, error } = await supabase
-    .from("conversation_summaries")
-    .select(
-      "id, contact_name, channel_type, channel_name, last_body, last_type, last_direction, last_message_at, window_open, case_status, case_priority, case_assigned_to",
-    )
-    .order("last_message_at", { ascending: false, nullsFirst: false })
-    .limit(100);
-
+  const { items, hasMore, counts, failed } = await listInbox({ userClient: await createClient(), userId: profile.id, query });
   const now = new Date();
+  const filtered = query.filter !== "todas" || query.channel !== null || query.search !== "";
 
   return (
     <main className="flex flex-1 flex-col">
       <LiveRefresh organizationId={profile.organizationId} />
-      <header className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-        <h1 className="text-xl font-semibold tracking-tight">Conversaciones</h1>
-      </header>
+      <PageHeader
+        title="Conversaciones"
+        description="Todo lo que escriben los asociados, en todos los canales."
+        actions={
+          <form action="/conversaciones" className="relative w-full sm:w-72" role="search">
+            {query.filter !== "todas" ? <input type="hidden" name="filtro" value={query.filter} /> : null}
+            {query.channel ? <input type="hidden" name="canal" value={query.channel} /> : null}
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
+            <input
+              type="search"
+              name="q"
+              defaultValue={query.search}
+              placeholder="Buscar por nombre o documento"
+              aria-label="Buscar conversaciones por nombre o documento"
+              className="field w-full !pl-9"
+            />
+          </form>
+        }
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <LinkTabs
+            label="Filtros de la bandeja"
+            items={(Object.keys(TAB_LABELS) as InboxFilter[]).map((filter) => ({
+              href: inboxHref(query, { filtro: filter }),
+              label: TAB_LABELS[filter],
+              active: query.filter === filter,
+              count: counts[filter],
+            }))}
+          />
+          <SegmentedLinks
+            label="Canal"
+            items={[
+              { href: inboxHref(query, { canal: null }), label: "Todos", active: query.channel === null },
+              { href: inboxHref(query, { canal: "whatsapp" }), label: "WhatsApp", active: query.channel === "whatsapp" },
+              { href: inboxHref(query, { canal: "telegram" }), label: "Telegram", active: query.channel === "telegram" },
+            ]}
+          />
+        </div>
+      </PageHeader>
 
-      {error ? (
-        <p className="p-6 text-sm text-red-600 dark:text-red-400">
+      {failed ? (
+        <p role="alert" className="m-4 rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger sm:m-6">
           No se pudieron cargar las conversaciones. Probá recargar la página.
         </p>
-      ) : !conversations?.length ? (
-        <p className="p-6 text-sm text-zinc-600 dark:text-zinc-400">
-          Todavía no hay conversaciones. Cuando alguien escriba, va a aparecer acá.
-        </p>
-      ) : (
-        <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {conversations.map((conversation) => (
-            <li key={conversation.id}>
-              <Link
-                href={`/conversaciones/${conversation.id}`}
-                className="flex items-start gap-4 px-6 py-4 hover:bg-zinc-100 dark:hover:bg-zinc-900"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate font-medium">{conversation.contact_name || "Sin nombre"}</p>
-                    <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                      {channelLabel(conversation.channel_type ?? "")}
-                    </span>
-                    {conversation.case_status ? (
-                      <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-                        Caso: {STATUS_LABELS[conversation.case_status]}
-                        {conversation.case_assigned_to === profile.id ? " · mío" : conversation.case_assigned_to ? "" : " · sin asignar"}
-                      </span>
-                    ) : null}
-                    {conversation.window_open ? (
-                      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                        Ventana abierta
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="truncate text-sm text-zinc-600 dark:text-zinc-400">
-                    {conversation.last_direction === "outbound" ? "Vos: " : ""}
-                    {messagePreview(conversation.last_body, conversation.last_type)}
-                  </p>
-                </div>
-                <time className="shrink-0 text-xs text-zinc-600 dark:text-zinc-400" dateTime={conversation.last_message_at ?? undefined}>
-                  {shortDate(conversation.last_message_at, now)}
-                </time>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={<ChatIcon className="size-5" />}
+          title={filtered ? "No hay conversaciones con estos filtros" : "Todavía no hay conversaciones"}
+          description={filtered ? "Probá con otro filtro o buscá otro nombre." : "Cuando un asociado escriba por WhatsApp o Telegram, su conversación va a aparecer acá."}
+          action={
+            filtered ? (
+              <Link href="/conversaciones" className="btn-secondary">
+                Ver todas
               </Link>
-            </li>
-          ))}
-        </ul>
+            ) : null
+          }
+        />
+      ) : (
+        <>
+          <ul className="divide-y divide-line">
+            {items.map((conversation) => {
+              const waiting = conversation.last_direction === "inbound";
+              return (
+                <li key={conversation.id}>
+                  <Link
+                    href={`/conversaciones/${conversation.id}`}
+                    className="flex items-start gap-3 px-4 py-3.5 transition hover:bg-zinc-100/80 sm:px-6 dark:hover:bg-zinc-900"
+                  >
+                    <Avatar name={conversation.contact_name} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className={`truncate ${waiting ? "font-semibold" : "font-medium"}`}>{conversation.contact_name || "Sin nombre"}</p>
+                        <span className="shrink-0 text-xs text-muted">{channelLabel(conversation.channel_type ?? "")}</span>
+                      </div>
+                      <p className={`truncate text-sm ${waiting ? "text-foreground" : "text-muted"}`}>
+                        {lastSenderPrefix(conversation.last_sender, conversation.last_direction)}
+                        {messagePreview(conversation.last_body, conversation.last_type)}
+                      </p>
+                      {conversation.case_status || !conversation.ai_enabled ? (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          {conversation.case_status ? <StatusBadge status={conversation.case_status} /> : null}
+                          {conversation.case_priority === "high" || conversation.case_priority === "urgent" ? (
+                            <PriorityBadge priority={conversation.case_priority} />
+                          ) : null}
+                          {conversation.case_status && conversation.case_assigned_to === profile.id ? <Badge tone="accent">Asignado a vos</Badge> : null}
+                          {!conversation.ai_enabled ? (
+                            <Badge tone="warning" title="Una persona del equipo tomó el chat: Jarvis no responde">
+                              <PauseIcon className="size-3" />
+                              IA en pausa
+                            </Badge>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <time className={`text-xs ${waiting ? "font-semibold text-accent" : "text-muted"}`} dateTime={conversation.last_message_at ?? undefined}>
+                        {shortDate(conversation.last_message_at, now)}
+                      </time>
+                      {waiting ? <span className="size-2 rounded-full bg-accent" title="Esperando respuesta" aria-label="Esperando respuesta" /> : null}
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          {hasMore ? (
+            <div className="flex justify-center p-4">
+              <Link href={inboxHref(query, { ver: query.limit + 50 })} className="btn-secondary" scroll={false}>
+                Ver más conversaciones
+              </Link>
+            </div>
+          ) : null}
+        </>
       )}
     </main>
   );

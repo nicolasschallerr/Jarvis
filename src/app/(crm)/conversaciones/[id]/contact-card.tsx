@@ -50,7 +50,7 @@ export async function ContactCard({
         }}
       />
 
-      <dl className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+      <dl className="flex flex-col gap-1 text-xs text-muted">
         {(identities ?? []).map((identity) => (
           <div key={`${identity.channel_type}-${identity.identifier}`} className="flex gap-1">
             <dt>{channelLabel(identity.channel_type)}:</dt>

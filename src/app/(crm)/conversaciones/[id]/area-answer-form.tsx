@@ -25,7 +25,7 @@ export function AreaAnswerForm({ conversationId, queryId }: { conversationId: st
         {pending ? "Enviando..." : "Responder consulta"}
       </button>
       {state.error ? (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-danger">
           {state.error}
         </p>
       ) : null}

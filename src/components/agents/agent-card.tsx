@@ -7,8 +7,8 @@ const ROLES: Record<AgentKind, string> = {
 
 const STATUS: Record<AgentStatus, { label: string; dot: string }> = {
   paused: { label: "En pausa", dot: "bg-zinc-400" },
-  working: { label: "Trabajando", dot: "bg-emerald-500" },
-  waiting_approval: { label: "Esperando aprobación", dot: "bg-amber-500" },
+  working: { label: "Trabajando", dot: "bg-success" },
+  waiting_approval: { label: "Esperando aprobación", dot: "bg-warning" },
 };
 
 export type AgentView = {
@@ -33,7 +33,7 @@ export function AgentCard({ agent, blinkDelay = 0 }: { agent: AgentView; blinkDe
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div>
           <h3 className="font-display text-xl font-semibold leading-tight">{agent.name}</h3>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{ROLES[agent.kind]}</p>
+          <p className="text-sm text-muted">{ROLES[agent.kind]}</p>
         </div>
 
         <p className="flex items-center gap-2 text-sm">

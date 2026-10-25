@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 
 import type { DuplicateCandidate } from "@/lib/crm/contact-merge";
+import { channelLabel } from "@/lib/crm/format";
 
 import { mergeContactAction, type MergeState } from "./merge-actions";
 
@@ -13,13 +14,13 @@ function Candidate({ keepId, conversationId, candidate }: { keepId: string; conv
   // Unir no se puede deshacer: primero se pide confirmar.
   const [confirming, setConfirming] = useState(false);
 
-  const channels = candidate.identities.map((identity) => `${identity.channelType} ${identity.identifier}`).join(", ");
+  const channels = candidate.identities.map((identity) => `${channelLabel(identity.channelType)} ${identity.identifier}`).join(", ");
 
   return (
-    <li className="flex flex-col gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm dark:bg-amber-950/40">
+    <li className="flex flex-col gap-2 rounded-lg border border-warning/25 bg-warning-soft px-3 py-2 text-sm">
       <div>
         <p className="font-medium">{candidate.displayName || "Sin nombre"}</p>
-        <p className="text-xs text-zinc-600 dark:text-zinc-400">
+        <p className="text-xs text-muted">
           {[candidate.locality, channels].filter(Boolean).join(" · ") || "Sin más datos"}
         </p>
       </div>
@@ -44,8 +45,8 @@ function Candidate({ keepId, conversationId, candidate }: { keepId: string; conv
         </button>
       )}
 
-      {state.error ? <p role="alert" className="text-xs text-red-600 dark:text-red-400">{state.error}</p> : null}
-      {state.message ? <p role="status" className="text-xs text-emerald-700 dark:text-emerald-400">{state.message}</p> : null}
+      {state.error ? <p role="alert" className="text-xs text-danger">{state.error}</p> : null}
+      {state.message ? <p role="status" className="text-xs text-success">{state.message}</p> : null}
     </li>
   );
 }
@@ -56,7 +57,7 @@ export function DuplicateContacts({ keepId, conversationId, candidates }: { keep
   return (
     <section aria-labelledby="duplicados" className="flex flex-col gap-2">
       <h3 id="duplicados" className="text-sm font-semibold">Posibles duplicados</h3>
-      <p className="text-xs text-zinc-600 dark:text-zinc-400">Otras fichas con el mismo documento. Pueden ser la misma persona escribiendo por otro canal.</p>
+      <p className="text-xs text-muted">Otras fichas con el mismo documento. Pueden ser la misma persona escribiendo por otro canal.</p>
       <ul className="flex flex-col gap-2">
         {candidates.map((candidate) => (
           <Candidate key={candidate.id} keepId={keepId} conversationId={conversationId} candidate={candidate} />

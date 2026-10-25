@@ -65,12 +65,12 @@ export function ContactForm({
       ) : null}
 
       {state.error ? (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-danger">
           {state.error}
         </p>
       ) : null}
-      {state.warning ? <p className="text-sm text-amber-700 dark:text-amber-400">{state.warning}</p> : null}
-      {state.savedAt && !state.error ? <p className="text-sm text-emerald-700 dark:text-emerald-400">Ficha guardada.</p> : null}
+      {state.warning ? <p className="text-sm text-warning">{state.warning}</p> : null}
+      {state.savedAt && !state.error ? <p className="text-sm text-success">Ficha guardada.</p> : null}
     </form>
   );
 }

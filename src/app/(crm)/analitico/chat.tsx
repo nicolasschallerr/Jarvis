@@ -53,7 +53,7 @@ export function AnalystChat({ agentName }: { agentName: string }) {
       <div className="card flex min-h-64 flex-1 flex-col gap-3 overflow-y-auto p-4" aria-live="polite">
         {entries.length === 0 ? (
           <div className="flex flex-col gap-3 text-sm">
-            <p className="text-zinc-600 dark:text-zinc-400">
+            <p className="text-muted">
               Preguntale a {agentName} por los números de tu operación. Responde con datos reales y no modifica nada.
             </p>
             <ul className="flex flex-wrap gap-2">
@@ -74,19 +74,19 @@ export function AnalystChat({ agentName }: { agentName: string }) {
                   entry.role === "user"
                     ? "bg-zinc-200 dark:bg-zinc-700"
                     : entry.isError
-                      ? "bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-300"
+                      ? "bg-danger-soft text-danger"
                       : "bg-zinc-100 dark:bg-zinc-800"
                 }`}
               >
                 {entry.text}
               </p>
               {entry.tools && entry.tools.length > 0 ? (
-                <p className="text-xs text-zinc-600 dark:text-zinc-400">Consultó: {entry.tools.map((tool) => TOOL_LABELS[tool] ?? tool).join(", ")}</p>
+                <p className="text-xs text-muted">Consultó: {entry.tools.map((tool) => TOOL_LABELS[tool] ?? tool).join(", ")}</p>
               ) : null}
             </div>
           ))
         )}
-        {pending ? <p className="text-sm text-zinc-600 dark:text-zinc-400">{agentName} está mirando los datos...</p> : null}
+        {pending ? <p className="text-sm text-muted">{agentName} está mirando los datos...</p> : null}
         <div ref={endRef} />
       </div>
 

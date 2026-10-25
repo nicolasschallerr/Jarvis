@@ -32,7 +32,7 @@ export function SectorCard({ sector }: { sector: SectorView }) {
       <h2 className="text-base font-semibold">{sector.name}</h2>
 
       {sector.members.length === 0 ? (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">Todavía no hay personas en este sector.</p>
+        <p className="text-sm text-muted">Todavía no hay personas en este sector.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {sector.members.map((member) => (
@@ -40,7 +40,7 @@ export function SectorCard({ sector }: { sector: SectorView }) {
               <span className="flex items-center gap-2">
                 {member.fullName}
                 {member.isLead ? (
-                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-300">
+                  <span className="badge bg-warning-soft text-warning">
                     Responsable
                   </span>
                 ) : null}
@@ -102,7 +102,7 @@ export function SectorCard({ sector }: { sector: SectorView }) {
       ) : null}
 
       {error ? (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       ) : null}

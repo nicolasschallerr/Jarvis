@@ -27,16 +27,16 @@ export function AgentForm({ id, agent }: { id: string; agent: AgentView }) {
         </label>
 
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="isEnabled" defaultChecked={agent.isEnabled} className="size-4" />
-          Encendido (atiende las conversaciones)
+          <input type="checkbox" name="isEnabled" defaultChecked={agent.isEnabled} className="size-4 accent-accent" />
+          {agent.kind === "attention" ? "Encendido (atiende las conversaciones)" : "Encendido (responde las preguntas del equipo)"}
         </label>
 
         <div className="flex items-center gap-3">
           <button type="submit" disabled={pending} className="btn-primary">
             {pending ? "Guardando..." : "Guardar"}
           </button>
-          {state.saved ? <p role="status" className="text-sm text-emerald-700 dark:text-emerald-400">Guardado.</p> : null}
-          {state.error ? <p role="alert" className="text-sm text-red-600 dark:text-red-400">{state.error}</p> : null}
+          {state.saved ? <p role="status" className="text-sm text-success">Guardado.</p> : null}
+          {state.error ? <p role="alert" className="text-sm text-danger">{state.error}</p> : null}
         </div>
       </form>
     </section>

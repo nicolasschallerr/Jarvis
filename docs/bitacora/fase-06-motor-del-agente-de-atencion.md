@@ -65,7 +65,26 @@ Ver lecciones 37 a 39.
 - **Agente analítico:** solo contesta con sus 5 herramientas sobre datos de Jarvis; no consulta la base del cliente (falta acceso y vistas filtradas); no se probó con Claude real ni se midió su costo por pregunta; hay que encender al agente analítico desde Agentes para usarlo.
 - **Consumo:** el panel no tiene límites ni alertas, no incluye servicios distintos de Claude y no se exporta; el costo depende de los precios que cargue el cliente.
 - **Seguimientos:** nadie pone aún el caso en "esperando al asociado" de forma automática (hoy lo hace una persona); falta que el agente lo haga al pedir datos. Fuera de la ventana de 24 h de WhatsApp quedan omitidos hasta tener plantillas de Meta. No hay pantalla para ver o cancelar los programados.
-- **Avisos:** solo se ven en Inicio y se refrescan al recargar o al cambiar algo en vivo; no hay campana en el menú
-  ni aviso por email o WhatsApp al responsable (Fase 9). Tampoco se avisa cuando el sector responde una consulta.
+- **Avisos:** se ven en Inicio, con un contador en el menú; no hay aviso por email o WhatsApp al responsable (Fase 9).
+  Tampoco se avisa cuando el sector responde una consulta.
 - **Auditoría:** `audit_log` sigue cubriendo solo contactos.
 - **Heredado:** estados y adjuntos de WhatsApp (Fase 14), retención de la bandeja de eventos, rotar claves antes de producción.
+
+## Auditoría de producto (2026-10-24)
+
+Escaneo completo de las fases, la interfaz y el CRM, con tres revisiones (interfaz, seguridad y lógica, producto).
+
+- **Seguridad y lógica (ADR-027):** tokens de canal solo del servidor y con formato fijo; columnas que solo escribe el
+  sistema protegidas por disparadores (incluida la ventana de 24 h); turno del agente por conversación para no
+  responder dos veces; tope de intentos en las respuestas del área; registro de herramientas sin datos personales; datos
+  libres acotados; deduplicación de Telegram por bot; mensajes fallidos fuera del historial; zona horaria sincronizada.
+- **Diseño y producto (ADR-028):** colores por significado y componentes comunes; bandeja con búsqueda, pestañas con
+  contador, canal y paginación; conversación con burbujas por autor, separadores por día y "Tomar el chat / Devolver a
+  Jarvis"; página de Contactos con historial en todos los canales; Casos con vista por rol y filtro de prioridad; consumo
+  con gráfico del mes; páginas de error, 404 y sin acceso; enlace "Saltar al contenido".
+- **Demo:** `scripts/sembrar-demo.mts` crea la organización "demo" con usuarios, canales y conversaciones de ejemplo
+  (datos inventados) para mostrar el producto. Las credenciales quedan en `.env.local`.
+- **Pruebas nuevas:** `tests/endurecimiento.test.ts`, `tests/crm-inbox.test.ts` y casos nuevos en `crm-reply` y
+  `agent-fields`.
+- **Pendiente de esta auditoría:** respuestas rápidas, "cargar mensajes anteriores" en conversaciones largas y editar la
+  ficha desde la página del contacto.

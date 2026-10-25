@@ -259,8 +259,7 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** el texto pasa por varias capas (shell, intérprete) y cada una consume barras invertidas; lo que llega al archivo no es lo que se escribió. Es el mismo origen que la lección 35.
 - **Solución:** para texto con barras invertidas (regex, `\n`), usar la herramienta de edición o escribir el archivo completo; reservar los scripts de reemplazo para texto sin barras.
 - **Cómo evitarlo:** después de cualquier reemplazo automático, compilar (`npx tsc --noEmit`) antes de seguir; el error aparece enseguida.
-- **Se repitió** (Fase 7) al agregar un texto con `
-` a un archivo desde un script: el compilador lo marcó al instante y se corrigió con la herramienta de edición. La regla vale tal cual: texto con barras invertidas, siempre con la herramienta de edición.
+- **Se repitió** (Fase 7) al agregar un texto con `\n` a un archivo desde un script: el compilador lo marcó al instante y se corrigió con la herramienta de edición. La regla vale tal cual: texto con barras invertidas, siempre con la herramienta de edición.
 
 ### 41. Un dato obligatorio nuevo en la plantilla rompe las pruebas que derivan sin datos
 - **Problema:** al definir `campos` en la plantilla, cuatro pruebas pasaron a fallar: derivaban sin datos y ahora el guardián lo bloquea, y otra quitaba una unidad a la que un campo apuntaba.
@@ -273,3 +272,35 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** `supabase-js` arma la inserción con la unión de las claves de todas las filas; a la fila que no trae una clave (aquí `status`, que sí tenía valor por defecto) se le manda `null` en vez de usar el valor por defecto. Además el error no se estaba revisando.
 - **Solución:** todas las filas con las mismas claves y el valor explícito, y revisar `error` al sembrar datos.
 - **Cómo evitarlo:** en las siembras de pruebas, comprobar siempre el error de cada inserción; una siembra que falla en silencio produce fallas lejos de su causa.
+
+## Auditoría de producto (2026-10-24)
+
+### 43. Con Cache Components, leer la hora o la sesión fuera de lugar rompe el prerender
+- **Problema:** las páginas del CRM tiraban "Next.js encountered the unstable value `Date.now()` while prerendering" y, al intentar arreglarlo con `connection()` dentro del cliente de Supabase, aparecía "blocking outside Suspense".
+- **Causa real:** con `cacheComponents`, Next intenta prerenderizar todo lo que puede. La lectura de la sesión (que internamente usa la hora) y el `new Date()` de cada página son datos de pedido: tienen que estar marcados como tales y dentro de un `<Suspense>`.
+- **Solución:** `getCurrentProfile` con `"use cache: private"` (se cachea por usuario y por poco tiempo); cada página del CRM llama `await connection()` al empezar y exporta `instant = false`; el menú, que cuenta avisos, también llama `connection()` y va dentro de `<Suspense>`.
+- **Cómo evitarlo:** antes de usar la hora, cookies o la sesión en un componente de servidor, decidir si es dato de pedido; si lo es, `connection()` arriba y `<Suspense>` alrededor. Leer `node_modules/next/dist/docs/` antes de "arreglar" a ciegas.
+
+### 44. El servidor de desarrollo puede servir CSS viejo después de agregar colores al tema
+- **Problema:** después de sumar tokens nuevos (`--success`, `--warning`, `--line`...) en `globals.css`, las placas aparecían sin color en el navegador, aunque el CSS compilaba bien.
+- **Causa real:** el servidor de desarrollo tenía en memoria la hoja anterior; las clases nuevas no estaban en ella.
+- **Solución:** verificar que el CSS compila (con `@tailwindcss/node`) y reiniciar el servidor de desarrollo.
+- **Cómo evitarlo:** al tocar el `@theme` de Tailwind, reiniciar `npm run dev` antes de concluir que una clase "no anda".
+
+### 45. RLS decide qué filas se pueden tocar, no qué columnas
+- **Problema:** la auditoría encontró que un operador, con su sesión y sin pasar por la pantalla, podía cambiar `last_inbound_at` de una conversación (y abrir a mano la ventana de 24 h de WhatsApp), marcar el consentimiento de un contacto o apuntar un canal a la variable de entorno de otro cliente.
+- **Causa real:** las políticas de RLS permiten actualizar la fila entera si la fila es de tu organización y tu rol puede editar; no distinguen columnas.
+- **Solución:** disparadores `before update` que, cuando hay un usuario en la sesión (`auth.uid()` no nulo), rechazan cambios en las columnas que solo escribe el sistema (ADR-027). El servidor, sin usuario, sigue pudiendo todo.
+- **Cómo evitarlo:** al agregar una columna, preguntarse "¿la cambia una persona desde la pantalla?". Si no, va a la lista de columnas protegidas y se agrega una prueba que lo intente con la sesión de un operador.
+
+### 46. Dos pasadas del trabajador pueden contestar el mismo mensaje
+- **Problema:** si una pasada del trabajador tardaba (el modelo demora), la siguiente podía tomar la misma conversación y Jarvis respondía dos veces.
+- **Causa real:** nada impedía que dos ejecuciones trabajaran sobre la misma conversación a la vez.
+- **Solución:** un turno por conversación en la base (`claim_agent_turn` / `release_agent_turn`) con vencimiento, para que un corte no la deje bloqueada. Si entran mensajes nuevos mientras responde, la misma ejecución los toma (hasta 3 vueltas) en lugar de dejar otra respuesta en paralelo.
+- **Cómo evitarlo:** todo proceso programado que pueda superponerse con la pasada siguiente necesita un candado con vencimiento; probarlo pidiendo el turno dos veces seguidas.
+
+### 47. Una función `security definer` sigue viendo al usuario en `auth.uid()`
+- **Problema:** después de proteger columnas con disparadores (lección 45), unir contactos dejó de funcionar: 6 pruebas fallaron con la suite completa.
+- **Causa real:** `merge_contacts` es una función `security definer` que ejecuta un superadmin. Corre con los permisos del dueño de la función, pero `auth.uid()` lee el token de la sesión, así que sigue devolviendo el usuario. El disparador creyó que era una persona cambiando columnas protegidas.
+- **Solución:** el disparador solo restringe cuando `current_user = 'authenticated'` (la persona escribiendo directo con su sesión). Dentro de una función `security definer`, `current_user` es el dueño de la función.
+- **Cómo evitarlo:** para saber "quién escribe" en un disparador, combinar `auth.uid()` (quién inició la sesión) con `current_user` (con qué permisos corre la sentencia). Y correr la suite completa después de cualquier disparador nuevo: las pruebas de una función lejana fueron las que lo mostraron.

@@ -1,4 +1,5 @@
-import { dateTime, describeCaseEvent, PRIORITY_LABELS, STATUS_LABELS } from "@/lib/crm/format";
+import { Badge, PriorityBadge, StatusBadge } from "@/components/ui/badge";
+import { dateTime, describeCaseEvent, fieldLabel } from "@/lib/crm/format";
 import type { CasePriority, CaseStatus } from "@/lib/crm/cases";
 import { createClient } from "@/lib/supabase/server";
 
@@ -14,7 +15,7 @@ function collectedEntries(data: unknown): Array<[string, string]> {
   if (!data || typeof data !== "object" || Array.isArray(data)) return [];
   return Object.entries(data as Record<string, unknown>)
     .filter(([key, value]) => !key.startsWith("_") && value !== null && value !== undefined && String(value).trim() !== "")
-    .map(([key, value]) => [key.replace(/_/g, " "), typeof value === "object" ? JSON.stringify(value) : String(value)]);
+    .map(([key, value]) => [fieldLabel(key), typeof value === "object" ? JSON.stringify(value) : String(value)]);
 }
 
 // Panel del caso de una conversación: el caso abierto con sus controles e historial, o el formulario
@@ -96,17 +97,20 @@ export async function CasePanel({
 
       {openCase ? (
         <>
-          <div className="flex flex-col gap-1 text-sm">
+          <div className="card flex flex-col gap-2 p-3 text-sm">
             <p className="font-medium">{openCase.title}</p>
-            <p className="text-zinc-600 dark:text-zinc-400">
-              {STATUS_LABELS[openCase.status]} · Prioridad {PRIORITY_LABELS[openCase.priority]?.toLowerCase()}
-            </p>
-            <p className="text-zinc-600 dark:text-zinc-400">
-              Sector: {openCase.sector_id ? (names.sectors.get(openCase.sector_id) ?? "—") : "sin sector"}
-            </p>
-            <p className="text-zinc-600 dark:text-zinc-400">
-              Asignado a: {openCase.assigned_to ? (names.profiles.get(openCase.assigned_to) ?? "—") : "sin asignar"}
-            </p>
+            <div className="flex flex-wrap gap-1.5">
+              <StatusBadge status={openCase.status} />
+              <PriorityBadge priority={openCase.priority} />
+            </div>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-muted">
+              <dt>Sector</dt>
+              <dd className="text-foreground">{openCase.sector_id ? (names.sectors.get(openCase.sector_id) ?? "—") : "Sin sector"}</dd>
+              <dt>Asignado a</dt>
+              <dd className="text-foreground">{openCase.assigned_to ? (names.profiles.get(openCase.assigned_to) ?? "—") : "Sin asignar"}</dd>
+              <dt>Abierto</dt>
+              <dd className="text-foreground">{dateTime(openCase.opened_at)}</dd>
+            </dl>
           </div>
 
           {openCase.summary || collectedEntries(openCase.collected_data).length > 0 ? (
@@ -117,7 +121,7 @@ export async function CasePanel({
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
                   {collectedEntries(openCase.collected_data).map(([key, value]) => (
                     <div key={key} className="contents">
-                      <dt className="text-zinc-600 dark:text-zinc-400">{key}</dt>
+                      <dt className="text-muted">{key}</dt>
                       <dd className="break-words">{value}</dd>
                     </div>
                   ))}
@@ -141,13 +145,15 @@ export async function CasePanel({
 
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Historial</h3>
-            <ol className="flex flex-col gap-2 text-sm">
+            {(events ?? []).length === 0 ? <p className="text-sm text-muted">Todavía no hay movimientos.</p> : null}
+            <ol className="flex flex-col gap-2 border-l border-line pl-3 text-sm">
               {(events ?? []).map((event) => {
                 const described = describeCaseEvent(event, names);
                 return (
-                  <li key={event.id} className="flex flex-col">
+                  <li key={event.id} className="relative flex flex-col">
+                    <span className="absolute top-1.5 -left-[16.5px] size-2 rounded-full bg-line ring-2 ring-background" aria-hidden="true" />
                     <span>{described.text}</span>
-                    <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                    <span className="text-xs text-muted">
                       {described.actor} · {dateTime(event.created_at)}
                     </span>
                   </li>
@@ -157,10 +163,10 @@ export async function CasePanel({
           </section>
         </>
       ) : role === "viewer" ? (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">Esta conversación no tiene un caso abierto.</p>
+        <p className="text-sm text-muted">Esta conversación no tiene un caso abierto.</p>
       ) : (
         <>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm text-muted">
             Esta conversación no tiene un caso abierto. Abrí uno para seguir la gestión.
           </p>
           <CreateCaseForm
@@ -178,16 +184,26 @@ export async function CasePanel({
               const canAnswer =
                 query.status === "pending" && role !== "viewer" && (role === "superadmin" || mySectorIds.has(query.sector_id));
               return (
-                <li key={query.id} className="flex flex-col gap-2 rounded-md bg-zinc-100 px-3 py-2 dark:bg-zinc-800">
-                  <span className="text-xs text-zinc-600 dark:text-zinc-400">
-                    A {names.sectors.get(query.sector_id) ?? "un sector"} · {dateTime(query.created_at)} ·{" "}
-                    {query.status === "pending" ? "Pendiente" : query.status === "answered" ? "Respondida" : "Cerrada"}
+                <li key={query.id} className="card flex flex-col gap-2 p-3">
+                  <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                    {query.status === "pending" ? (
+                      <Badge tone="warning" dot>
+                        Pendiente
+                      </Badge>
+                    ) : query.status === "answered" ? (
+                      <Badge tone="success" dot>
+                        Respondida
+                      </Badge>
+                    ) : (
+                      <Badge>Cerrada</Badge>
+                    )}
+                    A {names.sectors.get(query.sector_id) ?? "un sector"} · {dateTime(query.created_at)}
                   </span>
                   <span className="whitespace-pre-wrap break-words">{query.question}</span>
                   {query.answer ? (
-                    <span className="whitespace-pre-wrap break-words border-l-2 border-emerald-500 pl-2">
+                    <span className="whitespace-pre-wrap break-words border-l-2 border-success pl-2">
                       {query.answer}
-                      <span className="block text-xs text-zinc-600 dark:text-zinc-400">
+                      <span className="block text-xs text-muted">
                         {query.answered_by ? (names.profiles.get(query.answered_by) ?? "Operador") : "Persona eliminada"} · {dateTime(query.answered_at)}
                       </span>
                     </span>
@@ -202,16 +218,16 @@ export async function CasePanel({
 
       <section className="flex flex-col gap-3">
         <h3 className="text-sm font-semibold">Notas internas</h3>
-        <p className="text-xs text-zinc-600 dark:text-zinc-400">Solo las ve el equipo. No se envían al contacto.</p>
+        <p className="text-xs text-muted">Solo las ve el equipo. No se envían al contacto.</p>
         {role !== "viewer" ? <NoteForm conversationId={conversationId} /> : null}
         {(notes ?? []).length === 0 ? (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">Todavía no hay notas.</p>
+          <p className="text-sm text-muted">Todavía no hay notas.</p>
         ) : (
           <ul className="flex flex-col gap-3 text-sm">
             {(notes ?? []).map((note) => (
-              <li key={note.id} className="flex flex-col rounded-md bg-amber-50 px-3 py-2 dark:bg-amber-950/40">
+              <li key={note.id} className="flex flex-col rounded-lg border border-warning/25 bg-warning-soft px-3 py-2">
                 <span className="whitespace-pre-wrap break-words">{note.body}</span>
-                <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                <span className="text-xs text-muted">
                   {note.author_id ? (names.profiles.get(note.author_id) ?? "Operador") : "Persona eliminada"} · {dateTime(note.created_at)}
                 </span>
               </li>
@@ -227,7 +243,7 @@ export async function CasePanel({
             {closedCases.map((item) => (
               <li key={item.id} className="flex flex-col">
                 <span>{item.title}</span>
-                <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                <span className="text-xs text-muted">
                   Resuelto el {dateTime(item.resolved_at)}
                   {item.resolution ? ` · ${item.resolution}` : ""}
                 </span>

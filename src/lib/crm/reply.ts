@@ -4,7 +4,10 @@ import { ChannelSendError, OutsideWindowError } from "@/lib/outbound/errors";
 import { sendTextMessage, type SendTextParams } from "@/lib/outbound/send";
 import type { Database } from "@/lib/supabase/database.types";
 
-export type ReplyResult = { ok: true } | { ok: false; error: string };
+import { setConversationAi } from "./ai-switch";
+
+// `aiPaused`: la respuesta pausó a Jarvis en esta conversación (estaba atendiendo y ahora atiende una persona).
+export type ReplyResult = { ok: true; aiPaused: boolean } | { ok: false; error: string };
 
 export const MAX_REPLY_LENGTH = 4000;
 
@@ -35,7 +38,7 @@ export async function sendOperatorReply(params: ReplyParams): Promise<ReplyResul
 
   const { data: visible } = await params.userClient
     .from("conversations")
-    .select("id")
+    .select("id, ai_enabled")
     .eq("id", params.conversationId)
     .maybeSingle();
   if (!visible) return { ok: false, error: "La conversación no existe." };
@@ -48,7 +51,15 @@ export async function sendOperatorReply(params: ReplyParams): Promise<ReplyResul
       senderProfileId: params.profile.id,
       fetchImpl: params.fetchImpl,
     });
-    return { ok: true };
+
+    // Si una persona responde, toma el chat: Jarvis se pausa en esta conversación para no contestar por encima
+    // de ella. Se reactiva con "Devolver a Jarvis" (ADR-028).
+    let aiPaused = false;
+    if (visible.ai_enabled) {
+      const switched = await setConversationAi({ userClient: params.userClient, profile: params.profile, conversationId: params.conversationId, enabled: false });
+      aiPaused = switched.ok;
+    }
+    return { ok: true, aiPaused };
   } catch (error) {
     if (error instanceof OutsideWindowError) {
       return {

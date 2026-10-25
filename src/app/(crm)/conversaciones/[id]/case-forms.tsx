@@ -53,7 +53,7 @@ export function CreateCaseForm({ conversationId, sectors }: { conversationId: st
         {pending ? "Creando..." : "Crear caso"}
       </button>
       {state.error ? (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-danger">
           {state.error}
         </p>
       ) : null}
@@ -181,7 +181,7 @@ export function CaseControls(props: {
             </option>
           ))}
         </select>
-        <span className="text-xs text-zinc-600 dark:text-zinc-400">Al cambiar de sector se quita la asignación.</span>
+        <span className="text-xs text-muted">Al cambiar de sector se quita la asignación.</span>
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
@@ -213,7 +213,7 @@ export function CaseControls(props: {
       ) : null}
 
       {error ? (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       ) : null}

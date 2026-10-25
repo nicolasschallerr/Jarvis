@@ -7,7 +7,8 @@ import { sendOperatorReply } from "@/lib/crm/reply";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-export type ReplyState = { error: string | null; sentAt: number | null };
+// `aiPaused`: este envío tomó el chat (Jarvis estaba atendiendo y quedó en pausa).
+export type ReplyState = { error: string | null; sentAt: number | null; aiPaused?: boolean };
 
 export async function sendReply(
   conversationId: string,
@@ -27,5 +28,6 @@ export async function sendReply(
   if (!result.ok) return { error: result.error, sentAt: null };
 
   revalidatePath(`/conversaciones/${conversationId}`);
-  return { error: null, sentAt: Date.now() };
+  if (result.aiPaused) revalidatePath("/conversaciones");
+  return { error: null, sentAt: Date.now(), aiPaused: result.aiPaused };
 }
