@@ -61,8 +61,9 @@ export async function deliverAreaAnswers(
     .eq("status", "answered")
     .is("reply_sent_at", null)
     .lt("reply_attempts", MAX_REPLY_ATTEMPTS)
+    // Las que hoy no podían salir quedan postergadas un rato (ADR-029): así no tapan la cola.
+    .or(`reply_next_attempt_at.is.null,reply_next_attempt_at.lte.${now.toISOString()}`)
     .order("answered_at", { ascending: true })
-    // Se leen más de las que se procesan: las que hoy no pueden salir se saltean sin costo y no tapan a las demás.
     .limit(50);
   if (error) throw new Error(`No se pudieron leer las respuestas del área: ${error.message}`);
 
@@ -77,6 +78,17 @@ export async function deliverAreaAnswers(
 }
 
 export const MAX_REPLY_ATTEMPTS = 3;
+
+// Cuánto se posterga una respuesta que hoy no puede salir (chat tomado, canal sin envío, ventana cerrada).
+export const REPLY_DEFER_MS = 15 * 60 * 1000;
+
+// Se deja para más tarde sin gastar un intento: no es una falla, es que todavía no se puede escribir.
+async function defer(admin: SupabaseClient<Database>, queryId: string, now: Date, reason: string) {
+  await admin
+    .from("area_queries")
+    .update({ reply_next_attempt_at: new Date(now.getTime() + REPLY_DEFER_MS).toISOString(), reply_error: reason })
+    .eq("id", queryId);
+}
 
 type PendingAnswer = {
   id: string;
@@ -100,15 +112,44 @@ async function deliverOne(
 
   // Si un operador tomó el chat, la respuesta queda a la vista en el caso y la transmite él.
   const { data: conversation } = await admin.from("conversations").select("ai_enabled").eq("id", conversationId).maybeSingle();
-  if (!conversation?.ai_enabled) return "skipped";
+  if (!conversation?.ai_enabled) {
+    await defer(admin, query.id, now, "chat_tomado_por_una_persona");
+    return "skipped";
+  }
 
   // Si hoy no puede salir (canal sin envío o fuera de la ventana), no se paga el modelo: queda a la vista en el caso.
   const sendable = await checkSendable(admin, conversationId, now);
-  if (!sendable.ok) return "skipped";
+  if (!sendable.ok) {
+    await defer(admin, query.id, now, sendable.reason);
+    return "skipped";
+  }
 
   const loaded = await loadAttentionAgent(admin, query.organization_id);
   if (!loaded.ok) return loaded.status === "skipped" ? "skipped" : "failed";
-  const { agentId, config, settings } = loaded.agent;
+
+  // El turno de la conversación: si el agente está contestando otro mensaje en este chat, se espera a la
+  // próxima pasada en vez de escribir los dos a la vez.
+  const { data: turn } = await admin.rpc("claim_agent_turn", { p_conversation_id: conversationId });
+  if (!turn) return "skipped";
+  try {
+    return await deliverClaimed(admin, client, query, conversationId, loaded.agent, now, fetchImpl);
+  } finally {
+    await admin.rpc("release_agent_turn", { p_conversation_id: conversationId });
+  }
+}
+
+type LoadedAgent = Extract<Awaited<ReturnType<typeof loadAttentionAgent>>, { ok: true }>["agent"];
+
+async function deliverClaimed(
+  admin: SupabaseClient<Database>,
+  client: ModelClient,
+  query: PendingAnswer,
+  conversationId: string,
+  agent: LoadedAgent,
+  now: Date,
+  fetchImpl: Params["fetchImpl"],
+): Promise<keyof AreaRepliesResult> {
+  const { agentId, config, settings } = agent;
 
   const { data: claimed } = await admin
     .from("area_queries")
@@ -136,7 +177,7 @@ async function deliverOne(
     return "failed";
   }
 
-  const history = appendNotice(buildHistory(rows, await loadInlineMedia(admin, rows)), areaAnswerNotice(query.sectors?.name ?? "consultado", query.question, query.answer));
+  const history = appendNotice(buildHistory(rows, await loadInlineMedia(admin, rows)), areaAnswerNotice(query.sectors?.name ?? "consultado", query.question, query.answer ?? ""));
 
   await admin.from("agents").update({ status: "working" }).eq("id", agentId);
 

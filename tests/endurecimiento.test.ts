@@ -149,6 +149,58 @@ describe("tomar el chat y devolverlo a Jarvis", () => {
   });
 });
 
+describe("segunda ronda (ADR-029)", () => {
+  let caseId = "";
+
+  beforeAll(async () => {
+    const [orgA = ""] = orgIds;
+    const { data, error } = await admin
+      .from("cases")
+      .insert({ organization_id: orgA, contact_id: contactId, conversation_id: telegramConversation, title: "Caso de prueba" })
+      .select("id")
+      .single();
+    if (error || !data) throw new Error(`No se pudo crear el caso: ${error?.message}`);
+    caseId = data.id;
+  });
+
+  it("una persona (aun superadmin) cambia el estado de un caso pero no lo que juntó el agente ni de quién es", async () => {
+    const { data: changed, error: statusError } = await superadmin.client.from("cases").update({ status: "in_progress" }).eq("id", caseId).select("id");
+    expect(statusError).toBeNull();
+    expect(changed).toHaveLength(1);
+    const { error } = await superadmin.client.from("cases").update({ collected_data: { dni: "11111111" } }).eq("id", caseId);
+    expect(error?.message).toContain("solo el sistema");
+  });
+
+  it("las identidades de contacto no las escribe una persona (los mensajes irían a otro)", async () => {
+    const [orgA = ""] = orgIds;
+    const { error } = await operator.client
+      .from("contact_identities")
+      .insert({ organization_id: orgA, contact_id: contactId, channel_type: "telegram", identifier: "999" });
+    expect(error).not.toBeNull();
+  });
+
+  it("solo se asigna a alguien activo del equipo de la misma organización", async () => {
+    const { error: foreign } = await superadmin.client.from("cases").update({ assigned_to: foreignOperator.id }).eq("id", caseId);
+    expect(foreign?.message).toContain("Solo se puede asignar");
+    const { error: asViewer } = await superadmin.client.from("cases").update({ assigned_to: viewer.id }).eq("id", caseId);
+    expect(asViewer?.message).toContain("Solo se puede asignar");
+    const { error: ok } = await superadmin.client.from("cases").update({ assigned_to: operator.id }).eq("id", caseId);
+    expect(ok).toBeNull();
+  });
+
+  it("el turno del agente se renueva mientras lo tiene y no se puede renovar uno que no tomó", async () => {
+    await admin.rpc("claim_agent_turn", { p_conversation_id: telegramConversation, p_seconds: 5 });
+    await admin.rpc("extend_agent_turn", { p_conversation_id: telegramConversation, p_seconds: 600 });
+    const { data } = await admin.from("conversations").select("agent_lock_until").eq("id", telegramConversation).single();
+    expect(new Date(data?.agent_lock_until ?? 0).getTime()).toBeGreaterThan(Date.now() + 500_000);
+    await admin.rpc("release_agent_turn", { p_conversation_id: telegramConversation });
+
+    await admin.rpc("extend_agent_turn", { p_conversation_id: telegramConversation, p_seconds: 600 });
+    const { data: released } = await admin.from("conversations").select("agent_lock_until").eq("id", telegramConversation).single();
+    expect(released?.agent_lock_until).toBeNull();
+  });
+});
+
 describe("turno del agente por conversación", () => {
   it("una sola ejecución a la vez; al soltarlo se puede volver a tomar", async () => {
     const first = await admin.rpc("claim_agent_turn", { p_conversation_id: telegramConversation });

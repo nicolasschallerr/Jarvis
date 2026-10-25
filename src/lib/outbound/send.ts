@@ -130,8 +130,8 @@ async function sendByChannel(
     });
   }
 
-  // WhatsApp se conecta en la Fase 14, cuando exista el número de producción verificado.
-  throw new Error(`El envío por ${type} todavía no está implementado`);
+  // Un canal sin envío no se arregla reintentando: error definitivo (no se reintenta cada 15 minutos).
+  throw new ChannelSendError(`El envío por ${type} todavía no está implementado`, "canal_sin_envio", false);
 }
 
 // Canales por los que hoy se puede enviar texto (WhatsApp saliente llega en la Fase 14).

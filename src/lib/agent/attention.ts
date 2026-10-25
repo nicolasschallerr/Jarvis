@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ModelClient } from "@/lib/ai/types";
-import { sendTextMessage } from "@/lib/outbound/send";
+import { checkSendable, sendTextMessage } from "@/lib/outbound/send";
 import type { Database } from "@/lib/supabase/database.types";
 
 import { buildHistory, buildSystemPrompt, handoffText, isMenuCommand, sinceLastMenu } from "./context";
@@ -30,6 +30,9 @@ function skipped(reason: string): AttentionResult {
 
 // Cuántas veces una misma ejecución vuelve a empezar si llegan mensajes nuevos mientras piensa.
 const MAX_CATCH_UP = 3;
+
+// Duración del turno; se renueva al empezar cada vuelta para que una respuesta larga no lo pierda a mitad.
+const TURN_SECONDS = 180;
 
 type TurnContext = {
   admin: SupabaseClient<Database>;
@@ -68,7 +71,7 @@ export async function respondToMessage(
   const loaded = await loadAttentionAgent(admin, conversation.organization_id);
   if (!loaded.ok) return { status: loaded.status, reason: loaded.reason };
 
-  const { data: claimed } = await admin.rpc("claim_agent_turn", { p_conversation_id: params.conversationId });
+  const { data: claimed } = await admin.rpc("claim_agent_turn", { p_conversation_id: params.conversationId, p_seconds: TURN_SECONDS });
   // Otra ejecución está respondiendo esta conversación: ella va a ver este mensaje al terminar.
   if (!claimed) return skipped("otra_ejecucion_en_curso");
 
@@ -86,6 +89,7 @@ export async function respondToMessage(
 
   try {
     for (let round = 0; round < MAX_CATCH_UP; round += 1) {
+      if (round > 0) await admin.rpc("extend_agent_turn", { p_conversation_id: params.conversationId, p_seconds: TURN_SECONDS });
       const outcome = await respondOnce(context);
       if (outcome !== "newer-message") return outcome;
     }
@@ -117,6 +121,10 @@ async function respondOnce(context: TurnContext): Promise<AttentionResult | "new
     await sendTextMessage(admin, { conversationId, text: settings.menuText.slice(0, 4000), sender: "agent", now, fetchImpl: context.fetchImpl });
     return { status: "replied", text: settings.menuText };
   }
+
+  // Si el mensaje no va a poder salir (canal sin envío o ventana de 24 h cerrada), no se paga el modelo.
+  const sendable = await checkSendable(admin, conversationId, now);
+  if (!sendable.ok) return skipped(sendable.reason);
 
   const visible = sinceLastMenu(ordered);
   const history = buildHistory(visible, await loadInlineMedia(admin, visible));
@@ -162,16 +170,21 @@ async function respondOnce(context: TurnContext): Promise<AttentionResult | "new
 
   // Si mientras el modelo pensaba llegó otro mensaje del asociado, se vuelve a empezar con el contexto completo
   // (las herramientas ya guardaron lo que correspondía; la respuesta se arma de nuevo).
-  const { data: newest } = await admin
-    .from("messages")
-    .select("id")
-    .eq("conversation_id", conversationId)
-    .eq("direction", "inbound")
-    .order("provider_timestamp", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (newest && newest.id !== latest.id) return "newer-message";
+  // Y si mientras tanto una persona del equipo tomó el chat o contestó, el agente no escribe encima.
+  const [{ data: newest }, { data: current }] = await Promise.all([
+    admin
+      .from("messages")
+      .select("id, direction")
+      .eq("conversation_id", conversationId)
+      .neq("status", "failed")
+      .order("provider_timestamp", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    admin.from("conversations").select("ai_enabled").eq("id", conversationId).maybeSingle(),
+  ]);
+  if (!current?.ai_enabled) return skipped("una_persona_tomo_el_chat");
+  if (newest && newest.id !== latest.id) return newest.direction === "inbound" ? "newer-message" : skipped("una_persona_respondio");
 
   const texts = [result.text, official].filter((text): text is string => Boolean(text));
   if (texts.length === 0) return skipped("el_modelo_no_escribio_respuesta");

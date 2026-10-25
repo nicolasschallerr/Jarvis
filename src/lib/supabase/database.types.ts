@@ -307,6 +307,7 @@ export type Database = {
           question: string
           reply_attempts: number
           reply_error: string | null
+          reply_next_attempt_at: string | null
           reply_sent_at: string | null
           sector_id: string
           status: Database["public"]["Enums"]["area_query_status"]
@@ -325,6 +326,7 @@ export type Database = {
           question: string
           reply_attempts?: number
           reply_error?: string | null
+          reply_next_attempt_at?: string | null
           reply_sent_at?: string | null
           sector_id: string
           status?: Database["public"]["Enums"]["area_query_status"]
@@ -343,6 +345,7 @@ export type Database = {
           question?: string
           reply_attempts?: number
           reply_error?: string | null
+          reply_next_attempt_at?: string | null
           reply_sent_at?: string | null
           sector_id?: string
           status?: Database["public"]["Enums"]["area_query_status"]
@@ -1390,6 +1393,7 @@ export type Database = {
           body: string
           category: string | null
           channel_id: string | null
+          components: Json
           created_at: string
           id: string
           language: string
@@ -1397,6 +1401,9 @@ export type Database = {
           meta_template_id: string | null
           name: string
           organization_id: string
+          parameter_format: string
+          rejected_reason: string | null
+          synced_at: string | null
           updated_at: string
           variables: Json
         }
@@ -1404,6 +1411,7 @@ export type Database = {
           body: string
           category?: string | null
           channel_id?: string | null
+          components?: Json
           created_at?: string
           id?: string
           language?: string
@@ -1411,6 +1419,9 @@ export type Database = {
           meta_template_id?: string | null
           name: string
           organization_id: string
+          parameter_format?: string
+          rejected_reason?: string | null
+          synced_at?: string | null
           updated_at?: string
           variables?: Json
         }
@@ -1418,6 +1429,7 @@ export type Database = {
           body?: string
           category?: string | null
           channel_id?: string | null
+          components?: Json
           created_at?: string
           id?: string
           language?: string
@@ -1425,6 +1437,9 @@ export type Database = {
           meta_template_id?: string | null
           name?: string
           organization_id?: string
+          parameter_format?: string
+          rejected_reason?: string | null
+          synced_at?: string | null
           updated_at?: string
           variables?: Json
         }
@@ -1462,6 +1477,7 @@ export type Database = {
           sender_profile_id: string | null
           status: Database["public"]["Enums"]["message_status"]
           status_updated_at: string | null
+          template_id: string | null
           template_name: string | null
           transcription: string | null
           transcription_provider: string | null
@@ -1483,6 +1499,7 @@ export type Database = {
           sender_profile_id?: string | null
           status?: Database["public"]["Enums"]["message_status"]
           status_updated_at?: string | null
+          template_id?: string | null
           template_name?: string | null
           transcription?: string | null
           transcription_provider?: string | null
@@ -1504,6 +1521,7 @@ export type Database = {
           sender_profile_id?: string | null
           status?: Database["public"]["Enums"]["message_status"]
           status_updated_at?: string | null
+          template_id?: string | null
           template_name?: string | null
           transcription?: string | null
           transcription_provider?: string | null
@@ -1536,6 +1554,13 @@ export type Database = {
             columns: ["sender_profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -2040,6 +2065,10 @@ export type Database = {
           windows_by_contact: number
         }[]
       }
+      extend_agent_turn: {
+        Args: { p_conversation_id: string; p_seconds?: number }
+        Returns: undefined
+      }
       finalize_outbound_message: {
         Args: {
           p_external_id: string
@@ -2119,6 +2148,7 @@ export type Database = {
         | "approved"
         | "rejected"
         | "paused"
+        | "disabled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2292,6 +2322,7 @@ export const Constants = {
         "approved",
         "rejected",
         "paused",
+        "disabled",
       ],
     },
   },

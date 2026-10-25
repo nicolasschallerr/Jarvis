@@ -11,6 +11,12 @@ import { isAuthorizedWorkerRequest } from "@/lib/worker-auth";
 // entrantes (y el agente los contesta) y después envía al asociado las respuestas que dieron los
 // sectores a las consultas del agente.
 // Queda fuera del proxy de sesión: no tiene usuario, se protege con WORKER_SECRET.
+//
+// Tiempo máximo de una pasada (ADR-029). pg_cron la llama cada 10 s; si una pasada se alarga, las tareas que
+// pueden esperar (respuestas del área y seguimientos) quedan para la próxima en vez de cortarse a mitad.
+export const maxDuration = 60;
+const OPTIONAL_WORK_BUDGET_MS = 30_000;
+
 async function handle(request: NextRequest) {
   if (!process.env.WORKER_SECRET) {
     return new Response("Server misconfigured", { status: 500 });
@@ -21,15 +27,19 @@ async function handle(request: NextRequest) {
   }
 
   try {
+    const started = Date.now();
     const admin = createAdminClient();
     const modelClient = anthropicClientFromEnv();
     const result = await processPendingMessages(admin, 20, new Date(), modelClient);
-    const areaReplies = modelClient ? await deliverAreaAnswers(admin, modelClient) : null;
+    const hasTime = () => Date.now() - started < OPTIONAL_WORK_BUDGET_MS;
+    const areaReplies = modelClient && hasTime() ? await deliverAreaAnswers(admin, modelClient) : null;
     // Los seguimientos no necesitan el modelo. Si fallan, los mensajes ya quedaron procesados: se informa y se sigue.
-    const followups = await runFollowups(admin).catch((error: unknown) => {
-      console.error("worker seguimientos:", error instanceof Error ? error.message : error);
-      return null;
-    });
+    const followups = hasTime()
+      ? await runFollowups(admin).catch((error: unknown) => {
+          console.error("worker seguimientos:", error instanceof Error ? error.message : error);
+          return null;
+        })
+      : null;
     return Response.json({ ...result, areaReplies, followups });
   } catch (error) {
     console.error("worker mensajes:", error instanceof Error ? error.message : error);
