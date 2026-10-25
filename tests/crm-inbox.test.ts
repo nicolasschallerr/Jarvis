@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { defaultCaseView } from "../src/lib/crm/case-list";
+import { waitingTime } from "../src/lib/crm/format";
 import { contactQueryFrom } from "../src/lib/crm/contact-directory";
 import { filterSpec, inboxQueryFrom, lastSenderPrefix, searchTerm } from "../src/lib/crm/inbox";
 
@@ -53,5 +54,19 @@ describe("directorio de contactos y casos", () => {
     expect(defaultCaseView("operator")).toBe("mine");
     expect(defaultCaseView("superadmin")).toBe("all");
     expect(defaultCaseView("viewer")).toBe("all");
+  });
+});
+
+describe("tiempo de espera en la bandeja", () => {
+  const now = new Date("2026-10-25T15:00:00Z");
+  const ago = (minutes: number) => new Date(now.getTime() - minutes * 60_000).toISOString();
+
+  it("dice cuánto espera y marca la demora", () => {
+    expect(waitingTime(ago(0), now)).toEqual({ label: "1 min", level: "ok" });
+    expect(waitingTime(ago(29), now)).toEqual({ label: "29 min", level: "ok" });
+    expect(waitingTime(ago(45), now)).toEqual({ label: "45 min", level: "late" });
+    expect(waitingTime(ago(5 * 60), now)).toEqual({ label: "5 h", level: "critical" });
+    expect(waitingTime(ago(3 * 1440), now)).toEqual({ label: "3 d", level: "critical" });
+    expect(waitingTime(null, now)).toBeNull();
   });
 });

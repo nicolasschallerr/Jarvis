@@ -166,3 +166,15 @@ export function dayHeading(iso: string, now: Date): string {
 export function dayKeyOf(iso: string): string {
   return dayFormat.format(new Date(iso));
 }
+
+export type WaitLevel = "ok" | "late" | "critical";
+
+// Cuánto hace que el contacto espera respuesta, para la bandeja: "5 min", "2 h", "3 d". El nivel marca el color:
+// hasta 30 minutos está bien, desde 30 minutos se demora y desde 4 horas es urgente.
+export function waitingTime(since: string | null, now: Date): { label: string; level: WaitLevel } | null {
+  if (!since) return null;
+  const minutes = Math.max(0, Math.floor((now.getTime() - new Date(since).getTime()) / 60_000));
+  const label = minutes < 60 ? `${Math.max(1, minutes)} min` : minutes < 48 * 60 ? `${Math.floor(minutes / 60)} h` : `${Math.floor(minutes / 1440)} d`;
+  const level: WaitLevel = minutes >= 240 ? "critical" : minutes >= 30 ? "late" : "ok";
+  return { label, level };
+}

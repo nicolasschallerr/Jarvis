@@ -44,7 +44,8 @@ export const attentionSettingsSchema = z.object({
   fieldsPerMessage: z.number().default(3),
   // Recordatorios cuando el caso espera al asociado: horas desde que quedó esperando y texto a enviar.
   followups: z
-    .object({ active: z.boolean(), hours: z.array(z.number()), text: z.string().nullable() })
+    // template: nombre de la plantilla de Meta para los seguimientos fuera de la ventana de 24 h (Fase 9).
+    .object({ active: z.boolean(), hours: z.array(z.number()), text: z.string().nullable(), template: z.string().nullable().optional() })
     .default({ active: false, hours: [], text: null }),
   // Precios en USD por millón de tokens, solo si el cliente los configura: nunca se asumen.
   pricing: z.object({ inputPerMTok: z.number(), outputPerMTok: z.number() }).nullable().default(null),

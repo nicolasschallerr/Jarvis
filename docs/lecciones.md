@@ -304,3 +304,23 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** `merge_contacts` es una función `security definer` que ejecuta un superadmin. Corre con los permisos del dueño de la función, pero `auth.uid()` lee el token de la sesión, así que sigue devolviendo el usuario. El disparador creyó que era una persona cambiando columnas protegidas.
 - **Solución:** el disparador solo restringe cuando `current_user = 'authenticated'` (la persona escribiendo directo con su sesión). Dentro de una función `security definer`, `current_user` es el dueño de la función.
 - **Cómo evitarlo:** para saber "quién escribe" en un disparador, combinar `auth.uid()` (quién inició la sesión) con `current_user` (con qué permisos corre la sentencia). Y correr la suite completa después de cualquier disparador nuevo: las pruebas de una función lejana fueron las que lo mostraron.
+
+## Marca Orbita AI, segunda revisión y plantillas (2026-10-25)
+
+### 48. Una cola ordenada por antigüedad se traba con lo que "hoy no puede salir"
+- **Problema:** respuestas del área y seguimientos que no se podían enviar (chat tomado, canal sin envío, organización con seguimientos apagados) se salteaban sin cambiar nada; seguían siendo los más viejos y, con suficientes, ocupaban todo el lote y nada nuevo salía.
+- **Causa real:** "saltear" no es un estado: la fila vuelve primera en la próxima pasada.
+- **Solución:** todo lo que se saltea cambia algo: se posterga (`reply_next_attempt_at`, `due_at` + 15 min), se cancela o se omite (ADR-029).
+- **Cómo evitarlo:** en cualquier cola con `limit`, preguntarse qué pasa si las primeras N filas nunca pueden procesarse.
+
+### 49. Una prueba de RLS que "pasa" porque no cambió ninguna fila
+- **Problema:** una prueba esperaba que un operador pudiera cambiar el estado de un caso y que el guardia frenara otra columna; la primera dio "sin error" y la segunda no dio el error esperado.
+- **Causa real:** RLS no deja al operador tocar un caso ajeno a su sector, y un `update` que no alcanza filas no da error: cambia cero filas.
+- **Solución:** probar con quien sí puede (superadmin) y comprobar las filas devueltas con `.select()`.
+- **Cómo evitarlo:** en pruebas de escritura con la sesión de una persona, verificar siempre cuántas filas cambiaron, no solo que no hubo error.
+
+### 50. Las reglas del compilador de React no conocen el patrón de React Three Fiber
+- **Problema:** el lint marcó 15 errores en la escena 3D por "mutar valores" y "leer refs en el render".
+- **Causa real:** React Three Fiber anima mutando los objetos de three.js dentro de `useFrame`, fuera del render; es su patrón documentado, pero las reglas del compilador lo leen como un error.
+- **Solución:** desactivar esas dos reglas solo en ese archivo, con el motivo escrito. El aviso de `setState` dentro de un efecto sí era real y se corrigió con `useSyncExternalStore`.
+- **Cómo evitarlo:** ante un aviso del compilador en código de una librería con otro modelo (3D, canvas), distinguir si es un error real o el patrón de la librería, y desactivar lo mínimo y explicado.

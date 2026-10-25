@@ -3,7 +3,7 @@ import { Suspense } from "react";
 
 import { signOut } from "@/app/actions";
 import { Avatar } from "@/components/ui/avatar";
-import { BotIcon, CaseIcon, ChartIcon, ChatIcon, ContactsIcon, HomeIcon, SparkIcon, TeamIcon } from "@/components/ui/icons";
+import { BotIcon, CaseIcon, ChartIcon, ChatIcon, ContactsIcon, HomeIcon, InboxIcon, SparkIcon, TeamIcon } from "@/components/ui/icons";
 import { Logo } from "@/components/ui/logo";
 import { MotionToggle } from "@/components/ui/motion-toggle";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -94,6 +94,9 @@ async function MainNav() {
           </NavLink>
           <NavLink href="/agentes" icon={<BotIcon />}>
             Agentes
+          </NavLink>
+          <NavLink href="/plantillas" icon={<InboxIcon />}>
+            Plantillas
           </NavLink>
         </>
       ) : null}

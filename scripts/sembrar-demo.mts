@@ -338,4 +338,36 @@ const calls = Array.from({ length: 24 }, (_, index) => ({
 }));
 await admin.from("ai_calls").insert(calls);
 
+// 7. Plantillas de WhatsApp de ejemplo (Fase 9). Están marcadas como aprobadas para ver el formulario, pero el canal
+// demo no tiene token: nunca se envía nada real.
+await admin.from("message_templates").insert([
+  {
+    organization_id: orgId,
+    channel_id: channel("whatsapp"),
+    name: "recordatorio_gestion_pendiente",
+    language: "es_AR",
+    category: "utility",
+    body: "Hola {{1}}, soy {{2}} de {{3}}. Tu consulta quedó pendiente: ¿querés que la sigamos?",
+    meta_status: "approved",
+  },
+  {
+    organization_id: orgId,
+    channel_id: channel("whatsapp"),
+    name: "respuesta_del_area",
+    language: "es_AR",
+    category: "utility",
+    body: "Hola {{1}}, ya tenemos novedades sobre tu consulta. Respondé este mensaje y te contamos.",
+    meta_status: "approved",
+  },
+  {
+    organization_id: orgId,
+    channel_id: channel("whatsapp"),
+    name: "promocion_viajes",
+    language: "es_AR",
+    category: "marketing",
+    body: "¡Nuevos destinos para este verano! Escribinos para conocerlos.",
+    meta_status: "submitted",
+  },
+]);
+
 console.log(`Demo lista: ${NAME}. Entrá con el usuario de JARVIS_DEMO_EMAIL.`);

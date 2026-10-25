@@ -30,7 +30,10 @@ export function ReplyForm({
 
   // Después de un envío correcto se vacía el cuadro.
   useEffect(() => {
-    if (state.sentAt) formRef.current?.reset();
+    if (state.sentAt) {
+      formRef.current?.reset();
+      textRef.current?.focus();
+    }
   }, [state.sentAt]);
 
   function insert(body: string) {
@@ -52,7 +55,9 @@ export function ReplyForm({
     });
   }
 
-  function remove(id: string) {
+  function remove(id: string, title: string) {
+    // Es de toda la organización: se confirma antes de borrar.
+    if (!window.confirm(`¿Borrar la respuesta rápida "${title}" para todo el equipo?`)) return;
     setQuickError(null);
     startQuick(async () => {
       const result = await removeQuickReply(conversationId, id);
@@ -89,10 +94,10 @@ export function ReplyForm({
                 </button>
                 <button
                   type="button"
-                  onClick={() => remove(reply.id)}
+                  onClick={() => remove(reply.id, reply.title)}
                   disabled={quickPending}
                   aria-label={`Borrar la respuesta rápida ${reply.title}`}
-                  className="border-l border-line px-1.5 py-1 text-xs text-muted hover:text-danger"
+                  className="grid min-w-8 place-items-center border-l border-line px-2 py-1 text-sm text-muted hover:text-danger"
                 >
                   ×
                 </button>
@@ -136,12 +141,14 @@ export function ReplyForm({
           rows={2}
           required
           maxLength={4000}
-          disabled={pending}
+          readOnly={pending}
+          aria-busy={pending}
           placeholder="Escribí tu respuesta. Enter envía, Shift+Enter hace un salto de línea."
           aria-label="Respuesta"
           className="min-h-12 flex-1 resize-y field"
           onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+            const touch = window.matchMedia("(pointer: coarse)").matches;
+            if (event.key === "Enter" && !event.shiftKey && !touch && !event.nativeEvent.isComposing) {
               event.preventDefault();
               event.currentTarget.form?.requestSubmit();
             }

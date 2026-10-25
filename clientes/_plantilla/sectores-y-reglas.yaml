@@ -103,6 +103,8 @@ seguimientos:
   # Recordatorios automáticos cuando una gestión queda a medias (fuera de la ventana de 24 h: solo plantillas).
   activo: true
   horas: [24, 48, 72]
+  # Plantilla aprobada en Meta para escribir fuera de la ventana (se sincroniza en /plantillas). Variables: {{1}} o
+  # {{nombre}} = nombre del contacto, {{2}} o {{nombre_agente}}, {{3}} o {{nombre_organizacion}} (ADR-030).
   plantilla: recordatorio_gestion_pendiente
 
 textos_editables:

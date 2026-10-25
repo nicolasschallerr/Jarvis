@@ -8,7 +8,7 @@ import { ChatIcon, PauseIcon, SearchIcon } from "@/components/ui/icons";
 import { LinkTabs, SegmentedLinks } from "@/components/ui/link-tabs";
 import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentProfile } from "@/lib/auth/profile";
-import { channelLabel, messagePreview, shortDate } from "@/lib/crm/format";
+import { channelLabel, messagePreview, shortDate, waitingTime } from "@/lib/crm/format";
 import { getAgentNames } from "@/lib/crm/agent-names";
 import { inboxQueryFrom, lastSenderPrefix, listInbox, type InboxFilter, type InboxQuery } from "@/lib/crm/inbox";
 import { createClient } from "@/lib/supabase/server";
@@ -118,6 +118,7 @@ export default async function ConversacionesPage({ searchParams }: PageProps<"/c
           <ul className="divide-y divide-line">
             {items.map((conversation) => {
               const waiting = conversation.last_direction === "inbound";
+              const wait = waiting ? waitingTime(conversation.last_message_at, now) : null;
               return (
                 <li key={conversation.id}>
                   <Link
@@ -154,7 +155,12 @@ export default async function ConversacionesPage({ searchParams }: PageProps<"/c
                       <time className={`text-xs ${waiting ? "font-semibold text-accent" : "text-muted"}`} dateTime={conversation.last_message_at ?? undefined}>
                         {shortDate(conversation.last_message_at, now)}
                       </time>
-                      {waiting ? <span className="size-2 rounded-full bg-accent" title="Esperando respuesta" aria-label="Esperando respuesta" /> : null}
+                      {wait ? (
+                        <Badge tone={wait.level === "critical" ? "danger" : wait.level === "late" ? "warning" : "accent"} title="Tiempo esperando respuesta">
+                          <span className="sr-only">Esperando respuesta hace </span>
+                          {wait.label}
+                        </Badge>
+                      ) : null}
                     </div>
                   </Link>
                 </li>

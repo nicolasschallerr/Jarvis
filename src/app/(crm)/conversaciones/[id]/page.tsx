@@ -21,6 +21,7 @@ import { MessageMedia, type MediaItem } from "./message-media";
 import { LiveRefresh } from "../../live-refresh";
 import { ReplyForm } from "./reply-form";
 import { ScrollToEnd } from "./scroll-to-end";
+import { TemplateForm } from "./template-form";
 import { OpenSidePanelButton } from "./side-panel";
 
 const MESSAGE_PAGE = 100;
@@ -112,6 +113,12 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
 
   const agentName = (await getAgentNames()).attention;
   const quickReplies = profile.role === "viewer" ? [] : await listQuickReplies(supabase);
+  // Plantillas aprobadas de Meta: lo único que se puede enviar por WhatsApp fuera de la ventana de 24 h (Fase 9).
+  const { data: templates } =
+    conversation.channel_type === "whatsapp" && profile.role !== "viewer"
+      ? await supabase.from("message_templates").select("id, name, language, body, category").eq("meta_status", "approved").order("name")
+      : { data: [] };
+  const approvedTemplates = templates ?? [];
   const channel = (conversation.channel_type ?? "whatsapp") as ChannelType;
   const contactName = conversation.contact_name || "Sin nombre";
   const aiEnabled = conversation.ai_enabled ?? false;
@@ -196,10 +203,12 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
         {profile.role === "viewer" ? (
           <p className="border-t border-line px-6 py-4 text-sm text-muted">Tu rol es de consulta: podés leer la conversación pero no responder.</p>
         ) : !freeTextAllowed ? (
-          <p className="border-t border-line bg-warning-soft px-6 py-4 text-sm text-warning">
-            Pasaron más de 24 horas desde el último mensaje del contacto: WhatsApp solo deja enviar plantillas aprobadas
-            (disponible más adelante).
-          </p>
+          <TemplateForm
+            conversationId={conversation.id ?? id}
+            templates={approvedTemplates}
+            contactFirstName={contactName === "Sin nombre" ? "" : (contactName.trim().split(/\s+/)[0] ?? "")}
+            canManage={profile.role === "superadmin"}
+          />
         ) : (
           <ReplyForm conversationId={conversation.id ?? id} agentName={agentName} aiEnabled={aiEnabled} quickReplies={quickReplies} />
         )}

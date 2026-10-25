@@ -4,6 +4,8 @@ import { isWithinBusinessHours, type AttentionSettings } from "@/lib/agent/conte
 import { loadAttentionAgent } from "@/lib/agent/load";
 import { ChannelSendError, OutsideWindowError } from "@/lib/outbound/errors";
 import { sendTextMessage } from "@/lib/outbound/send";
+import { sendTemplateMessage } from "@/lib/whatsapp/service";
+import { templateVariables } from "@/lib/whatsapp/templates";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type FollowupsResult = { scheduled: number; cancelled: number; sent: number; skipped: number; failed: number };
@@ -26,6 +28,68 @@ export function followupText(settings: AttentionSettings): string {
     .replace(/\{\{nombre_agente\}\}/g, settings.agentName)
     .replace(/\{\{nombre_organizacion\}\}/g, settings.organizationName)
     .trim();
+}
+
+// Valores de las variables de la plantilla de seguimiento: posicionales en orden ({{1}} el nombre del contacto, {{2}}
+// el del agente, {{3}} el de la organización) o con nombre (nombre, nombre_agente, nombre_organizacion). Si la
+// plantilla pide algo que no se conoce, no se usa (null): mejor omitir que mandar un texto incompleto.
+export function followupTemplateValues(
+  body: string,
+  known: { contact: string; agent: string; organization: string },
+): Record<string, string> | null {
+  const byName: Record<string, string> = {
+    "1": known.contact,
+    "2": known.agent,
+    "3": known.organization,
+    nombre: known.contact,
+    nombre_contacto: known.contact,
+    nombre_agente: known.agent,
+    nombre_organizacion: known.organization,
+  };
+  const values: Record<string, string> = {};
+  for (const key of templateVariables(body)) {
+    const value = byName[key.toLowerCase()];
+    if (!value) return null;
+    values[key] = value;
+  }
+  return values;
+}
+
+// Fuera de la ventana de 24 h de WhatsApp: el seguimiento sale con la plantilla aprobada configurada
+// (seguimientos.plantilla). Devuelve el id del mensaje, o null si no hay plantilla utilizable.
+async function sendFollowupTemplate(
+  admin: SupabaseClient<Database>,
+  followup: { organization_id: string; conversation_id: string },
+  settings: AttentionSettings,
+  now: Date,
+  fetchImpl: Params["fetchImpl"],
+): Promise<string | null> {
+  const name = settings.followups.template;
+  if (!name) return null;
+  const { data: template } = await admin
+    .from("message_templates")
+    .select("id, body")
+    .eq("organization_id", followup.organization_id)
+    .eq("name", name)
+    .eq("meta_status", "approved")
+    .limit(1)
+    .maybeSingle();
+  if (!template) return null;
+
+  const { data: conversation } = await admin.from("conversations").select("contacts(display_name)").eq("id", followup.conversation_id).maybeSingle();
+  const contact = (conversation?.contacts?.display_name ?? "").trim().split(/\s+/)[0] ?? "";
+  const values = followupTemplateValues(template.body, { contact, agent: settings.agentName, organization: settings.organizationName });
+  if (!values) return null;
+
+  const sent = await sendTemplateMessage(admin, {
+    conversationId: followup.conversation_id,
+    templateId: template.id,
+    values,
+    sender: "agent",
+    now,
+    fetchImpl,
+  });
+  return sent.messageId;
 }
 
 // Configuración de seguimientos de una organización, o null si no corresponde enviar (agente apagado,
@@ -164,7 +228,7 @@ async function sendDue(
 ): Promise<void> {
   const { data: due, error } = await admin
     .from("followups")
-    .select("id, organization_id, conversation_id, conversations!inner(ai_enabled)")
+    .select("id, organization_id, conversation_id, due_at, step_hours, cases(status), conversations!inner(ai_enabled, last_inbound_at)")
     .eq("status", "pending")
     // Los de chats tomados por un operador no salen: se dejan afuera para que no tapen al resto de la cola.
     .eq("conversations.ai_enabled", true)
@@ -174,12 +238,33 @@ async function sendDue(
   if (error) throw new Error(`No se pudieron leer los seguimientos vencidos: ${error.message}`);
 
   for (const followup of due ?? []) {
+    // Lo que no va a salir no se deja primero en la cola: taparía los seguimientos de las demás organizaciones.
     const settings = await settingsFor(admin, cache, followup.organization_id);
-    if (!settings || !followup.conversation_id) continue;
+    if (!settings || !followup.conversation_id) {
+      // Seguimientos desactivados o agente apagado: se omite (no se manda cuando se reactive, días después).
+      await admin.from("followups").update({ status: "skipped" }).eq("id", followup.id).eq("status", "pending");
+      result.skipped += 1;
+      continue;
+    }
+    // Si el caso ya no espera o el asociado escribió después de que empezó la espera, ya no corresponde.
+    const waitingSince = new Date(followup.due_at).getTime() - followup.step_hours * 3_600_000;
+    const lastInbound = followup.conversations?.last_inbound_at;
+    if (followup.cases?.status !== "waiting_contact" || (lastInbound && new Date(lastInbound).getTime() > waitingSince)) {
+      await admin.from("followups").update({ status: "cancelled" }).eq("id", followup.id).eq("status", "pending");
+      result.cancelled += 1;
+      continue;
+    }
     // Si un operador tomó el chat, el seguimiento lo decide él; queda pendiente.
     if (!followup.conversations?.ai_enabled) continue;
-    // Fuera de horario no se escribe: queda pendiente para la próxima pasada dentro del horario.
-    if (!isWithinBusinessHours(now, settings)) continue;
+    // Fuera de horario no se escribe: se corre un rato para que no tape la cola y salga dentro del horario.
+    if (!isWithinBusinessHours(now, settings)) {
+      await admin
+        .from("followups")
+        .update({ due_at: new Date(now.getTime() + RETRY_DELAY_MS).toISOString() })
+        .eq("id", followup.id)
+        .eq("status", "pending");
+      continue;
+    }
 
     // Se reserva antes de enviar para no mandarlo dos veces si dos pasadas coinciden.
     const { data: claimed } = await admin
@@ -202,9 +287,24 @@ async function sendDue(
       result.sent += 1;
     } catch (error) {
       if (error instanceof OutsideWindowError) {
-        // Sin ventana solo se puede escribir con una plantilla de Meta: se omite.
-        await admin.from("followups").update({ status: "skipped", sent_at: null }).eq("id", followup.id);
-        result.skipped += 1;
+        // Sin ventana solo se puede escribir con una plantilla de Meta: se usa la configurada si está aprobada.
+        const viaTemplate = await sendFollowupTemplate(
+          admin,
+          { organization_id: followup.organization_id, conversation_id: followup.conversation_id },
+          settings,
+          now,
+          fetchImpl,
+        ).catch((templateError: unknown) => {
+          console.error("seguimiento con plantilla:", templateError instanceof Error ? templateError.message : "Error desconocido");
+          return null;
+        });
+        if (viaTemplate) {
+          await admin.from("followups").update({ message_id: viaTemplate }).eq("id", followup.id);
+          result.sent += 1;
+        } else {
+          await admin.from("followups").update({ status: "skipped", sent_at: null }).eq("id", followup.id);
+          result.skipped += 1;
+        }
       } else if (error instanceof ChannelSendError && !error.retryable) {
         // El canal rechazó el pedido (por ejemplo, el asociado bloqueó al bot): reintentar no sirve.
         await admin.from("followups").update({ status: "skipped", sent_at: null }).eq("id", followup.id);
