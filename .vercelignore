@@ -1,0 +1,7 @@
+# Lo que nunca sube a Vercel: configuración real de los clientes (confidencial), secretos locales y pruebas.
+/clientes
+.env*
+!.env.example
+/tests
+/evals
+/scripts
