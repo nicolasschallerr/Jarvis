@@ -4,7 +4,7 @@ import { Suspense } from "react";
 
 import { signOut } from "@/app/actions";
 import { Avatar } from "@/components/ui/avatar";
-import { BotIcon, CaseIcon, ChartIcon, ChatIcon, ContactsIcon, HomeIcon, InboxIcon, LockIcon, SparkIcon, TeamIcon } from "@/components/ui/icons";
+import { BellIcon, BotIcon, CaseIcon, ChartIcon, ChatIcon, ContactsIcon, HomeIcon, InboxIcon, LockIcon, SparkIcon, TeamIcon } from "@/components/ui/icons";
 import { Logo } from "@/components/ui/logo";
 import { MotionToggle } from "@/components/ui/motion-toggle";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -78,8 +78,11 @@ async function MainNav() {
 
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Principal">
-      <NavLink href="/inicio" icon={<HomeIcon />} count={unread} countLabel={`${unread} avisos sin leer`}>
+      <NavLink href="/inicio" icon={<HomeIcon />}>
         Inicio
+      </NavLink>
+      <NavLink href="/avisos" icon={<BellIcon />} count={unread} countLabel={`${unread} avisos sin leer`}>
+        Avisos
       </NavLink>
       <NavLink href="/conversaciones" icon={<ChatIcon />}>
         Conversaciones
@@ -112,6 +115,9 @@ async function MainNav() {
           {profile.role !== "superadmin" ? <p className="mt-4 mb-1 px-3 text-xs font-semibold tracking-wide text-muted uppercase">Reportes</p> : null}
           <NavLink href="/analitico" icon={<SparkIcon />}>
             Analítico
+          </NavLink>
+          <NavLink href="/reportes" icon={<ChartIcon />}>
+            Reportes
           </NavLink>
           <NavLink href="/consumo" icon={<ChartIcon />}>
             Consumo

@@ -11,7 +11,7 @@ import { capitalizeFirst, channelLabel, messagePreview, shortDate } from "@/lib/
 import { WelcomeGate } from "@/components/welcome/welcome-gate";
 import { greetingFor, longDate } from "@/lib/crm/greeting";
 import { getHomeSummary } from "@/lib/crm/home";
-import { getUnreadNotifications } from "@/lib/crm/notifications";
+import { getUnreadNotifications, noticeTarget } from "@/lib/crm/notifications";
 import { dayKey, welcomeLine } from "@/lib/crm/welcome";
 import { createClient } from "@/lib/supabase/server";
 
@@ -107,6 +107,9 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
             <h2 id="avisos" className="eyebrow">
               Avisos ({notices.unread})
             </h2>
+            <Link href="/avisos" className="ml-auto text-xs text-accent underline-offset-2 hover:underline">
+              Ver todos
+            </Link>
             <form action={markNoticesRead}>
               <button type="submit" className="btn-secondary !px-2 !py-1 text-xs">
                 Marcar como leídos
@@ -121,8 +124,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
                   <p className="truncate text-sm text-muted">{notice.body}</p>
                 </div>
               );
-              const conversationId = notice.cases?.conversation_id;
-              const href = conversationId ? `/conversaciones/${conversationId}` : notice.type === "usage_limit" ? "/consumo" : null;
+              const href = noticeTarget(notice);
               return (
                 <li key={notice.id}>
                   {href ? (

@@ -2148,6 +2148,8 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: undefined
       }
+      report_last_days: { Args: { p_days: number }; Returns: Json }
+      report_summary: { Args: { p_from: string; p_to: string }; Returns: Json }
       set_worker_active: { Args: { p_active?: boolean }; Returns: boolean }
     }
     Enums: {
