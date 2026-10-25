@@ -1,5 +1,5 @@
 {
-  "name": "jarvis",
+  "name": "orbita-ai",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -12,6 +12,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.137.0",
     "@dnd-kit/core": "^6.3.1",
+    "@react-three/fiber": "^9.8.2",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "motion": "^14.6.0",
@@ -19,6 +20,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1",
+    "three": "^0.186.1",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
   },
@@ -29,6 +31,7 @@
     "@types/node": "^24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.186.0",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "jsdom": "^30.1.3",

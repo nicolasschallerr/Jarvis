@@ -9,7 +9,17 @@ import { removeQuickReply, saveQuickReply } from "./quick-reply-actions";
 
 const INITIAL: ReplyState = { error: null, sentAt: null };
 
-export function ReplyForm({ conversationId, aiEnabled, quickReplies }: { conversationId: string; aiEnabled: boolean; quickReplies: QuickReply[] }) {
+export function ReplyForm({
+  conversationId,
+  agentName,
+  aiEnabled,
+  quickReplies,
+}: {
+  conversationId: string;
+  agentName: string;
+  aiEnabled: boolean;
+  quickReplies: QuickReply[];
+}) {
   const [state, action, pending] = useActionState(sendReply.bind(null, conversationId), INITIAL);
   const formRef = useRef<HTMLFormElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -59,10 +69,10 @@ export function ReplyForm({ conversationId, aiEnabled, quickReplies }: { convers
       ) : null}
       {state.aiPaused ? (
         <p role="status" className="text-xs text-warning">
-          Tomaste el chat: Jarvis quedó en pausa en esta conversación. Podés devolvérselo desde el encabezado.
+          Tomaste el chat: {agentName} quedó en pausa en esta conversación. Podés devolvérselo desde el encabezado.
         </p>
       ) : aiEnabled ? (
-        <p className="text-xs text-muted">Jarvis está atendiendo. Si respondés, tomás el chat y Jarvis se pausa acá.</p>
+        <p className="text-xs text-muted">{agentName} está atendiendo. Si respondés, tomás el chat y {agentName} se pausa acá.</p>
       ) : null}
 
       <details className="group text-sm">

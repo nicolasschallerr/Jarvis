@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeftIcon, BotIcon } from "@/components/ui/icons";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { channelLabel, dayHeading, dayKeyOf, timeOnly, typeLabel } from "@/lib/crm/format";
+import { getAgentNames } from "@/lib/crm/agent-names";
 import { listQuickReplies } from "@/lib/crm/quick-replies";
 import { createClient } from "@/lib/supabase/server";
 
@@ -109,6 +110,7 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
     if (url) mediaByMessage.set(file.message_id, { url, mimeType: file.mime_type });
   }
 
+  const agentName = (await getAgentNames()).attention;
   const quickReplies = profile.role === "viewer" ? [] : await listQuickReplies(supabase);
   const channel = (conversation.channel_type ?? "whatsapp") as ChannelType;
   const contactName = conversation.contact_name || "Sin nombre";
@@ -138,7 +140,7 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
             <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
               <Badge>{channelLabel(channel)}</Badge>
               <Badge tone={aiEnabled ? "agent" : "warning"} dot>
-                {aiEnabled ? "Atiende Jarvis" : "Atiende una persona"}
+                {aiEnabled ? `Atiende ${agentName}` : "Atiende una persona"}
               </Badge>
               {conversation.contact_document ? <span>Doc. {conversation.contact_document}</span> : null}
               {/* La ventana de 24 h es una regla de WhatsApp: en los demás canales no aplica. */}
@@ -156,7 +158,7 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <AiSwitch conversationId={conversation.id ?? id} aiEnabled={aiEnabled} canChange={profile.role !== "viewer"} />
+            <AiSwitch conversationId={conversation.id ?? id} agentName={agentName} aiEnabled={aiEnabled} canChange={profile.role !== "viewer"} />
             <OpenSidePanelButton />
           </div>
         </header>
@@ -183,6 +185,7 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
                 dayLabel={newDay ? dayHeading(when, now) : null}
                 media={mediaByMessage.get(message.id)}
                 operatorName={message.sender_profile_id ? operatorNames.get(message.sender_profile_id) : undefined}
+                agentName={agentName}
               />
             );
           })}
@@ -198,7 +201,7 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
             (disponible más adelante).
           </p>
         ) : (
-          <ReplyForm conversationId={conversation.id ?? id} aiEnabled={aiEnabled} quickReplies={quickReplies} />
+          <ReplyForm conversationId={conversation.id ?? id} agentName={agentName} aiEnabled={aiEnabled} quickReplies={quickReplies} />
         )}
       </main>
       <Suspense fallback={<aside className="hidden w-80 shrink-0 border-l border-line p-4 lg:block xl:w-96" aria-busy="true"><div className="skeleton h-40" /></aside>}>
@@ -208,7 +211,7 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
   );
 }
 
-// Una burbuja. Cada autor tiene su estilo: el contacto a la izquierda; Jarvis y el equipo a la derecha (Jarvis
+// Una burbuja. Cada autor tiene su estilo: el contacto a la izquierda; el agente y el equipo a la derecha (el agente
 // en tono suave con su marca, una persona del equipo en el color fuerte); los avisos del sistema, al centro.
 function MessageItem({
   message,
@@ -216,12 +219,14 @@ function MessageItem({
   dayLabel,
   media,
   operatorName,
+  agentName,
 }: {
   message: MessageRow;
   when: string;
   dayLabel: string | null;
   media: MediaItem | undefined;
   operatorName: string | undefined;
+  agentName: string;
 }) {
   const separator = dayLabel ? (
     <li className="my-2 flex items-center gap-3 text-xs font-medium text-muted" aria-label={dayLabel}>
@@ -261,7 +266,7 @@ function MessageItem({
           {fromAgent ? (
             <p className="flex items-center gap-1 text-xs font-semibold text-accent">
               <BotIcon className="size-3.5" />
-              Jarvis
+              {agentName}
             </p>
           ) : !fromContact ? (
             <p className={`text-xs font-semibold ${meta}`}>{operatorName ?? "Equipo"}</p>

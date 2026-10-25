@@ -1,10 +1,12 @@
-# Jarvis
+# Orbita AI
 
 @AGENTS.md
 
 ## Producto
 
-Jarvis es una plataforma SaaS multi-cliente con tres componentes:
+Orbita AI es una plataforma SaaS multi-cliente con tres componentes (la marca y su manual están en
+`../orbita-ai-manual-de-marca.pptx`; la carpeta del repo se sigue llamando `jarvis`). Jarvis es el nombre del agente
+de atención de la organización propia; cada cliente le pone el nombre que quiera a sus agentes:
 
 1. **Agente de atención**: atiende a los asociados del cliente por WhatsApp (y luego otros canales)
    24/7, entiende texto, audios, imágenes y PDF, resuelve con la base de conocimiento, junta los
@@ -20,7 +22,7 @@ métricas, evaluación automática de conversaciones, configuración por cliente
 ## Arquitectura
 
 - Next.js 16 (App Router, `src/`, alias `@/*`) + TypeScript estricto (`strict`, `noUncheckedIndexedAccess`), deploy en Vercel.
-- Base de Jarvis: Supabase propio (Postgres, Auth, RLS, Realtime, Storage, pgvector, pg_cron).
+- Base de Orbita AI: Supabase propio (Postgres, Auth, RLS, Realtime, Storage, pgvector, pg_cron).
   Multi-tenant: `organization_id` en todas las tablas + RLS.
 - Base del cliente: separada; el agente accede con permisos acotados, el Agente Analítico con un rol solo `SELECT`.
 - IA: Claude API con tool use (`@anthropic-ai/sdk`).

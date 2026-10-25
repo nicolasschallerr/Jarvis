@@ -1,27 +1,23 @@
 import type { Metadata } from "next";
-import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import { JetBrains_Mono, Manrope } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Tipografías de la marca Orbita AI: Manrope para el logo, títulos y textos; JetBrains Mono para etiquetas,
+// fechas y datos técnicos.
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-// Tipografía con carácter para los títulos; el texto usa Geist.
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  // Cada página pone su nombre ("Casos · Jarvis"): con varias pestañas abiertas se distinguen.
-  title: { default: "Jarvis", template: "%s · Jarvis" },
-  description: "Atención al afiliado, CRM omnicanal y análisis de datos",
+  // Cada página pone su nombre ("Casos · Orbita AI"): con varias pestañas abiertas se distinguen.
+  title: { default: "Orbita AI", template: "%s · Orbita AI" },
+  description: "Agentes de IA que atienden a tus clientes, CRM omnicanal y análisis de datos. Software y automatización con IA para empresas.",
 };
 
 // Fija el tema y el nivel de movimiento antes de que se pinte la página (sin destellos ni saltos). Usa la
@@ -35,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="es"
       // data-theme lo escribe el script de arriba antes de hidratar.
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
+      className={`${manrope.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />

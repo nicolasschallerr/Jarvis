@@ -1,6 +1,7 @@
 import { Badge, PriorityBadge, StatusBadge } from "@/components/ui/badge";
 import { dateTime, describeCaseEvent, fieldLabel } from "@/lib/crm/format";
 import type { CasePriority, CaseStatus } from "@/lib/crm/cases";
+import { getAgentNames } from "@/lib/crm/agent-names";
 import { createClient } from "@/lib/supabase/server";
 
 import { AreaAnswerForm } from "./area-answer-form";
@@ -54,6 +55,7 @@ export async function CasePanel({
   const closedCases = (cases ?? []).filter((item) => item.status === "resolved");
 
   const names = {
+    agent: (await getAgentNames()).attention,
     sectors: new Map((sectors ?? []).map((sector) => [sector.id, sector.name])),
     profiles: new Map((people ?? []).map((person) => [person.id, person.full_name])),
   };

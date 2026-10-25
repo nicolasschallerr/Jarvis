@@ -105,9 +105,9 @@ export async function listInbox(params: { userClient: SupabaseClient<Database>; 
 }
 
 // Quién escribió lo último, para el adelanto de la bandeja.
-export function lastSenderPrefix(sender: string | null, direction: string | null): string {
+export function lastSenderPrefix(sender: string | null, direction: string | null, agentName = "Agente"): string {
   if (direction !== "outbound") return "";
-  if (sender === "agent") return "Jarvis: ";
+  if (sender === "agent") return `${agentName}: `;
   if (sender === "operator") return "Equipo: ";
   return "";
 }

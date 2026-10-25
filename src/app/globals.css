@@ -4,68 +4,70 @@
    interruptor del menú). Así `dark:` responde al interruptor y no solo a la preferencia del sistema. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* Paleta cálida. Los neutros de Tailwind (zinc) se reemplazan por una escala cálida: toda la interfaz
-   existente toma el color nuevo sin tocar cada clase. 50 a 400 sirven de fondo y borde en claro;
-   600 a 950, de texto atenuado y fondos en oscuro. */
+/* Paleta de Orbita AI (manual de marca v2.0): Noche, Tinta, Niebla, Bruma y Petróleo. Los neutros de Tailwind
+   (zinc) se reemplazan por la escala fría de la marca: toda la interfaz toma el color nuevo sin tocar cada clase.
+   50 a 400 sirven de fondo y borde en claro; 600 a 950, de texto atenuado y fondos en oscuro. */
 @theme {
-  --color-zinc-50: #faf8f3;
-  --color-zinc-100: #f1ede2;
-  --color-zinc-200: #e6e0d2;
-  --color-zinc-300: #d3ccba;
-  --color-zinc-400: #a8a294;
-  --color-zinc-500: #837d70;
-  --color-zinc-600: #686355;
-  --color-zinc-700: #4c483e;
-  --color-zinc-800: #2f3436;
-  --color-zinc-900: #1e2326;
-  --color-zinc-950: #14181a;
+  --color-zinc-50: #f4f7f8; /* Bruma */
+  --color-zinc-100: #eaf0f2;
+  --color-zinc-200: #d5e0e4;
+  --color-zinc-300: #b7c6cc;
+  --color-zinc-400: #9fb3bc;
+  --color-zinc-500: #7f949e;
+  --color-zinc-600: #5e6e78;
+  --color-zinc-700: #44545e;
+  --color-zinc-800: #1a2a36;
+  --color-zinc-900: #0b1822;
+  --color-zinc-950: #040b12; /* Noche */
 }
 
 :root {
   color-scheme: light;
-  --background: #f5f2eb; /* crema */
-  --surface: #fbf9f4; /* tarjetas y campos */
-  --foreground: #1c1b19;
-  --accent: #1f5f6b; /* azul petróleo */
-  --accent-hover: #184b55;
+  --background: #f4f7f8; /* Bruma */
+  --surface: #ffffff;
+  --foreground: #08151f; /* Tinta */
+  --accent: #0a7f8c; /* Petróleo profundo: acento sobre fondo claro */
+  --accent-hover: #086a75;
   --accent-foreground: #ffffff;
-  --accent-soft: #dcebee; /* fondo suave del acento */
-  --agent-jarvis: #1f5f6b;
-  --agent-sinapsis: #b7791f; /* ocre */
+  --accent-soft: #dcebf0; /* Niebla */
+  --agent-jarvis: #0a7f8c;
+  --agent-sinapsis: #b8741a; /* ámbar: distingue al agente analítico */
+  --glow: rgb(34 184 201 / 0.18);
   /* Tokens semánticos: un solo lugar para el significado de cada color (ADR-028). */
-  --muted: #686355; /* texto secundario, contraste ≥ 5:1 sobre crema */
-  --line: #e6e0d2; /* bordes y divisores */
-  --success: #2f7a4f;
-  --success-soft: #e3f1e8;
-  --warning: #9a5a06;
-  --warning-soft: #fbefd9;
-  --danger: #b42318;
-  --danger-soft: #fbe5e2;
-  --info: #1f5f6b;
-  --info-soft: #dcebee;
+  --muted: #5e6e78; /* texto secundario, contraste ≥ 5:1 sobre Bruma */
+  --line: #d5e0e4; /* bordes y divisores */
+  --success: #1f7a4d;
+  --success-soft: #e1f2e9;
+  --warning: #96580a;
+  --warning-soft: #fbeedb;
+  --danger: #b3261e;
+  --danger-soft: #fbe4e1;
+  --info: #0a7f8c;
+  --info-soft: #dcebf0;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --background: #14181a;
-  --surface: #1b2023;
-  --foreground: #ece8df;
-  --accent: #5fb3c2;
-  --accent-hover: #7cc4d1;
-  --accent-foreground: #0b2a30;
-  --accent-soft: #1d3a40;
-  --agent-jarvis: #5fb3c2;
-  --agent-sinapsis: #e0a94a;
-  --muted: #aaa496;
-  --line: #2b3134;
-  --success: #74c897;
-  --success-soft: #173326;
+  --background: #040b12; /* Noche */
+  --surface: #08151f; /* Tinta */
+  --foreground: #dcebf0; /* Niebla */
+  --accent: #22b8c9; /* Petróleo: acento sobre fondo oscuro */
+  --accent-hover: #4cc8d6;
+  --accent-foreground: #04232a;
+  --accent-soft: #0b2a33;
+  --agent-jarvis: #22b8c9;
+  --agent-sinapsis: #e8a948;
+  --glow: rgb(34 184 201 / 0.22);
+  --muted: #9fb3bc;
+  --line: #1a2a36;
+  --success: #6fd0a0;
+  --success-soft: #0f2a20;
   --warning: #e8b04f;
-  --warning-soft: #3a2c12;
+  --warning-soft: #33260f;
   --danger: #f28b7f;
-  --danger-soft: #3d1d1a;
-  --info: #6cc0cf;
-  --info-soft: #1d3a40;
+  --danger-soft: #3a1714;
+  --info: #7fcfd8;
+  --info-soft: #0b2a33;
 }
 
 @theme inline {
@@ -88,15 +90,16 @@
   --color-danger-soft: var(--danger-soft);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-fraunces);
+  --color-glow: var(--glow);
+  --font-sans: var(--font-manrope);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-display: var(--font-manrope);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-manrope), system-ui, sans-serif;
 }
 
 :focus-visible {
@@ -135,6 +138,51 @@ body {
   .skeleton {
     @apply animate-pulse rounded-md bg-zinc-200/80 dark:bg-zinc-800;
   }
+}
+
+/* Movimiento de la marca: las órbitas giran despacio; los bloques entran con un fundido corto. */
+@keyframes orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.orbit-spin {
+  animation: orbit-spin 24s linear infinite;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise-in {
+  animation: rise-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Etiqueta en mono, como las referencias del manual ("TIP #04 · AUTOMATIZACIÓN"). */
+.eyebrow {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 /* Menos movimiento: sin transiciones ni animaciones. Se activa con data-motion="reduce", que fija un script

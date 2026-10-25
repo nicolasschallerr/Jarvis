@@ -9,5 +9,5 @@ import { createClient } from "@/lib/supabase/server";
 export async function markNoticesRead(): Promise<void> {
   const profile = await getCurrentProfile();
   await markAllNotificationsRead({ userClient: await createClient(), userId: profile.id });
-  revalidatePath("/");
+  revalidatePath("/inicio");
 }

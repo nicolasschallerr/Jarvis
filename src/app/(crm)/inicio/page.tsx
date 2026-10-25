@@ -4,6 +4,8 @@ import Link from "next/link";
 import { AgentCard, type AgentView } from "@/components/agents/agent-card";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { Avatar } from "@/components/ui/avatar";
+import { AlertIcon, CaseIcon, ChatIcon, InboxIcon } from "@/components/ui/icons";
+import { LogoMark } from "@/components/ui/logo";
 import { PriorityBadge, StatusBadge } from "@/components/ui/badge";
 import { capitalizeFirst, channelLabel, messagePreview, shortDate } from "@/lib/crm/format";
 import { WelcomeGate } from "@/components/welcome/welcome-gate";
@@ -13,15 +15,15 @@ import { getUnreadNotifications } from "@/lib/crm/notifications";
 import { dayKey, welcomeLine } from "@/lib/crm/welcome";
 import { createClient } from "@/lib/supabase/server";
 
-import { markNoticesRead } from "./avisos-actions";
-import { LiveRefresh } from "./live-refresh";
+import { markNoticesRead } from "../avisos-actions";
+import { LiveRefresh } from "../live-refresh";
 
-type Tile = { label: string; value: number; href: string; hint: string };
+type Tile = { label: string; value: number; href: string; hint: string; icon: React.ReactNode; alert?: boolean };
 
 // Lee la sesión: bloquea en el servidor hasta tenerla (ver el layout del CRM).
 export const instant = false;
 
-export default async function InicioPage({ searchParams }: PageProps<"/">) {
+export default async function InicioPage({ searchParams }: PageProps<"/inicio">) {
   // Página por pedido: lee la sesión y la hora actual (ver la nota de `instant` en el layout del CRM).
   await connection();
   const profile = await getCurrentProfile();
@@ -46,10 +48,17 @@ export default async function InicioPage({ searchParams }: PageProps<"/">) {
   }));
 
   const tiles: Tile[] = [
-    { label: "Esperando respuesta", value: summary.counts.awaitingReply, href: "/conversaciones?filtro=esperando", hint: "conversaciones" },
-    { label: "Mis casos abiertos", value: summary.counts.myOpenCases, href: "/casos?vista=mine", hint: "asignados a vos" },
-    { label: "Casos sin asignar", value: summary.counts.unassignedCases, href: "/casos?vista=unassigned", hint: "nadie los tomó" },
-    { label: "Casos urgentes", value: summary.counts.urgentCases, href: "/casos?vista=all&prioridad=urgent", hint: "abiertos" },
+    { label: "Esperando respuesta", value: summary.counts.awaitingReply, href: "/conversaciones?filtro=esperando", hint: "conversaciones", icon: <ChatIcon /> },
+    { label: "Mis casos abiertos", value: summary.counts.myOpenCases, href: "/casos?vista=mine", hint: "asignados a vos", icon: <CaseIcon /> },
+    { label: "Casos sin asignar", value: summary.counts.unassignedCases, href: "/casos?vista=unassigned", hint: "nadie los tomó", icon: <InboxIcon /> },
+    {
+      label: "Casos urgentes",
+      value: summary.counts.urgentCases,
+      href: "/casos?vista=all&prioridad=urgent",
+      hint: "abiertos",
+      icon: <AlertIcon />,
+      alert: summary.counts.urgentCases > 0,
+    },
   ];
 
   return (
@@ -68,11 +77,22 @@ export default async function InicioPage({ searchParams }: PageProps<"/">) {
       />
       <LiveRefresh organizationId={profile.organizationId} />
 
-      <header>
-        <p className="text-sm text-muted">{capitalizeFirst(longDate(now))}</p>
-        <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+      <header className="rise-in relative flex flex-col gap-1 overflow-hidden rounded-2xl border border-line bg-surface p-5 sm:p-6">
+        <div
+          className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full blur-3xl"
+          style={{ background: "radial-gradient(closest-side, var(--glow), transparent)" }}
+          aria-hidden="true"
+        />
+        <LogoMark animated className="pointer-events-none absolute -right-6 -bottom-10 size-44 opacity-15" title="" />
+        <p className="eyebrow relative">{capitalizeFirst(longDate(now))} · {profile.organizationName}</p>
+        <h1 className="relative text-3xl font-bold tracking-tight sm:text-4xl">
           {greetingFor(now)}, {firstName}
         </h1>
+        <p className="relative text-sm text-muted">
+          {summary.counts.awaitingReply === 0
+            ? "No hay conversaciones esperando respuesta. Todo al día."
+            : `${summary.counts.awaitingReply === 1 ? "Hay 1 conversación" : `Hay ${summary.counts.awaitingReply} conversaciones`} esperando respuesta.`}
+        </p>
       </header>
 
       {summary.failed ? (
@@ -84,7 +104,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/">) {
       {notices.unread > 0 ? (
         <section aria-labelledby="avisos" className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
-            <h2 id="avisos" className="text-sm font-semibold uppercase tracking-wide text-muted">
+            <h2 id="avisos" className="eyebrow">
               Avisos ({notices.unread})
             </h2>
             <form action={markNoticesRead}>
@@ -122,7 +142,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/">) {
       ) : null}
 
       <section aria-labelledby="agentes" className="flex flex-col gap-3">
-        <h2 id="agentes" className="text-sm font-semibold uppercase tracking-wide text-muted">
+        <h2 id="agentes" className="eyebrow">
           Tu equipo de agentes
         </h2>
         {agents.length === 0 ? (
@@ -139,7 +159,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/">) {
       </section>
 
       <section aria-labelledby="resumen" className="flex flex-col gap-3">
-        <h2 id="resumen" className="text-sm font-semibold uppercase tracking-wide text-muted">
+        <h2 id="resumen" className="eyebrow">
           Cómo está todo
         </h2>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -147,9 +167,17 @@ export default async function InicioPage({ searchParams }: PageProps<"/">) {
             <Link
               key={tile.label}
               href={tile.href}
-              className="card flex flex-col gap-1 p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
+              className="card group flex flex-col gap-1 p-4 transition duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-md"
             >
-              <span className="font-display text-3xl font-semibold">{tile.value}</span>
+              <span className="flex items-center justify-between">
+                <span className={`font-mono text-3xl font-semibold ${tile.alert ? "text-danger" : ""}`}>{tile.value}</span>
+                <span
+                  className={`grid size-8 place-items-center rounded-lg transition group-hover:scale-110 ${tile.alert ? "bg-danger-soft text-danger" : "bg-accent-soft text-accent"}`}
+                  aria-hidden="true"
+                >
+                  {tile.icon}
+                </span>
+              </span>
               <span className="text-sm font-medium">{tile.label}</span>
               <span className="text-xs text-muted">{tile.hint}</span>
             </Link>
@@ -159,7 +187,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/">) {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section aria-labelledby="esperando" className="flex flex-col gap-3">
-          <h2 id="esperando" className="text-sm font-semibold uppercase tracking-wide text-muted">
+          <h2 id="esperando" className="eyebrow">
             Esperando respuesta
           </h2>
           {summary.awaitingList.length === 0 ? (
@@ -188,7 +216,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/">) {
         </section>
 
         <section aria-labelledby="mios" className="flex flex-col gap-3">
-          <h2 id="mios" className="text-sm font-semibold uppercase tracking-wide text-muted">
+          <h2 id="mios" className="eyebrow">
             Mis casos
           </h2>
           {summary.myCases.length === 0 ? (

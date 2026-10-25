@@ -74,7 +74,7 @@ async function MainNav() {
 
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Principal">
-      <NavLink href="/" icon={<HomeIcon />} count={unread} countLabel={`${unread} avisos sin leer`}>
+      <NavLink href="/inicio" icon={<HomeIcon />} count={unread} countLabel={`${unread} avisos sin leer`}>
         Inicio
       </NavLink>
       <NavLink href="/conversaciones" icon={<ChatIcon />}>

@@ -23,7 +23,7 @@ type Params = {
 // el dato lo confirmó el sector: el agente lo transmite, no agrega nada que no esté en la respuesta.
 export function areaAnswerNotice(sectorName: string, question: string, answer: string): string {
   return [
-    `[Aviso interno de Jarvis, no lo escribió el asociado] El sector ${sectorName} respondió la consulta que le hiciste.`,
+    `[Aviso interno del sistema, no lo escribió el asociado] El sector ${sectorName} respondió la consulta que le hiciste.`,
     `Consulta: ${question}`,
     `Respuesta del sector: ${answer}`,
     "Escribile al asociado un mensaje breve que le transmita esta respuesta tal como la confirmó el sector, sin agregar datos que no estén en ella. Si con esto no se cierra el tema, decile qué sigue.",

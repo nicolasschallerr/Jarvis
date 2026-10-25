@@ -9,6 +9,7 @@ import { LinkTabs, SegmentedLinks } from "@/components/ui/link-tabs";
 import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { channelLabel, messagePreview, shortDate } from "@/lib/crm/format";
+import { getAgentNames } from "@/lib/crm/agent-names";
 import { inboxQueryFrom, lastSenderPrefix, listInbox, type InboxFilter, type InboxQuery } from "@/lib/crm/inbox";
 import { createClient } from "@/lib/supabase/server";
 
@@ -48,6 +49,7 @@ export default async function ConversacionesPage({ searchParams }: PageProps<"/c
   const query = inboxQueryFrom(await searchParams);
 
   const { items, hasMore, counts, failed } = await listInbox({ userClient: await createClient(), userId: profile.id, query });
+  const agentName = (await getAgentNames()).attention;
   const now = new Date();
   const filtered = query.filter !== "todas" || query.channel !== null || query.search !== "";
 
@@ -129,7 +131,7 @@ export default async function ConversacionesPage({ searchParams }: PageProps<"/c
                         <span className="shrink-0 text-xs text-muted">{channelLabel(conversation.channel_type ?? "")}</span>
                       </div>
                       <p className={`truncate text-sm ${waiting ? "text-foreground" : "text-muted"}`}>
-                        {lastSenderPrefix(conversation.last_sender, conversation.last_direction)}
+                        {lastSenderPrefix(conversation.last_sender, conversation.last_direction, agentName)}
                         {messagePreview(conversation.last_body, conversation.last_type)}
                       </p>
                       {conversation.case_status || !conversation.ai_enabled ? (
@@ -140,7 +142,7 @@ export default async function ConversacionesPage({ searchParams }: PageProps<"/c
                           ) : null}
                           {conversation.case_status && conversation.case_assigned_to === profile.id ? <Badge tone="accent">Asignado a vos</Badge> : null}
                           {!conversation.ai_enabled ? (
-                            <Badge tone="warning" title="Una persona del equipo tomó el chat: Jarvis no responde">
+                            <Badge tone="warning" title={`Una persona del equipo tomó el chat: ${agentName} no responde`}>
                               <PauseIcon className="size-3" />
                               IA en pausa
                             </Badge>

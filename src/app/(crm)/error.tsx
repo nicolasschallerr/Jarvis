@@ -11,7 +11,7 @@ export default function CrmError({ retry }: { error: unknown; retry: () => void 
       <EmptyState
         icon={<AlertIcon className="size-5" />}
         title="No pudimos cargar esta sección"
-        description="Puede ser un corte momentáneo de conexión. Probá de nuevo en unos segundos; si sigue pasando, avisale a quien administra Jarvis."
+        description="Puede ser un corte momentáneo de conexión. Probá de nuevo en unos segundos; si sigue pasando, avisale a quien administra Orbita AI en tu organización."
         action={
           <button type="button" onClick={() => retry()} className="btn-primary">
             Reintentar

@@ -114,7 +114,7 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
       <LiveRefresh organizationId={profile.organizationId} />
       <PageHeader
         title="Casos"
-        description="Cada gestión que abre Jarvis o el equipo, con su estado, sector y responsable."
+        description="Cada gestión que abre el agente o el equipo, con su estado, sector y responsable."
         actions={
           <SegmentedLinks
             label="Forma de ver los casos"

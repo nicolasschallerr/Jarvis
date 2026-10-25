@@ -41,7 +41,7 @@ export function dateTime(iso: string | null): string {
 }
 
 const SENDER_LABELS: Record<string, string> = {
-  agent: "Jarvis (IA)",
+  agent: "Agente (IA)",
   operator: "Operador",
   system: "Sistema",
 };
@@ -66,7 +66,7 @@ export const PRIORITY_LABELS: Record<string, string> = {
   urgent: "Urgente",
 };
 
-export type EventNames = { sectors: Map<string, string>; profiles: Map<string, string> };
+export type EventNames = { sectors: Map<string, string>; profiles: Map<string, string>; agent?: string };
 
 type CaseEventRow = { event_type: string; actor_type: string; actor_profile_id: string | null; data: unknown };
 
@@ -82,7 +82,7 @@ export function describeCaseEvent(event: CaseEventRow, names: EventNames): { tex
     event.actor_type === "operator" && event.actor_profile_id
       ? (names.profiles.get(event.actor_profile_id) ?? "Operador")
       : event.actor_type === "agent"
-        ? "Jarvis (IA)"
+        ? `${names.agent ?? "Agente"} (IA)`
         : "Sistema";
 
   const sector = (id: string | null) => (id ? (names.sectors.get(id) ?? "sector desconocido") : "sin sector");

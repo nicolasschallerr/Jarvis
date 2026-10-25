@@ -22,6 +22,6 @@ export async function saveAgent(agentId: string, _previous: AgentFormState, form
 
   if (!result.ok) return { error: result.error, saved: false };
   revalidatePath("/agentes");
-  revalidatePath("/");
+  revalidatePath("/inicio");
   return { error: null, saved: true };
 }

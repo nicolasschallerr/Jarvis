@@ -8,6 +8,7 @@ import { ArrowLeftIcon } from "@/components/ui/icons";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { getContactHistory } from "@/lib/crm/contact-directory";
 import { channelLabel, dateTime, messagePreview, shortDate } from "@/lib/crm/format";
+import { getAgentNames } from "@/lib/crm/agent-names";
 import { lastSenderPrefix } from "@/lib/crm/inbox";
 import { createClient } from "@/lib/supabase/server";
 
@@ -31,6 +32,7 @@ export default async function ContactoPage({ params }: PageProps<"/contactos/[id
   if (history.contact.merged_into) redirect(`/contactos/${history.contact.merged_into}`);
 
   const { contact, conversations, cases } = history;
+  const agentName = (await getAgentNames()).attention;
   const now = new Date();
   const name = contact.display_name || "Sin nombre";
   const openCases = cases.filter((item) => item.status !== "resolved");
@@ -72,7 +74,7 @@ export default async function ContactoPage({ params }: PageProps<"/contactos/[id
                           {!conversation.ai_enabled ? <Badge tone="warning">IA en pausa</Badge> : null}
                         </div>
                         <p className="mt-1 truncate text-sm">
-                          {lastSenderPrefix(conversation.last_sender, conversation.last_direction)}
+                          {lastSenderPrefix(conversation.last_sender, conversation.last_direction, agentName)}
                           {messagePreview(conversation.last_body, conversation.last_type) || "Sin mensajes"}
                         </p>
                       </div>

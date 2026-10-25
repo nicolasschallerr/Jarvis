@@ -57,7 +57,7 @@ export default async function EquipoPage() {
     <main className="flex flex-1 flex-col">
       <PageHeader
         title="Equipo"
-        description="Quién trabaja en cada sector. Jarvis deriva cada caso al sector que corresponde y avisa a su equipo."
+        description="Quién trabaja en cada sector. El agente deriva cada caso al sector que corresponde y avisa a su equipo."
       />
 
       {error ? (

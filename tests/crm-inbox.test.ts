@@ -36,7 +36,8 @@ describe("filtros de la bandeja", () => {
   });
 
   it("el último mensaje dice quién lo escribió cuando fue del lado de la organización", () => {
-    expect(lastSenderPrefix("agent", "outbound")).toBe("Jarvis: ");
+    expect(lastSenderPrefix("agent", "outbound", "Jarvis")).toBe("Jarvis: ");
+    expect(lastSenderPrefix("agent", "outbound")).toBe("Agente: ");
     expect(lastSenderPrefix("operator", "outbound")).toBe("Equipo: ");
     expect(lastSenderPrefix("contact", "inbound")).toBe("");
   });

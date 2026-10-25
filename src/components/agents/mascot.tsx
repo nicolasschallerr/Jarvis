@@ -1,8 +1,16 @@
-// Mascotas de los agentes: ilustraciones planas originales, dibujadas en SVG. Usan los colores del tema
-// (cada agente tiene el suyo) y reaccionan a su estado:
-//   paused            ojos cerrados y "z" flotando
-//   working           balanceo suave y parpadeo
-//   waiting_approval  parpadeo y la antena (o la cresta) late
+"use client";
+
+import dynamic from "next/dynamic";
+import { Component, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+
+import type { AnimalMood } from "./animal-scene";
+
+// Mascotas de los agentes: animales en 3D (ver animal-scene.tsx). El agente de atención es un zorro con
+// auriculares; el analítico, un búho con anteojos. Reaccionan a su estado:
+//   paused (encendido)  disponible: respira, parpadea y sigue al cursor
+//   working             trabajando: mueve la cola o aletea, la luz de marca late
+//   waiting_approval    esperando: inclina la cabeza, la luz se pone ámbar
+//   apagado (asleep)    duerme: ojos cerrados, cabeza baja y "z" flotando
 
 export type AgentKind = "attention" | "analytic";
 export type AgentStatus = "paused" | "working" | "waiting_approval";
@@ -11,110 +19,116 @@ type Props = {
   kind: AgentKind;
   status: AgentStatus;
   className?: string;
-  // Desfasa el parpadeo para que dos mascotas juntas no parpadeen a la vez.
+  // Desfasa los movimientos para que dos mascotas juntas no se muevan igual.
   blinkDelay?: number;
   // Marca el lugar donde "aterriza" la mascota al terminar la bienvenida (ver welcome-overlay).
   slot?: string;
+  // El agente está apagado: la mascota duerme.
+  asleep?: boolean;
 };
 
-function ClosedEyes({ cx1, cx2, cy }: { cx1: number; cx2: number; cy: number }) {
+const NAMES: Record<AgentKind, string> = { attention: "zorro", analytic: "búho" };
+
+// El 3D se carga solo en el navegador y aparte del resto de la página (three.js pesa).
+const AnimalScene = dynamic(() => import("./animal-scene"), { ssr: false, loading: () => <Placeholder /> });
+
+function Placeholder() {
+  return <span className="absolute inset-[18%] animate-pulse rounded-full bg-accent-soft" aria-hidden="true" />;
+}
+
+// Si el navegador no puede dibujar 3D (WebGL apagado o un error), se muestra un respaldo quieto en vez de romper
+// la tarjeta.
+class SceneBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+function Fallback({ kind }: { kind: AgentKind }) {
   return (
-    <g fill="none" strokeWidth="3" strokeLinecap="round" className="stroke-foreground">
-      <path d={`M${cx1 - 6} ${cy} Q${cx1} ${cy + 5} ${cx1 + 6} ${cy}`} />
-      <path d={`M${cx2 - 6} ${cy} Q${cx2} ${cy + 5} ${cx2 + 6} ${cy}`} />
-    </g>
+    <span className="absolute inset-[14%] grid place-items-center rounded-full bg-accent-soft text-4xl" aria-hidden="true">
+      {kind === "attention" ? "🦊" : "🦉"}
+    </span>
   );
 }
 
-function Zzz() {
-  return (
-    <g className="fill-zinc-500" fontFamily="var(--font-geist-sans), sans-serif" fontWeight="700" aria-hidden="true">
-      <text x="92" y="26" fontSize="14" className="mascot-zzz">
-        z
-      </text>
-      <text x="100" y="16" fontSize="10" className="mascot-zzz" style={{ animationDelay: "1s" }}>
-        z
-      </text>
-    </g>
-  );
+// Se pregunta una sola vez por página (crear contextos WebGL de prueba cuesta).
+let webglSupport: boolean | undefined;
+function hasWebGL(): boolean {
+  if (webglSupport === undefined) {
+    try {
+      const canvas = document.createElement("canvas");
+      webglSupport = Boolean(canvas.getContext("webgl2") ?? canvas.getContext("webgl"));
+    } catch {
+      webglSupport = false;
+    }
+  }
+  return webglSupport;
 }
 
-// Jarvis: un robot redondo con auriculares, para el agente de atención.
-function Jarvis({ status, blinkDelay }: { status: AgentStatus; blinkDelay: number }) {
-  const sleeping = status === "paused";
+const noSubscription = () => () => {};
+
+// null en el servidor (todavía no se sabe); en el navegador, si puede dibujar 3D.
+function useWebGL(): boolean | null {
+  return useSyncExternalStore(noSubscription, hasWebGL, () => null);
+}
+
+// El nivel de movimiento lo fija <html data-motion> (preferencia del sistema o el selector del menú) y puede
+// cambiar en vivo.
+function useMotionAllowed(): boolean {
+  const [allowed, setAllowed] = useState(true);
+  useEffect(() => {
+    const read = () => setAllowed(document.documentElement.dataset.motion !== "reduce");
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-motion"] });
+    return () => observer.disconnect();
+  }, []);
+  return allowed;
+}
+
+export function Mascot({ kind, status, className = "size-28", blinkDelay = 0, slot, asleep = false }: Props) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Arranca visible; si el navegador sabe observarlo, se pausa cuando sale de pantalla.
+  const [visible, setVisible] = useState(true);
+  const webgl = useWebGL();
+  const animate = useMotionAllowed();
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+    // Solo se dibuja mientras está a la vista: ahorra batería y procesador.
+    const observer = new IntersectionObserver(([entry]) => setVisible(Boolean(entry?.isIntersecting)), { rootMargin: "80px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const mood: AnimalMood = asleep ? "asleep" : status === "working" ? "working" : status === "waiting_approval" ? "waiting" : "idle";
+  const label = `Mascota del agente: un ${NAMES[kind]} ${asleep ? "durmiendo" : mood === "working" ? "trabajando" : mood === "waiting" ? "esperando" : "atento"}`;
 
   return (
-    <g className={status === "working" ? "mascot-bob" : undefined}>
-      {/* antena */}
-      <line x1="60" y1="18" x2="60" y2="31" strokeWidth="4" strokeLinecap="round" className="stroke-agent-jarvis" />
-      <circle cx="60" cy="14" r="5.5" className={`fill-agent-sinapsis ${status === "waiting_approval" ? "mascot-pulse" : ""}`} />
-      {/* auriculares */}
-      <rect x="15" y="52" width="9" height="22" rx="4.5" className="fill-agent-jarvis" opacity="0.75" />
-      <rect x="96" y="52" width="9" height="22" rx="4.5" className="fill-agent-jarvis" opacity="0.75" />
-      {/* cabeza */}
-      <rect x="22" y="30" width="76" height="62" rx="22" className="fill-agent-jarvis" />
-      {/* cara */}
-      <rect x="30" y="40" width="60" height="40" rx="15" className="fill-surface" />
-      {sleeping ? (
-        <ClosedEyes cx1={47} cx2={73} cy={58} />
+    <div ref={ref} className={`relative ${className}`} role="img" aria-label={label} data-mascot-slot={slot}>
+      {webgl === false ? (
+        <Fallback kind={kind} />
+      ) : webgl ? (
+        <SceneBoundary fallback={<Fallback kind={kind} />}>
+          <AnimalScene kind={kind} mood={mood} delay={blinkDelay} animate={animate} visible={visible} />
+        </SceneBoundary>
       ) : (
-        <g className="fill-foreground">
-          <ellipse cx="47" cy="58" rx="5" ry="7" className="mascot-eye" style={{ animationDelay: `${blinkDelay}s` }} />
-          <ellipse cx="73" cy="58" rx="5" ry="7" className="mascot-eye" style={{ animationDelay: `${blinkDelay}s` }} />
-        </g>
+        <Placeholder />
       )}
-      <path d="M51 70 Q60 77 69 70" fill="none" strokeWidth="3" strokeLinecap="round" className="stroke-foreground" />
-      {/* cuello */}
-      <rect x="40" y="92" width="40" height="14" rx="7" className="fill-agent-jarvis" />
-    </g>
-  );
-}
-
-// Sinapsis: un búho con anteojos y un gráfico en la panza, para el agente analítico.
-function Sinapsis({ status, blinkDelay }: { status: AgentStatus; blinkDelay: number }) {
-  const sleeping = status === "paused";
-
-  return (
-    <g className={status === "working" ? "mascot-bob" : undefined}>
-      {/* mechones */}
-      <path d="M33 42 L29 20 L50 33 Z" className={`fill-agent-sinapsis ${status === "waiting_approval" ? "mascot-pulse" : ""}`} />
-      <path d="M87 42 L91 20 L70 33 Z" className={`fill-agent-sinapsis ${status === "waiting_approval" ? "mascot-pulse" : ""}`} />
-      {/* cuerpo */}
-      <ellipse cx="60" cy="66" rx="37" ry="39" className="fill-agent-sinapsis" />
-      {/* panza con un gráfico de barras */}
-      <ellipse cx="60" cy="84" rx="22" ry="21" className="fill-surface" />
-      <rect x="49" y="86" width="6" height="10" rx="1.5" className="fill-agent-sinapsis" />
-      <rect x="57" y="80" width="6" height="16" rx="1.5" className="fill-agent-sinapsis" />
-      <rect x="65" y="73" width="6" height="23" rx="1.5" className="fill-agent-sinapsis" />
-      {/* anteojos */}
-      <circle cx="46" cy="55" r="13.5" strokeWidth="3" className="fill-surface stroke-foreground" />
-      <circle cx="74" cy="55" r="13.5" strokeWidth="3" className="fill-surface stroke-foreground" />
-      <line x1="59.5" y1="55" x2="60.5" y2="55" strokeWidth="3" className="stroke-foreground" />
-      {sleeping ? (
-        <ClosedEyes cx1={46} cx2={74} cy={55} />
-      ) : (
-        <g className="fill-foreground">
-          <circle cx="46" cy="55" r="4.5" className="mascot-eye" style={{ animationDelay: `${blinkDelay}s` }} />
-          <circle cx="74" cy="55" r="4.5" className="mascot-eye" style={{ animationDelay: `${blinkDelay}s` }} />
-        </g>
-      )}
-      {/* pico */}
-      <path d="M56 65 L64 65 L60 72 Z" className="fill-foreground" opacity="0.85" />
-      {/* patas */}
-      <ellipse cx="47" cy="105" rx="9" ry="4.5" className="fill-agent-sinapsis" opacity="0.8" />
-      <ellipse cx="73" cy="105" rx="9" ry="4.5" className="fill-agent-sinapsis" opacity="0.8" />
-    </g>
-  );
-}
-
-export function Mascot({ kind, status, className = "size-28", blinkDelay = 0, slot }: Props) {
-  const name = kind === "attention" ? "Jarvis" : "Sinapsis";
-
-  return (
-    <svg viewBox="0 0 120 120" className={className} role="img" aria-label={`Mascota de ${name}`} data-mascot-slot={slot}>
-      <ellipse cx="60" cy="112" rx="28" ry="4.5" className="fill-foreground" opacity="0.1" />
-      {kind === "attention" ? <Jarvis status={status} blinkDelay={blinkDelay} /> : <Sinapsis status={status} blinkDelay={blinkDelay} />}
-      {status === "paused" ? <Zzz /> : null}
-    </svg>
+      {asleep ? (
+        <span className="pointer-events-none absolute top-[6%] right-[10%] font-mono text-sm font-bold text-muted" aria-hidden="true">
+          <span className="mascot-zzz inline-block">z</span>
+          <span className="mascot-zzz inline-block text-xs" style={{ animationDelay: "1s" }}>
+            z
+          </span>
+        </span>
+      ) : null}
+    </div>
   );
 }
