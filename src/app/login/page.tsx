@@ -12,6 +12,14 @@ import { LoginForm } from "./login-form";
 // parámetros de la URL, que son del pedido: va dentro de <Suspense>.
 async function AccessNotice({ searchParams }: { searchParams: PageProps<"/login">["searchParams"] }) {
   const { motivo } = await searchParams;
+  if (motivo === "enlace-invalido") {
+    return (
+      <p role="alert" className="rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-sm">
+        <strong>Ese enlace ya no sirve.</strong> Los enlaces de acceso se usan una sola vez y duran una hora. Pedile a quien administra tu organización que te genere
+        uno nuevo.
+      </p>
+    );
+  }
   if (motivo !== "sin-acceso") return null;
 
   return (

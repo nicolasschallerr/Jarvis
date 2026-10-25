@@ -46,6 +46,10 @@ export function LoginForm() {
       >
         {pending ? "Ingresando..." : "Ingresar"}
       </button>
+
+      <p className="text-center text-xs text-muted">
+        ¿Olvidaste tu contraseña? Pedile a quien administra tu organización que te genere un enlace de acceso.
+      </p>
     </form>
   );
 }

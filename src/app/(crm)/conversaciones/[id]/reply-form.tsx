@@ -5,7 +5,7 @@ import { useActionState, useEffect, useRef, useState, useTransition } from "reac
 import type { QuickReply } from "@/lib/crm/quick-replies";
 
 import { sendReply, type ReplyState } from "./actions";
-import { removeQuickReply, saveQuickReply } from "./quick-reply-actions";
+import { editQuickReply, removeQuickReply, saveQuickReply } from "./quick-reply-actions";
 
 const INITIAL: ReplyState = { error: null, sentAt: null };
 
@@ -55,6 +55,19 @@ export function ReplyForm({
     });
   }
 
+  // Renombrar (y, si hay texto escrito abajo, reemplazar el texto guardado con ese).
+  function rename(reply: QuickReply) {
+    const title = window.prompt("Nuevo título de la respuesta rápida:", reply.title);
+    if (title === null) return;
+    const typed = textRef.current?.value.trim() ?? "";
+    const replaceText = typed !== "" && typed !== reply.body && window.confirm("¿Reemplazar también el texto guardado con el que escribiste abajo?");
+    setQuickError(null);
+    startQuick(async () => {
+      const result = await editQuickReply(conversationId, reply.id, title, replaceText ? typed : reply.body);
+      if (result.error) setQuickError(result.error);
+    });
+  }
+
   function remove(id: string, title: string) {
     // Es de toda la organización: se confirma antes de borrar.
     if (!window.confirm(`¿Borrar la respuesta rápida "${title}" para todo el equipo?`)) return;
@@ -91,6 +104,16 @@ export function ReplyForm({
               <li key={reply.id} className="flex items-center overflow-hidden rounded-lg border border-line">
                 <button type="button" onClick={() => insert(reply.body)} title={reply.body} className="px-2.5 py-1 text-xs hover:bg-accent-soft">
                   {reply.title}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => rename(reply)}
+                  disabled={quickPending}
+                  aria-label={`Editar la respuesta rápida ${reply.title}`}
+                  title="Editar"
+                  className="grid min-w-8 place-items-center border-l border-line px-2 py-1 text-sm text-muted hover:text-accent"
+                >
+                  ✎
                 </button>
                 <button
                   type="button"

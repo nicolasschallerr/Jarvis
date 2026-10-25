@@ -5,6 +5,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { createClient } from "@/lib/supabase/server";
 
+import { createAdminClient } from "@/lib/supabase/admin";
+import { memberEmails } from "@/lib/team/members";
+
+import { People, type PersonView } from "./people";
 import { SectorCard, type SectorView } from "./sector-card";
 
 export const metadata = { title: "Equipo" };
@@ -36,6 +40,18 @@ export default async function EquipoPage() {
     .in("role", ["superadmin", "operator"])
     .eq("is_active", true)
     .order("full_name");
+
+  // Todas las personas de la organización (también las desactivadas) con su email, que vive en el sistema de cuentas.
+  const { data: profiles } = await supabase.from("profiles").select("id, full_name, role, is_active").order("full_name");
+  const emails = await memberEmails(createAdminClient(), (profiles ?? []).map((person) => person.id));
+  const everyone: PersonView[] = (profiles ?? []).map((person) => ({
+    id: person.id,
+    fullName: person.full_name,
+    email: emails.get(person.id) ?? "",
+    role: person.role,
+    isActive: person.is_active,
+    isYou: person.id === profile.id,
+  }));
 
   const views: SectorView[] = (sectors ?? []).map((sector) => {
     const memberIds = new Set(sector.sector_members.map((member) => member.profile_id));
@@ -77,6 +93,10 @@ export default async function EquipoPage() {
           ))}
         </div>
       )}
+
+      <div className="p-4 pt-0 sm:p-6 sm:pt-0">
+        <People people={everyone} />
+      </div>
     </main>
   );
 }

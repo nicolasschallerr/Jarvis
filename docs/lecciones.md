@@ -324,3 +324,15 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** React Three Fiber anima mutando los objetos de three.js dentro de `useFrame`, fuera del render; es su patrón documentado, pero las reglas del compilador lo leen como un error.
 - **Solución:** desactivar esas dos reglas solo en ese archivo, con el motivo escrito. El aviso de `setState` dentro de un efecto sí era real y se corrigió con `useSyncExternalStore`.
 - **Cómo evitarlo:** ante un aviso del compilador en código de una librería con otro modelo (3D, canvas), distinguir si es un error real o el patrón de la librería, y desactivar lo mínimo y explicado.
+
+### 51. Un archivo con módulos de servidor no puede entrar al código del navegador
+- **Problema:** las constantes de roles y la longitud mínima de contraseña estaban en el mismo archivo que usa `node:crypto`; los componentes del navegador las importaban y el archivo arrastraba un módulo que no existe allá.
+- **Causa real:** importar una constante importa el archivo entero con todo lo que él importa.
+- **Solución:** lo compartido va en un archivo propio sin módulos de servidor (`roles.ts`) y el de servidor lo reexporta.
+- **Cómo evitarlo:** si un archivo toca `node:*`, `server-only` o el cliente de servicio, no se importa desde un componente `"use client"`; lo que se comparte se separa antes.
+
+### 52. Probar una pantalla desde un navegador oculto puede dar falsos negativos
+- **Problema:** una página parecía "no hidratar" (los botones no respondían y los formularios se enviaban recargando la página) y un script de espera se cortó por tiempo.
+- **Causa real:** el panel del navegador estaba oculto y el sistema le frena la ejecución; no era el código.
+- **Solución:** comprobar lo que no depende de la pantalla directamente (canjear el enlace con una llamada al servidor) y dejar lo visual para cuando el panel está a la vista.
+- **Cómo evitarlo:** antes de culpar al código, descartar que sea el entorno de prueba (¿está visible?, ¿otra página que antes andaba también falla?).

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
@@ -48,6 +49,9 @@ async function UserBlock() {
         <div className="mt-2 flex flex-col gap-2 px-1">
           <ThemeToggle />
           <MotionToggle />
+          <Link href="/nueva-clave" className="rounded-lg px-3 py-1.5 text-sm text-muted transition hover:bg-zinc-200/60 hover:text-foreground dark:hover:bg-zinc-800">
+            Cambiar mi contraseña
+          </Link>
         </div>
       </details>
       <form action={signOut}>

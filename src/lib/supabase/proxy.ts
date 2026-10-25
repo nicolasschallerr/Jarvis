@@ -4,7 +4,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "./database.types";
 
 // Rutas que se pueden ver sin iniciar sesión: la página pública de Orbita AI ("/", exacta) y el ingreso.
-const PUBLIC_PATHS = ["/login"];
+// /auth: el enlace de acceso que genera el superadmin (se canjea por una sesión, ver auth/confirmar).
+const PUBLIC_PATHS = ["/login", "/auth"];
 const PUBLIC_EXACT = ["/"];
 
 // Refresca la sesión de Supabase en cada pedido y redirige a /login si no hay sesión válida.

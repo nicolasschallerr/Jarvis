@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { addQuickReply, deleteQuickReply, listQuickReplies } from "../src/lib/crm/quick-replies";
+import { addQuickReply, deleteQuickReply, listQuickReplies, updateQuickReply } from "../src/lib/crm/quick-replies";
 import { adminClient, createTestUser, randomId, type TestUser } from "./helpers/supabase-test";
 
 // Respuestas rápidas contra el proyecto de desarrollo. Crea sus propias organizaciones y usuarios "zz-test-".
@@ -62,6 +62,22 @@ describe("respuestas rápidas", () => {
     // Con rol de operador declarado pero la sesión de consulta, RLS lo frena igual.
     const forged = await addQuickReply({ userClient: viewer.client, profile: { ...asViewer, role: "operator" }, title: "x", body: "x" });
     expect(forged.ok).toBe(false);
+  });
+
+  it("se puede renombrar y corregir; vacío, de consulta o de otra organización no", async () => {
+    const [orgA = "", orgB = ""] = orgIds;
+    const [reply] = await listQuickReplies(operator.client);
+    const id = reply?.id ?? "";
+
+    expect(await updateQuickReply({ userClient: colleague.client, profile: profileOf(colleague, orgA, "operator"), id, title: " Horario nuevo ", body: " Atendemos de 8 a 16. " })).toEqual({ ok: true });
+    expect(await listQuickReplies(operator.client)).toEqual([{ id, title: "Horario nuevo", body: "Atendemos de 8 a 16." }]);
+
+    expect((await updateQuickReply({ userClient: operator.client, profile: profileOf(operator, orgA, "operator"), id, title: " ", body: "x" })).ok).toBe(false);
+    expect((await updateQuickReply({ userClient: viewer.client, profile: profileOf(viewer, orgA, "viewer"), id, title: "x", body: "x" })).ok).toBe(false);
+    const forged = await updateQuickReply({ userClient: viewer.client, profile: { ...profileOf(viewer, orgA, "viewer"), role: "operator" }, id, title: "robado", body: "x" });
+    expect(forged.ok).toBe(false);
+    expect((await updateQuickReply({ userClient: foreign.client, profile: profileOf(foreign, orgB, "operator"), id, title: "ajeno", body: "x" })).ok).toBe(false);
+    expect((await listQuickReplies(operator.client))[0]?.title).toBe("Horario nuevo");
   });
 
   it("otra organización no puede borrar las ajenas; la propia sí", async () => {

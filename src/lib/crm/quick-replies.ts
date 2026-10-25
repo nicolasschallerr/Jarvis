@@ -35,6 +35,23 @@ export async function addQuickReply(params: { userClient: Client; profile: Profi
   return { ok: true };
 }
 
+// Cambia el título y el texto. RLS limita a la propia organización y a quien puede escribir.
+export async function updateQuickReply(params: { userClient: Client; profile: Profile; id: string; title: string; body: string }): Promise<QuickReplyResult> {
+  if (params.profile.role === "viewer") return { ok: false, error: "Tu rol es de consulta: no puede editar respuestas." };
+
+  const title = params.title.trim();
+  const body = params.body.trim();
+  if (!title) return { ok: false, error: "El título no puede quedar vacío." };
+  if (!body) return { ok: false, error: "El texto no puede quedar vacío." };
+  if (title.length > MAX_QUICK_TITLE) return { ok: false, error: `El título supera los ${MAX_QUICK_TITLE} caracteres.` };
+  if (body.length > MAX_QUICK_BODY) return { ok: false, error: `El texto supera los ${MAX_QUICK_BODY} caracteres.` };
+
+  const { data, error } = await params.userClient.from("quick_replies").update({ title, body }).eq("id", params.id).select("id");
+  if (error) return { ok: false, error: "No se pudo guardar el cambio." };
+  if (!data?.length) return { ok: false, error: "La respuesta no existe." };
+  return { ok: true };
+}
+
 export async function deleteQuickReply(params: { userClient: Client; profile: Profile; id: string }): Promise<QuickReplyResult> {
   if (params.profile.role === "viewer") return { ok: false, error: "Tu rol es de consulta: no puede borrar respuestas." };
   const { data, error } = await params.userClient.from("quick_replies").delete().eq("id", params.id).select("id");
