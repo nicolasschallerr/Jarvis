@@ -336,3 +336,9 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** el panel del navegador estaba oculto y el sistema le frena la ejecución; no era el código.
 - **Solución:** comprobar lo que no depende de la pantalla directamente (canjear el enlace con una llamada al servidor) y dejar lo visual para cuando el panel está a la vista.
 - **Cómo evitarlo:** antes de culpar al código, descartar que sea el entorno de prueba (¿está visible?, ¿otra página que antes andaba también falla?).
+
+### 53. En una app lenta, medir antes de optimizar: la distancia cuenta más que la consulta
+- **Problema:** la navegación del CRM se sentía lenta y lo primero que se sospecha es la base de datos o las consultas pesadas.
+- **Causa real:** medidas una por una (con la sesión de un usuario), todas las consultas tardaban lo mismo que un viaje vacío: lo caro era cada viaje (la base en Oregón, las funciones en Virginia) multiplicado por la cantidad de consultas en fila (hasta 16 por pantalla, con el perfil repetido 3 veces).
+- **Solución:** funciones en la misma zona que la base, una sola consulta de perfil por pedido, conteos en una función de la base, consultas independientes en paralelo (ADR-034).
+- **Cómo evitarlo:** contar consultas y tandas por pantalla antes de tocar índices; un contador temporal que registra cada pedido a la base alcanza para verlo. Pensar siempre en "cuántas tandas", no en "cuántas consultas".

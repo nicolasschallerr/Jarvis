@@ -48,8 +48,11 @@ export default async function ConversacionesPage({ searchParams }: PageProps<"/c
   const profile = await getCurrentProfile();
   const query = inboxQueryFrom(await searchParams);
 
-  const { items, hasMore, counts, failed } = await listInbox({ userClient: await createClient(), userId: profile.id, query });
-  const agentName = (await getAgentNames()).attention;
+  const [{ items, hasMore, counts, failed }, agentNames] = await Promise.all([
+    listInbox({ userClient: await createClient(), userId: profile.id, query }),
+    getAgentNames(),
+  ]);
+  const agentName = agentNames.attention;
   const now = new Date();
   const filtered = query.filter !== "todas" || query.channel !== null || query.search !== "";
 

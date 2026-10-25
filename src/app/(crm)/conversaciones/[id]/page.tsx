@@ -66,37 +66,51 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
 
   const supabase = await createClient();
 
+  // Tanda 1: todo lo que depende solo del id de la conversación y de la sesión, junto. Cada consulta es un viaje a la
+  // base: hacerlas en fila sumaba la demora de cada una.
   // RLS limita todo a la organización del usuario: un id ajeno simplemente no existe.
-  const { data: conversation } = await supabase
-    .from("conversation_summaries")
-    .select("id, contact_id, contact_name, contact_document, channel_type, last_inbound_at, ai_enabled")
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data: conversation }, { data: latest }, agentNames, quickReplies, { data: templates }] = await Promise.all([
+    supabase
+      .from("conversation_summaries")
+      .select("id, contact_id, contact_name, contact_document, channel_type, last_inbound_at, ai_enabled")
+      .eq("id", id)
+      .maybeSingle(),
+    // Los últimos mensajes en el orden en que ocurrieron, mostrados del más viejo al más nuevo (uno de más para saber
+    // si hay anteriores).
+    supabase
+      .from("messages")
+      .select("id, direction, sender, sender_profile_id, type, body, transcription, status, created_at, provider_timestamp")
+      .eq("conversation_id", id)
+      .order("provider_timestamp", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(limit + 1),
+    getAgentNames(),
+    profile.role === "viewer" ? Promise.resolve([]) : listQuickReplies(supabase),
+    // Plantillas aprobadas de Meta: lo único que se puede enviar por WhatsApp fuera de la ventana de 24 h (Fase 9).
+    // Se piden siempre y se usan solo si el canal es WhatsApp (así no esperan a saber el canal).
+    profile.role === "viewer"
+      ? Promise.resolve({ data: [] })
+      : supabase.from("message_templates").select("id, name, language, body, category").eq("meta_status", "approved").order("name"),
+  ]);
   if (!conversation) notFound();
 
-  // Los últimos mensajes en el orden en que ocurrieron, mostrados del más viejo al más nuevo.
-  const { data: latest } = await supabase
-    .from("messages")
-    .select("id, direction, sender, sender_profile_id, type, body, transcription, status, created_at, provider_timestamp")
-    .eq("conversation_id", id)
-    .order("provider_timestamp", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .limit(limit + 1);
-  // Se pide uno más para saber si hay mensajes anteriores.
   const hasOlder = (latest?.length ?? 0) > limit;
   const messages: MessageRow[] = [...(latest ?? []).slice(0, limit)].reverse();
+  const agentName = agentNames.attention;
+  const approvedTemplates = conversation.channel_type === "whatsapp" ? (templates ?? []) : [];
 
-  // Nombres de quienes respondieron a mano, para firmar cada burbuja.
+  // Tanda 2: lo que depende de los mensajes. Nombres de quienes respondieron a mano (para firmar cada burbuja) y
+  // archivos adjuntos, juntos.
   const operatorIds = [...new Set(messages.map((message) => message.sender_profile_id).filter((value): value is string => !!value))];
-  const { data: operators } = operatorIds.length ? await supabase.from("profiles").select("id, full_name").in("id", operatorIds) : { data: [] };
+  const messageIds = messages.map((message) => message.id);
+  const [{ data: operators }, { data: files }] = await Promise.all([
+    operatorIds.length ? supabase.from("profiles").select("id, full_name").in("id", operatorIds) : Promise.resolve({ data: [] }),
+    // La política de Storage deja firmar solo los archivos de la propia organización.
+    messageIds.length ? supabase.from("media_files").select("message_id, storage_path, mime_type").in("message_id", messageIds) : Promise.resolve({ data: [] }),
+  ]);
   const operatorNames = new Map((operators ?? []).map((operator) => [operator.id, operator.full_name]));
 
-  // Archivos adjuntos: la política de Storage deja firmar solo los de la propia organización.
-  const messageIds = messages.map((message) => message.id);
-  const { data: files } = messageIds.length
-    ? await supabase.from("media_files").select("message_id, storage_path, mime_type").in("message_id", messageIds)
-    : { data: [] };
-
+  // Tanda 3: las direcciones firmadas de los adjuntos.
   const signed = files?.length
     ? await supabase.storage.from("media").createSignedUrls(
         files.map((file) => file.storage_path),
@@ -111,14 +125,6 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
     if (url) mediaByMessage.set(file.message_id, { url, mimeType: file.mime_type });
   }
 
-  const agentName = (await getAgentNames()).attention;
-  const quickReplies = profile.role === "viewer" ? [] : await listQuickReplies(supabase);
-  // Plantillas aprobadas de Meta: lo único que se puede enviar por WhatsApp fuera de la ventana de 24 h (Fase 9).
-  const { data: templates } =
-    conversation.channel_type === "whatsapp" && profile.role !== "viewer"
-      ? await supabase.from("message_templates").select("id, name, language, body, category").eq("meta_status", "approved").order("name")
-      : { data: [] };
-  const approvedTemplates = templates ?? [];
   const channel = (conversation.channel_type ?? "whatsapp") as ChannelType;
   const contactName = conversation.contact_name || "Sin nombre";
   const aiEnabled = conversation.ai_enabled ?? false;

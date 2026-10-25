@@ -73,27 +73,24 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
   const filters: Filters = { view, sector: sectorId, resolved: includeResolved, mode, priority };
 
   const supabase = await createClient();
-  const { data: sectors } = await supabase.from("sectors").select("id, name").eq("is_active", true).order("name");
 
+  // Las listas de casos y los sectores (que solo se usan en la vista "Por sector") se piden a la vez: cada consulta es
+  // un viaje a la base y en fila sumaban la demora de las tres.
   let cases: Awaited<ReturnType<typeof listCases>> = [];
   let failed = false;
-  try {
-    cases = await listCases({ userClient: supabase, view, userId: profile.id, sectorId, includeResolved, priority });
-    if (board) {
-      const resolved = await listCases({
-        userClient: supabase,
-        view,
-        userId: profile.id,
-        sectorId,
-        resolvedOnly: true,
-        priority,
-        limit: BOARD_RESOLVED_LIMIT,
-      });
-      cases = [...cases, ...resolved];
-    }
-  } catch {
-    failed = true;
-  }
+  const [sectorsResult, casesResult] = await Promise.all([
+    view === "sector" ? supabase.from("sectors").select("id, name").eq("is_active", true).order("name") : Promise.resolve({ data: [] }),
+    Promise.all([
+      listCases({ userClient: supabase, view, userId: profile.id, sectorId, includeResolved, priority }),
+      // El tablero muestra además los últimos resueltos en su última columna.
+      board
+        ? listCases({ userClient: supabase, view, userId: profile.id, sectorId, resolvedOnly: true, priority, limit: BOARD_RESOLVED_LIMIT })
+        : Promise.resolve([]),
+    ]).catch(() => null),
+  ]);
+  const sectors = sectorsResult.data;
+  if (casesResult) cases = [...casesResult[0], ...casesResult[1]];
+  else failed = true;
 
   const now = new Date();
 

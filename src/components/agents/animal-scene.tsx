@@ -4,8 +4,8 @@
    React Three Fiber anima mutando los objetos 3D (posición, rotación, escala) dentro de useFrame, fuera del render de
    React: es el patrón documentado de la librería y no provoca renders. Estas reglas del compilador no lo distinguen. */
 
-import { Canvas, useFrame } from "@react-three/fiber";
-import { useRef } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useEffect, useRef } from "react";
 import type { Group, Mesh, MeshPhysicalMaterial } from "three";
 
 // Animales en 3D de los agentes, armados con formas simples (esferas, conos, toros) y un material tipo juguete
@@ -357,14 +357,28 @@ function GroundShadow() {
   );
 }
 
+// Dibuja a 30 cuadros por segundo en vez de 60: en un muñeco de este tamaño no se nota y se reduce a la mitad el trabajo
+// de la placa de video. Solo corre mientras hay animación; si no, la escena se dibuja cuando cambia algo.
+function Ticker({ active }: { active: boolean }) {
+  const invalidate = useThree((state) => state.invalidate);
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => invalidate(), 1000 / 30);
+    return () => clearInterval(id);
+  }, [active, invalidate]);
+  return null;
+}
+
 export default function AnimalScene({ kind, mood, delay, animate, visible }: SceneProps) {
   return (
     <Canvas
-      dpr={[1, 2]}
+      // Resolución acotada: en pantallas de alta densidad dibujar a 2x cuadruplica el trabajo de la placa de video para
+      // una diferencia que en un muñeco de este tamaño casi no se nota.
+      dpr={[1, 1.5]}
       camera={{ position: [0, 0.1, 5.4], fov: 32 }}
-      gl={{ alpha: true, antialias: true, powerPreference: "low-power" }}
-      // Fuera de pantalla no se dibuja; sin animaciones, se dibuja solo cuando cambia algo.
-      frameloop={!visible ? "never" : animate ? "always" : "demand"}
+      gl={{ alpha: true, antialias: true, powerPreference: "low-power", stencil: false, depth: true }}
+      // Fuera de pantalla no se dibuja; con animación, el Ticker pide un cuadro cada 1/30 s.
+      frameloop={visible ? "demand" : "never"}
       style={{ pointerEvents: "none" }}
     >
       <ambientLight intensity={0.55} />
@@ -373,6 +387,7 @@ export default function AnimalScene({ kind, mood, delay, animate, visible }: Sce
       <pointLight position={[-2.5, 1.5, -2]} intensity={6} color={BRAND} />
       {kind === "attention" ? <Fox mood={mood} delay={delay} animate={animate} /> : <Owl mood={mood} delay={delay} animate={animate} />}
       <GroundShadow />
+      <Ticker active={animate && visible} />
     </Canvas>
   );
 }

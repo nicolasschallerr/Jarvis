@@ -253,6 +253,24 @@ describe("último mensaje guardado en la conversación (ADR-032)", () => {
   });
 });
 
+describe("conteos en una consulta (ADR-034)", () => {
+  it("la bandeja cuenta las pestañas de una vez y solo de la propia organización", async () => {
+    const { data: own } = await superadmin.client.rpc("inbox_counts", { p_user_id: superadmin.id });
+    expect(own).toMatchObject({ todas: 2 });
+    expect(Object.keys(own as object).sort()).toEqual(["esperando", "ia-pausada", "mias", "sin-asignar", "todas"]);
+
+    const { data: other } = await foreignOperator.client.rpc("inbox_counts", { p_user_id: foreignOperator.id });
+    expect(other).toMatchObject({ todas: 0, esperando: 0 });
+  });
+
+  it("el Inicio cuenta casos y conversaciones de una vez", async () => {
+    const { data } = await superadmin.client.rpc("home_counts", { p_user_id: superadmin.id });
+    expect(Object.keys(data as object).sort()).toEqual(["awaiting", "mine", "unassigned", "urgent"]);
+    const { data: other } = await foreignOperator.client.rpc("home_counts", { p_user_id: foreignOperator.id });
+    expect(other).toEqual({ awaiting: 0, mine: 0, unassigned: 0, urgent: 0 });
+  });
+});
+
 describe("turno del agente por conversación", () => {
   it("una sola ejecución a la vez; al soltarlo se puede volver a tomar", async () => {
     const first = await admin.rpc("claim_agent_turn", { p_conversation_id: telegramConversation });

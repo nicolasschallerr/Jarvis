@@ -2098,6 +2098,8 @@ export type Database = {
         }
         Returns: undefined
       }
+      home_counts: { Args: { p_user_id: string }; Returns: Json }
+      inbox_counts: { Args: { p_user_id: string }; Returns: Json }
       ingest_inbound_message: {
         Args: {
           p_body: string

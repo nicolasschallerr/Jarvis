@@ -81,26 +81,18 @@ export async function listInbox(params: { userClient: SupabaseClient<Database>; 
     list = digits.length >= 4 ? list.or(`contact_name.ilike.%${term}%,contact_document.ilike.%${digits}%`) : list.ilike("contact_name", `%${term}%`);
   }
 
-  // Cuántas hay en cada pestaña (sin búsqueda ni canal: son el mapa general de la bandeja).
-  const counts = await Promise.all(
-    INBOX_FILTERS.map(async (filter) => {
-      let base = userClient.from("conversation_summaries").select("id", { count: "exact", head: true });
-      const tab = filterSpec(filter, userId);
-      for (const [column, operator, value] of tab.filters) base = base.filter(column, operator, value);
-      if (tab.or) base = base.or(tab.or);
-      const { count } = await base;
-      return [filter, count ?? 0] as const;
-    }),
-  );
-
-  const { data, error } = await list;
+  // La lista y cuántas hay en cada pestaña (sin búsqueda ni canal: son el mapa general de la bandeja), a la vez. Los
+  // cinco conteos son una sola consulta (función de la base).
+  const [{ data, error }, countsResult] = await Promise.all([list, userClient.rpc("inbox_counts", { p_user_id: userId })]);
   const rows = data ?? [];
+  const numbers = (countsResult.data ?? {}) as Record<string, number>;
+  const counts = Object.fromEntries(INBOX_FILTERS.map((filter) => [filter, numbers[filter] ?? 0])) as Record<InboxFilter, number>;
 
   return {
     items: rows.slice(0, query.limit),
     hasMore: rows.length > query.limit,
-    counts: Object.fromEntries(counts) as Record<InboxFilter, number>,
-    failed: Boolean(error),
+    counts,
+    failed: Boolean(error || countsResult.error),
   };
 }
 

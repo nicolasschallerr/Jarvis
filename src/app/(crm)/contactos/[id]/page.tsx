@@ -26,13 +26,13 @@ export default async function ContactoPage({ params }: PageProps<"/contactos/[id
   const profile = await getCurrentProfile();
   const { id } = await params;
 
-  const history = await getContactHistory({ userClient: await createClient(), contactId: id });
+  const [history, agentNames] = await Promise.all([getContactHistory({ userClient: await createClient(), contactId: id }), getAgentNames()]);
   if (!history) notFound();
   // Una ficha unida a otra ya no existe por separado: se muestra la que quedó.
   if (history.contact.merged_into) redirect(`/contactos/${history.contact.merged_into}`);
 
   const { contact, conversations, cases } = history;
-  const agentName = (await getAgentNames()).attention;
+  const agentName = agentNames.attention;
   const now = new Date();
   const name = contact.display_name || "Sin nombre";
   const openCases = cases.filter((item) => item.status !== "resolved");

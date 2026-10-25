@@ -10,14 +10,9 @@ export const HOME_LIST_SIZE = 5;
 export async function getHomeSummary(params: { userClient: SupabaseClient<Database>; userId: string }) {
   const { userClient, userId } = params;
 
-  const openCases = () => userClient.from("cases").select("id", { count: "exact", head: true }).neq("status", "resolved");
-
-  const [awaiting, mine, unassigned, urgent, awaitingList, myCases, agents] = await Promise.all([
-    // Conversaciones cuyo último mensaje es del contacto: esperan una respuesta.
-    userClient.from("conversation_summaries").select("id", { count: "exact", head: true }).eq("last_direction", "inbound"),
-    openCases().eq("assigned_to", userId),
-    openCases().is("assigned_to", null),
-    openCases().eq("priority", "urgent"),
+  const [counts, awaitingList, myCases, agents] = await Promise.all([
+    // Los cuatro conteos en una sola consulta (función de la base): esperan respuesta, mis casos, sin asignar y urgentes.
+    userClient.rpc("home_counts", { p_user_id: userId }),
     userClient
       .from("conversation_summaries")
       .select("id, contact_name, channel_type, last_body, last_type, last_message_at")
@@ -35,16 +30,18 @@ export async function getHomeSummary(params: { userClient: SupabaseClient<Databa
     userClient.from("agents").select("id, kind, name, tagline, status, is_enabled").order("kind"),
   ]);
 
+  const numbers = (counts.data ?? {}) as Record<string, number>;
+
   return {
     counts: {
-      awaitingReply: awaiting.count ?? 0,
-      myOpenCases: mine.count ?? 0,
-      unassignedCases: unassigned.count ?? 0,
-      urgentCases: urgent.count ?? 0,
+      awaitingReply: numbers.awaiting ?? 0,
+      myOpenCases: numbers.mine ?? 0,
+      unassignedCases: numbers.unassigned ?? 0,
+      urgentCases: numbers.urgent ?? 0,
     },
     awaitingList: awaitingList.data ?? [],
     myCases: myCases.data ?? [],
     agents: agents.data ?? [],
-    failed: [awaiting, mine, unassigned, urgent, awaitingList, myCases, agents].some((result) => result.error),
+    failed: [counts, awaitingList, myCases, agents].some((result) => result.error),
   };
 }
