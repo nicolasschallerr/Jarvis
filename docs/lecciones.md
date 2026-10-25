@@ -342,3 +342,21 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** medidas una por una (con la sesión de un usuario), todas las consultas tardaban lo mismo que un viaje vacío: lo caro era cada viaje (la base en Oregón, las funciones en Virginia) multiplicado por la cantidad de consultas en fila (hasta 16 por pantalla, con el perfil repetido 3 veces).
 - **Solución:** funciones en la misma zona que la base, una sola consulta de perfil por pedido, conteos en una función de la base, consultas independientes en paralelo (ADR-034).
 - **Cómo evitarlo:** contar consultas y tandas por pantalla antes de tocar índices; un contador temporal que registra cada pedido a la base alcanza para verlo. Pensar siempre en "cuántas tandas", no en "cuántas consultas".
+
+### 54. Una palabra clave de baja tiene que ser inequívoca en el negocio del cliente
+- **Problema:** el estándar para dejar de recibir mensajes es una palabra ("BAJA", "STOP"), y la primera idea fue aceptar "baja".
+- **Causa real:** en una mutual o un gremio, "baja" suele significar darse de baja de un servicio o de la afiliación: una gestión que tiene que llegar al agente o al equipo. Tratarla como "no quiero novedades" habría dejado a esa persona sin atención.
+- **Solución:** solo frases inequívocas por coincidencia exacta ("STOP", "no recibir más", "dejar de recibir"…), probadas contra frases parecidas que no deben contar ("quiero la baja del gimnasio").
+- **Cómo evitarlo:** antes de automatizar un comando por palabra, preguntarse qué otras cosas significa esa palabra para el cliente y probarlas.
+
+### 55. Los ids de un servicio falso no se pueden repetir entre pruebas
+- **Problema:** las pruebas de envíos fallaban con "duplicate key … messages_external_id_key" aunque el código estaba bien.
+- **Causa real:** el Meta falso armaba el id del mensaje con el largo de la lista de llamadas, que la prueba vacía entre casos: se repetían los mismos ids y chocaban con los ya guardados.
+- **Solución:** un contador aparte que nunca se reinicia.
+- **Cómo evitarlo:** todo id que un doble de prueba inventa tiene que ser único en toda la corrida, no en cada caso.
+
+### 56. El orden de un lote no es un orden fijo: no lo uses en una prueba
+- **Problema:** una prueba de cancelación fallaba a veces: esperaba que el primer destinatario del lote fuera uno con nombre, y a veces era el que no tenía.
+- **Causa real:** los destinatarios se toman por el orden de su identificador (aleatorio).
+- **Solución:** que la prueba use solo datos para los que el resultado no depende del orden (aquí, un filtro que deja solo contactos con nombre) y repetirla varias veces para ver que es estable.
+- **Cómo evitarlo:** si un resultado depende de cuál fila sale primero, o se ordena de forma explícita o se arma el caso para que todas den lo mismo.

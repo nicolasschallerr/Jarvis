@@ -5,6 +5,7 @@ import { anthropicClientFromEnv } from "@/lib/ai/anthropic-client";
 import { runFollowups } from "@/lib/followups/run";
 import { processPendingMessages } from "@/lib/inbound/process";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { runBroadcasts } from "@/lib/broadcasts/service";
 import { checkUsageAlerts } from "@/lib/usage/alerts";
 import { isAuthorizedWorkerRequest } from "@/lib/worker-auth";
 
@@ -48,7 +49,14 @@ async function handle(request: NextRequest) {
           return null;
         })
       : null;
-    return Response.json({ ...result, areaReplies, followups, usageAlerts });
+    // Envíos masivos: empiezan los programados y sale un lote de cada uno. Tampoco necesitan el modelo.
+    const broadcasts = hasTime()
+      ? await runBroadcasts(admin).catch((error: unknown) => {
+          console.error("worker envíos masivos:", error instanceof Error ? error.message : error);
+          return null;
+        })
+      : null;
+    return Response.json({ ...result, areaReplies, followups, usageAlerts, broadcasts });
   } catch (error) {
     console.error("worker mensajes:", error instanceof Error ? error.message : error);
     return new Response("Error", { status: 500 });

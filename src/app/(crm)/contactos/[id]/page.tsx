@@ -6,6 +6,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge, PriorityBadge, StatusBadge } from "@/components/ui/badge";
 import { ArrowLeftIcon } from "@/components/ui/icons";
 import { getCurrentProfile } from "@/lib/auth/profile";
+import { consentStatus } from "@/lib/consent";
 import { getContactHistory } from "@/lib/crm/contact-directory";
 import { channelLabel, dateTime, messagePreview, shortDate } from "@/lib/crm/format";
 import { getAgentNames } from "@/lib/crm/agent-names";
@@ -13,6 +14,7 @@ import { lastSenderPrefix } from "@/lib/crm/inbox";
 import { createClient } from "@/lib/supabase/server";
 
 import { ContactForm } from "../../conversaciones/[id]/contact-form";
+import { ConsentCard } from "./consent-card";
 
 export const metadata = { title: "Contacto" };
 
@@ -146,10 +148,14 @@ export default async function ContactoPage({ params }: PageProps<"/contactos/[id
                 notes: contact.notes ?? "",
               }}
             />
-            <p className="text-xs text-muted">
-              Envíos: {contact.opted_out_at ? "no quiere recibir" : contact.opted_in_at ? "aceptó recibir" : "sin registrar"}
-            </p>
           </section>
+
+          <ConsentCard
+            contactId={contact.id}
+            status={consentStatus(contact)}
+            since={consentStatus(contact) === "withdrawn" ? dateTime(contact.opted_out_at) : consentStatus(contact) === "accepted" ? dateTime(contact.opted_in_at) : null}
+            canEdit={profile.role !== "viewer"}
+          />
 
           <section aria-labelledby="canales" className="card flex flex-col gap-2 p-4 text-sm">
             <h2 id="canales" className="font-semibold">

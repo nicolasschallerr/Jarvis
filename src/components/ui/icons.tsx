@@ -83,6 +83,13 @@ export const ChartIcon = (props: IconProps) => (
   </Svg>
 );
 
+export const SendIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M21 3 10.5 13.5" />
+    <path d="M21 3 14 21l-3.5-7.5L3 10l18-7Z" />
+  </Svg>
+);
+
 export const BellIcon = (props: IconProps) => (
   <Svg {...props}>
     <path d="M6 9a6 6 0 1 1 12 0c0 6 2 7 2 7H4s2-1 2-7" />

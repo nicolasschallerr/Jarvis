@@ -446,27 +446,36 @@ export type Database = {
       }
       broadcast_recipients: {
         Row: {
+          attempts: number
           broadcast_id: string
+          claimed_at: string | null
           contact_id: string
           error: string | null
           message_id: string | null
           organization_id: string
+          sent_at: string | null
           status: Database["public"]["Enums"]["message_status"]
         }
         Insert: {
+          attempts?: number
           broadcast_id: string
+          claimed_at?: string | null
           contact_id: string
           error?: string | null
           message_id?: string | null
           organization_id: string
+          sent_at?: string | null
           status?: Database["public"]["Enums"]["message_status"]
         }
         Update: {
+          attempts?: number
           broadcast_id?: string
+          claimed_at?: string | null
           contact_id?: string
           error?: string | null
           message_id?: string | null
           organization_id?: string
+          sent_at?: string | null
           status?: Database["public"]["Enums"]["message_status"]
         }
         Relationships: [
@@ -504,38 +513,47 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          finished_at: string | null
           id: string
           name: string
           organization_id: string
           scheduled_at: string | null
           segment: Json
+          started_at: string | null
           status: Database["public"]["Enums"]["broadcast_status"]
           template_id: string
           updated_at: string
+          variables: Json
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          finished_at?: string | null
           id?: string
           name: string
           organization_id: string
           scheduled_at?: string | null
           segment?: Json
+          started_at?: string | null
           status?: Database["public"]["Enums"]["broadcast_status"]
           template_id: string
           updated_at?: string
+          variables?: Json
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          finished_at?: string | null
           id?: string
           name?: string
           organization_id?: string
           scheduled_at?: string | null
           segment?: Json
+          started_at?: string | null
           status?: Database["public"]["Enums"]["broadcast_status"]
           template_id?: string
           updated_at?: string
+          variables?: Json
         }
         Relationships: [
           {
@@ -2063,9 +2081,35 @@ export type Database = {
         }
         Returns: undefined
       }
+      broadcast_audience: {
+        Args: { p_limit?: number; p_org: string; p_segment: Json }
+        Returns: {
+          contact_id: string
+        }[]
+      }
+      broadcast_audience_count: {
+        Args: { p_org: string; p_segment: Json }
+        Returns: number
+      }
+      broadcast_stats: {
+        Args: never
+        Returns: {
+          broadcast_id: string
+          failed: number
+          queued: number
+          sent: number
+        }[]
+      }
       claim_agent_turn: {
         Args: { p_conversation_id: string; p_seconds?: number }
         Returns: boolean
+      }
+      claim_broadcast_recipients: {
+        Args: { p_broadcast: string; p_limit?: number }
+        Returns: {
+          attempts: number
+          contact_id: string
+        }[]
       }
       claim_webhook_events: {
         Args: { p_limit?: number; p_prefix: string }

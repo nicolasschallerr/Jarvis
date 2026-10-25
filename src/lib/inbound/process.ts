@@ -4,6 +4,7 @@ import { respondToMessage } from "@/lib/agent/attention";
 import { anthropicClientFromEnv } from "@/lib/ai/anthropic-client";
 import { transcriptionClientFromEnv, type TranscriptionClient } from "@/lib/ai/transcription";
 import type { ModelClient } from "@/lib/ai/types";
+import { handleOptOutKeyword, isOptOutKeyword } from "@/lib/consent";
 import { channelToken } from "@/lib/outbound/channel-token";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
@@ -91,6 +92,15 @@ async function processMessageEvent(
   }
 
   const created = messageId !== null;
+
+  // "STOP" y frases equivalentes: se registra la baja y se confirma; el agente no contesta ese mensaje (ADR-038).
+  if (created && messageId && message.type === "text" && isOptOutKeyword(message.body)) {
+    const handled = await handleOptOutKeyword(admin, { messageId, now }).catch((error: unknown) => {
+      console.error("baja por palabra clave:", error instanceof Error ? error.message : "Error desconocido");
+      return false;
+    });
+    if (handled) return created;
+  }
 
   // El agente responde también al reprocesar: si una corrida se cortó entre guardar el mensaje y responder, el
   // reintento ve el mensaje como duplicado y el asociado se quedaba sin respuesta. respondToMessage no contesta

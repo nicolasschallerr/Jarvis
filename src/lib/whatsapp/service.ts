@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { consentStatus } from "@/lib/consent";
 import { channelToken } from "@/lib/outbound/channel-token";
 import { ChannelSendError } from "@/lib/outbound/errors";
 import { listWhatsAppTemplates, sendWhatsAppPayload } from "@/lib/outbound/whatsapp";
@@ -95,8 +96,10 @@ export type SendTemplateParams = {
   conversationId: string;
   templateId: string;
   values: Record<string, string>;
-  sender: "agent" | "operator";
+  sender: "agent" | "operator" | "system";
   senderProfileId?: string | null;
+  // Envíos masivos: además de no haber pedido la baja, tiene que haber aceptado recibir mensajes (ADR-038).
+  requireConsent?: boolean;
   fetchImpl?: FetchLike;
   now?: Date;
 };
@@ -109,14 +112,19 @@ export async function sendTemplateMessage(admin: Admin, params: SendTemplatePara
 
   const { data: conversation, error } = await admin
     .from("conversations")
-    .select("id, organization_id, contact_id, channels(type, external_id, secret_ref), contacts(opted_out_at)")
+    .select("id, organization_id, contact_id, channels(type, external_id, secret_ref), contacts(opted_in_at, opted_out_at)")
     .eq("id", params.conversationId)
     .maybeSingle();
   if (error) throw new Error(`No se pudo consultar la conversación: ${error.message}`);
   if (!conversation?.channels) throw new TemplateError("La conversación no existe.");
   if (conversation.channels.type !== "whatsapp") throw new TemplateError("Las plantillas son de WhatsApp: en este canal se escribe texto libre.");
   // Quien pidió no recibir mensajes no recibe plantillas (consentimiento, ADR de envíos).
-  if (conversation.contacts?.opted_out_at) throw new TemplateError("El contacto pidió no recibir mensajes: no se le puede escribir con una plantilla.");
+  if (conversation.contacts?.opted_out_at && consentStatus(conversation.contacts) === "withdrawn") {
+    throw new TemplateError("El contacto pidió no recibir mensajes: no se le puede escribir con una plantilla.");
+  }
+  if (params.requireConsent && (!conversation.contacts || consentStatus(conversation.contacts) !== "accepted")) {
+    throw new TemplateError("El contacto no aceptó recibir mensajes masivos.");
+  }
 
   const { data: template } = await admin
     .from("message_templates")

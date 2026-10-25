@@ -17,6 +17,7 @@ export const AUDIT_GROUPS = [
   { key: "sector", label: "Sectores" },
   { key: "template", label: "Plantillas" },
   { key: "usage", label: "Consumo" },
+  { key: "broadcast", label: "Envíos" },
   { key: "export", label: "Exportaciones" },
 ] as const;
 
@@ -105,6 +106,16 @@ export function describeAudit(item: Pick<AuditItem, "action" | "data">, names: M
       const fields = Array.isArray(data.fields) ? data.fields.map((field) => CONTACT_FIELDS[String(field)] ?? String(field)) : [];
       return `Editó la ficha de un contacto${fields.length ? ` (${fields.join(", ")})` : ""}`;
     }
+    case "contact.consent_given":
+      return "Registró que un contacto aceptó recibir mensajes";
+    case "contact.consent_withdrawn":
+      return "Registró que un contacto dejó de querer recibir mensajes";
+    case "broadcast.created":
+      return `Creó el envío masivo «${text(data.name)}»`;
+    case "broadcast.scheduled":
+      return `Programó el envío masivo «${text(data.name)}» para ${Number(data.audience ?? 0)} contactos`;
+    case "broadcast.cancelled":
+      return `Canceló el envío masivo «${text(data.name)}»`;
     case "contact.merged":
       return "Unió dos fichas de contacto";
     case "conversation.ai_toggled":

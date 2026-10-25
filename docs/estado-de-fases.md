@@ -24,8 +24,22 @@ está escrita en ningún documento del repositorio: se listan por tema.
 | 7 Multimedia | Elegir el servicio de transcripción de audios y probar con audios reales (imágenes y PDF ya andan) |
 | 8 Evaluaciones | Correr los casos del cliente con Claude real (necesita la API key) |
 | 9 Plantillas y seguimientos | Probar con el número de WhatsApp verificado: crear las plantillas en Meta, sincronizar y enviar una |
-| 11 Consumo | Opcional: límites y alertas, y exportar |
+| 11 Consumo | Hecho: límites con avisos y exportar a CSV (ADR-036). Falta decidir con el cliente si al llegar al límite se corta al agente |
 | Agente analítico | Encenderlo y probarlo con Claude real; después, conectarlo a la base del cliente |
+
+## Construido sin la API ni los números de teléfono (2026-10-25)
+
+Probado con servicios falsos; la prueba real espera al número verificado y a la clave.
+
+| Tema | Qué hay |
+|------|---------|
+| Auditoría | Pantalla con filtros y exportar; registra quién hizo qué (ADR-035) |
+| Exportar a CSV | Casos, contactos, consumo y auditoría, con control de rol y protección contra fórmulas |
+| Límites de consumo | Tope mensual de créditos y costo con avisos al llegar al umbral y al superarlo (ADR-036) |
+| Avisos | Pantalla con lista completa y contador propio |
+| Reportes | Volumen, primera respuesta del agente y del equipo, casos y carga de trabajo (ADR-037) |
+| Envíos masivos | Borrador, revisión, programación y envío por lotes, solo a quien aceptó recibir (ADR-038) |
+| Consentimiento | Registro en la ficha y baja automática por "STOP" |
 
 ## Pendientes por completo
 
@@ -34,9 +48,7 @@ está escrita en ningún documento del repositorio: se listan por tema.
 | 14 WhatsApp saliente | Texto libre, adjuntos y estados por la API de Meta; depende de la verificación de negocio |
 | 13 Producción | Base de producción separada, región (São Paulo recomendado), rotar claves, copias de respaldo, dominio propio, monitoreo |
 | Integración con la base del cliente | Lectura con permisos acotados; necesita acceso del cliente |
-| Envíos masivos con consentimiento | Las tablas existen; falta la pantalla y el envío con plantillas |
-| Avisos al responsable | Por email o WhatsApp; necesita un servicio de email |
+| Avisos por email o WhatsApp | Los avisos ya se ven en la aplicación (pantalla Avisos); falta enviarlos por afuera, necesita un servicio de email |
 | Copiloto para operadores | Sugerencia de respuestas y resumen de la conversación |
 | Búsqueda por similitud (pgvector) | Cuando el conocimiento no entre cómodo en las instrucciones |
-| Auditoría completa | Hoy solo registra cambios en contactos; falta una pantalla |
 | Encuestas y confirmaciones de turno | Por plantillas oficiales |
