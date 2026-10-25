@@ -1649,31 +1649,49 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          monthly_cost_limit_usd: number | null
+          monthly_credit_limit: number | null
           name: string
           settings: Json
           slug: string
           timezone: string
           updated_at: string
+          usage_alert_level: string | null
+          usage_alert_month: string | null
+          usage_alert_percent: number
+          usage_checked_at: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           is_active?: boolean
+          monthly_cost_limit_usd?: number | null
+          monthly_credit_limit?: number | null
           name: string
           settings?: Json
           slug: string
           timezone?: string
           updated_at?: string
+          usage_alert_level?: string | null
+          usage_alert_month?: string | null
+          usage_alert_percent?: number
+          usage_checked_at?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           is_active?: boolean
+          monthly_cost_limit_usd?: number | null
+          monthly_credit_limit?: number | null
           name?: string
           settings?: Json
           slug?: string
           timezone?: string
           updated_at?: string
+          usage_alert_level?: string | null
+          usage_alert_month?: string | null
+          usage_alert_percent?: number
+          usage_checked_at?: string | null
         }
         Relationships: []
       }
@@ -2118,6 +2136,13 @@ export type Database = {
       merge_contacts: {
         Args: { p_keep: string; p_remove: string }
         Returns: Json
+      }
+      org_month_usage: {
+        Args: { p_month: string; p_org: string }
+        Returns: {
+          cost_usd: number
+          credits: number
+        }[]
       }
       release_agent_turn: {
         Args: { p_conversation_id: string }

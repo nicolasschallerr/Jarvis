@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentProfile } from "@/lib/auth/profile";
+import { recordAudit } from "@/lib/audit/record";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncTemplates } from "@/lib/whatsapp/service";
 
@@ -14,7 +15,11 @@ export async function syncTemplatesAction(): Promise<SyncState> {
   if (profile.role !== "superadmin") return { error: "Solo un superadministrador puede sincronizar las plantillas.", message: null, problems: [] };
 
   try {
-    const result = await syncTemplates(createAdminClient(), profile.organizationId);
+    const admin = createAdminClient();
+    const result = await syncTemplates(admin, profile.organizationId);
+    if (result.channels > 0) {
+      await recordAudit(admin, { organizationId: profile.organizationId, actorId: profile.id, action: "template.synced", entityType: "template", data: { count: result.synced } });
+    }
     revalidatePath("/plantillas");
     return {
       error: null,

@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { CONTACTS_PAGE_SIZE, contactQueryFrom, listContacts } from "@/lib/crm/contact-directory";
 import { channelLabel, shortDate } from "@/lib/crm/format";
+import { canExport } from "@/lib/export/datasets";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Contactos" };
@@ -27,8 +28,8 @@ function contactsHref(search: string, limit?: number): string {
 export default async function ContactosPage({ searchParams }: PageProps<"/contactos">) {
   // Página por pedido: lee la sesión y la hora actual (ver la nota de `instant` en el layout del CRM).
   await connection();
-  await getCurrentProfile();
   const query = contactQueryFrom(await searchParams);
+  const profile = await getCurrentProfile();
   const { items, hasMore, failed } = await listContacts({ userClient: await createClient(), ...query });
   const now = new Date();
 
@@ -38,6 +39,12 @@ export default async function ContactosPage({ searchParams }: PageProps<"/contac
         title="Contactos"
         description="Las personas que escribieron por algún canal, con su ficha y todo su historial."
         actions={
+          <>
+          {canExport(profile.role, "contactos") ? (
+            <a href="/exportar/contactos" className="btn-secondary" download>
+              Exportar CSV
+            </a>
+          ) : null}
           <form action="/contactos" className="relative w-full sm:w-80" role="search">
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
             <input
@@ -49,6 +56,7 @@ export default async function ContactosPage({ searchParams }: PageProps<"/contac
               className="field w-full !pl-9"
             />
           </form>
+          </>
         }
       />
 

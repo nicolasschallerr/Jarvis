@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/supabase/database.types";
 
+import { recordAudit } from "@/lib/audit/record";
+
 import { ROLES, type Role } from "./roles";
 
 export { ACCESS_LINK_MINUTES, MIN_PASSWORD_LENGTH, ROLES, ROLE_LABELS, type Role } from "./roles";
@@ -49,7 +51,7 @@ async function otherActiveSuperadmin(admin: Admin, organizationId: string, excep
 // Alta de una persona. La contraseña inicial es al azar y no se muestra a nadie: la persona elige la suya con el enlace.
 export async function createMember(
   admin: Admin,
-  params: { organizationId: string; email: string; fullName: string; role: string; siteUrl: string },
+  params: { organizationId: string; email: string; fullName: string; role: string; siteUrl: string; actorId?: string | null },
 ): Promise<MemberResult> {
   const email = params.email.trim().toLowerCase();
   const fullName = params.fullName.trim();
@@ -76,6 +78,15 @@ export async function createMember(
     return { ok: false, error: "No se pudo crear la persona." };
   }
 
+  await recordAudit(admin, {
+    organizationId: params.organizationId,
+    actorId: params.actorId ?? null,
+    action: "person.created",
+    entityType: "person",
+    entityId: created.user.id,
+    data: { name: fullName, role: params.role },
+  });
+
   const link = await accessLink(admin, email, params.siteUrl);
   if (!link) return { ok: false, error: "La persona se creó, pero no se pudo generar su enlace. Generalo desde su fila." };
   return { ok: true, link };
@@ -84,7 +95,7 @@ export async function createMember(
 // Enlace nuevo para entrar o para elegir otra contraseña (olvidó la suya).
 export async function resetMemberAccess(
   admin: Admin,
-  params: { organizationId: string; userId: string; siteUrl: string },
+  params: { organizationId: string; userId: string; siteUrl: string; actorId?: string | null },
 ): Promise<MemberResult> {
   const member = await memberOf(admin, params.organizationId, params.userId);
   if (!member) return { ok: false, error: "La persona no existe." };
@@ -95,7 +106,16 @@ export async function resetMemberAccess(
   if (!email) return { ok: false, error: "La persona no tiene email." };
 
   const link = await accessLink(admin, email, params.siteUrl);
-  return link ? { ok: true, link } : { ok: false, error: "No se pudo generar el enlace." };
+  if (!link) return { ok: false, error: "No se pudo generar el enlace." };
+  await recordAudit(admin, {
+    organizationId: params.organizationId,
+    actorId: params.actorId ?? null,
+    action: "person.access_link",
+    entityType: "person",
+    entityId: params.userId,
+    data: { name: member.full_name },
+  });
+  return { ok: true, link };
 }
 
 export async function setMemberRole(admin: Admin, params: { organizationId: string; actorId: string; userId: string; role: string }): Promise<MemberResult> {
@@ -110,7 +130,16 @@ export async function setMemberRole(admin: Admin, params: { organizationId: stri
   }
 
   const { error } = await admin.from("profiles").update({ role: params.role }).eq("id", params.userId).eq("organization_id", params.organizationId);
-  return error ? { ok: false, error: "No se pudo cambiar el rol." } : { ok: true };
+  if (error) return { ok: false, error: "No se pudo cambiar el rol." };
+  await recordAudit(admin, {
+    organizationId: params.organizationId,
+    actorId: params.actorId,
+    action: "person.role_changed",
+    entityType: "person",
+    entityId: params.userId,
+    data: { name: member.full_name, from: member.role, to: params.role },
+  });
+  return { ok: true };
 }
 
 // Desactivar corta el acceso al CRM y bloquea el ingreso (una sesión abierta deja de servir); reactivar lo devuelve.
@@ -129,6 +158,14 @@ export async function setMemberActive(admin: Admin, params: { organizationId: st
 
   // Bloquear el ingreso en Supabase (casi 100 años) o levantarlo.
   await admin.auth.admin.updateUserById(params.userId, { ban_duration: params.active ? "none" : "876000h" });
+  await recordAudit(admin, {
+    organizationId: params.organizationId,
+    actorId: params.actorId,
+    action: params.active ? "person.reactivated" : "person.deactivated",
+    entityType: "person",
+    entityId: params.userId,
+    data: { name: member.full_name },
+  });
   return { ok: true };
 }
 

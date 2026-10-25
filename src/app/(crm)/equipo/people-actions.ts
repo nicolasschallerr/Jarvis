@@ -35,6 +35,7 @@ export async function addMemberAction(_previous: PeopleState, formData: FormData
     fullName: String(formData.get("fullName") ?? ""),
     role: String(formData.get("role") ?? ""),
     siteUrl: await siteUrl(),
+    actorId: profile.id,
   });
   revalidatePath("/equipo");
   return toState(result, "Persona creada. Pasale este enlace para que elija su contraseña.");
@@ -43,7 +44,7 @@ export async function addMemberAction(_previous: PeopleState, formData: FormData
 export async function resetAccessAction(userId: string): Promise<PeopleState> {
   const profile = await getCurrentProfile();
   if (profile.role !== "superadmin") return NO_PERMISSION;
-  const result = await resetMemberAccess(createAdminClient(), { organizationId: profile.organizationId, userId, siteUrl: await siteUrl() });
+  const result = await resetMemberAccess(createAdminClient(), { organizationId: profile.organizationId, userId, siteUrl: await siteUrl(), actorId: profile.id });
   return toState(result, "Enlace listo. Pasaselo a la persona para que elija una contraseña nueva.");
 }
 

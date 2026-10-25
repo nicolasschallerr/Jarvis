@@ -122,10 +122,11 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
                 </div>
               );
               const conversationId = notice.cases?.conversation_id;
+              const href = conversationId ? `/conversaciones/${conversationId}` : notice.type === "usage_limit" ? "/consumo" : null;
               return (
                 <li key={notice.id}>
-                  {conversationId ? (
-                    <Link href={`/conversaciones/${conversationId}`} className="flex items-start gap-3 px-4 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/60">
+                  {href ? (
+                    <Link href={href} className="flex items-start gap-3 px-4 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/60">
                       {body}
                       <time className="shrink-0 text-xs text-muted" dateTime={notice.created_at}>
                         {shortDate(notice.created_at, now)}

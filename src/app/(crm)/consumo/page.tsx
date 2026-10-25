@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import Link from "next/link";
 
 import { NoAccess } from "@/components/ui/empty-state";
+import { LimitsCard } from "./limits-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { getConsumption } from "@/lib/crm/consumption";
@@ -37,10 +38,17 @@ export default async function ConsumoPage({ searchParams }: PageProps<"/consumo"
   }
 
   const query = await searchParams;
-  const { range, days, totals, failed } = await getConsumption({
-    userClient: await createClient(),
-    requestedMonth: first(query.mes),
-  });
+  const supabase = await createClient();
+  // El consumo del mes y los límites de la organización, a la vez.
+  const [{ range, days, totals, failed }, { data: organization }] = await Promise.all([
+    getConsumption({ userClient: supabase, requestedMonth: first(query.mes) }),
+    supabase.from("organizations").select("monthly_credit_limit, monthly_cost_limit_usd, usage_alert_percent").maybeSingle(),
+  ]);
+  const limits = {
+    credits: organization?.monthly_credit_limit ?? null,
+    costUsd: organization?.monthly_cost_limit_usd === null || organization?.monthly_cost_limit_usd === undefined ? null : Number(organization.monthly_cost_limit_usd),
+    alertPercent: organization?.usage_alert_percent ?? 80,
+  };
 
   const maxCredits = Math.max(1, ...days.map((day) => day.credits));
   const costNote =
@@ -79,6 +87,10 @@ export default async function ConsumoPage({ searchParams }: PageProps<"/consumo"
         title={`Consumo · ${monthLabel(range.month)}`}
         description={<>Un crédito es una conversación de 24 h con un contacto. {range.isCurrent ? "Mes en curso, hasta hoy." : null}</>}
         actions={
+          <>
+          <a href={`/exportar/consumo?mes=${range.month}`} className="btn-secondary !px-3 !py-1.5 text-sm" download>
+            Exportar CSV
+          </a>
           <nav aria-label="Meses" className="flex gap-2">
             <Link href={`/consumo?mes=${range.previous}`} className="btn-secondary !px-3 !py-1.5 text-sm">
               ← {monthLabel(range.previous)}
@@ -89,6 +101,7 @@ export default async function ConsumoPage({ searchParams }: PageProps<"/consumo"
               </Link>
             ) : null}
           </nav>
+          </>
         }
       />
       <div className="flex flex-col gap-6 p-4 sm:p-6">
@@ -108,6 +121,8 @@ export default async function ConsumoPage({ searchParams }: PageProps<"/consumo"
           </div>
         ))}
       </section>
+
+      <LimitsCard limits={limits} used={{ credits: totals.credits, costUsd: totals.costUsd }} canEdit={profile.role === "superadmin"} />
 
       <section aria-labelledby="por-dia" className="flex flex-col gap-3">
         <h2 id="por-dia" className="text-sm font-semibold uppercase tracking-wide text-muted">

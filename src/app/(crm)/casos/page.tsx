@@ -20,6 +20,7 @@ import {
 } from "@/lib/crm/case-list";
 import type { CaseStatus } from "@/lib/crm/cases";
 import { PRIORITY_LABELS, shortDate } from "@/lib/crm/format";
+import { canExport } from "@/lib/export/datasets";
 import { createClient } from "@/lib/supabase/server";
 
 import { LiveRefresh } from "../live-refresh";
@@ -113,7 +114,13 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
         title="Casos"
         description="Cada gestión que abre el agente o el equipo, con su estado, sector y responsable."
         actions={
-          <SegmentedLinks
+          <>
+            {canExport(profile.role, "casos") ? (
+              <a href="/exportar/casos" className="btn-secondary" download>
+                Exportar CSV
+              </a>
+            ) : null}
+            <SegmentedLinks
             label="Forma de ver los casos"
             items={(["tablero", "lista"] as const).map((option) => ({
               href: href({ ...filters, mode: option }),
@@ -121,6 +128,7 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
               active: option === mode,
             }))}
           />
+          </>
         }
       >
         <div className="flex flex-wrap items-center gap-3">

@@ -5,6 +5,7 @@ import { anthropicClientFromEnv } from "@/lib/ai/anthropic-client";
 import { runFollowups } from "@/lib/followups/run";
 import { processPendingMessages } from "@/lib/inbound/process";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkUsageAlerts } from "@/lib/usage/alerts";
 import { isAuthorizedWorkerRequest } from "@/lib/worker-auth";
 
 // Trabajador de mensajes. Lo invoca pg_cron (POST) con el secreto del trabajador. Procesa los mensajes
@@ -40,7 +41,14 @@ async function handle(request: NextRequest) {
           return null;
         })
       : null;
-    return Response.json({ ...result, areaReplies, followups });
+    // Avisos de consumo: tampoco necesitan el modelo y no deben frenar nada si fallan.
+    const usageAlerts = hasTime()
+      ? await checkUsageAlerts(admin).catch((error: unknown) => {
+          console.error("worker consumo:", error instanceof Error ? error.message : error);
+          return null;
+        })
+      : null;
+    return Response.json({ ...result, areaReplies, followups, usageAlerts });
   } catch (error) {
     console.error("worker mensajes:", error instanceof Error ? error.message : error);
     return new Response("Error", { status: 500 });
