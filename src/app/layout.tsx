@@ -19,7 +19,8 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Jarvis",
+  // Cada página pone su nombre ("Casos · Jarvis"): con varias pestañas abiertas se distinguen.
+  title: { default: "Jarvis", template: "%s · Jarvis" },
   description: "Atención al afiliado, CRM omnicanal y análisis de datos",
 };
 

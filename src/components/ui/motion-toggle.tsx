@@ -48,7 +48,7 @@ export function MotionToggle() {
   }
 
   return (
-    <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+    <label className="flex flex-col gap-1 text-xs text-muted">
       Animaciones
       <select
         value={choice}

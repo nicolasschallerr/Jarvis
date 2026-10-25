@@ -22,7 +22,14 @@ export function Shell({ sidebar, children }: { sidebar: React.ReactNode; childre
 
   return (
     <div className="flex h-dvh flex-col md:flex-row">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-zinc-200 px-4 md:hidden dark:border-zinc-800">
+      {/* Para quien navega con teclado: saltar el menú e ir directo al contenido. */}
+      <a
+        href="#contenido"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-lg focus:bg-accent focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-accent-foreground"
+      >
+        Saltar al contenido
+      </a>
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line px-4 md:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -53,14 +60,16 @@ export function Shell({ sidebar, children }: { sidebar: React.ReactNode; childre
         onClick={(event) => {
           if ((event.target as HTMLElement).closest("a, button[type=submit]")) setOpen(false);
         }}
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85%] flex-col justify-between border-r border-zinc-200 bg-background p-4 shadow-xl transition-[transform,visibility] duration-200 md:visible md:static md:z-auto md:w-60 md:max-w-none md:translate-x-0 md:shadow-none dark:border-zinc-800 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85%] flex-col justify-between border-r border-line bg-background p-4 shadow-xl transition-[transform,visibility] duration-200 md:visible md:static md:z-auto md:w-60 md:max-w-none md:translate-x-0 md:shadow-none ${
           open ? "visible translate-x-0" : "invisible -translate-x-full"
         }`}
       >
         {sidebar}
       </aside>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">{children}</div>
+      <div id="contenido" tabIndex={-1} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto outline-none">
+        {children}
+      </div>
     </div>
   );
 }

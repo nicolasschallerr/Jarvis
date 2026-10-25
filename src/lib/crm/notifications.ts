@@ -34,3 +34,13 @@ export async function markAllNotificationsRead(params: {
   if (error) return { ok: false, error: "No se pudieron marcar los avisos como leídos." };
   return { ok: true };
 }
+
+// Cuántos avisos sin leer tiene la persona (para el contador del menú).
+export async function countUnreadNotifications(params: { userClient: SupabaseClient<Database>; userId: string }): Promise<number> {
+  const { count } = await params.userClient
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("profile_id", params.userId)
+    .is("read_at", null);
+  return count ?? 0;
+}

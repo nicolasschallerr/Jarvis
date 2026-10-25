@@ -51,7 +51,8 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Con sesión iniciada, /login no tiene sentido: se manda al inicio.
-  if (isAuthenticated && pathname === "/login") {
+  // Excepción: si el CRM lo mandó acá porque su usuario no tiene acceso, se queda para leer el motivo.
+  if (isAuthenticated && pathname === "/login" && !request.nextUrl.searchParams.has("motivo")) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";

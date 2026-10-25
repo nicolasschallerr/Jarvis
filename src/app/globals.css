@@ -32,6 +32,17 @@
   --accent-soft: #dcebee; /* fondo suave del acento */
   --agent-jarvis: #1f5f6b;
   --agent-sinapsis: #b7791f; /* ocre */
+  /* Tokens semánticos: un solo lugar para el significado de cada color (ADR-028). */
+  --muted: #686355; /* texto secundario, contraste ≥ 5:1 sobre crema */
+  --line: #e6e0d2; /* bordes y divisores */
+  --success: #2f7a4f;
+  --success-soft: #e3f1e8;
+  --warning: #9a5a06;
+  --warning-soft: #fbefd9;
+  --danger: #b42318;
+  --danger-soft: #fbe5e2;
+  --info: #1f5f6b;
+  --info-soft: #dcebee;
 }
 
 :root[data-theme="dark"] {
@@ -45,6 +56,16 @@
   --accent-soft: #1d3a40;
   --agent-jarvis: #5fb3c2;
   --agent-sinapsis: #e0a94a;
+  --muted: #aaa496;
+  --line: #2b3134;
+  --success: #74c897;
+  --success-soft: #173326;
+  --warning: #e8b04f;
+  --warning-soft: #3a2c12;
+  --danger: #f28b7f;
+  --danger-soft: #3d1d1a;
+  --info: #6cc0cf;
+  --info-soft: #1d3a40;
 }
 
 @theme inline {
@@ -57,6 +78,16 @@
   --color-accent-soft: var(--accent-soft);
   --color-agent-jarvis: var(--agent-jarvis);
   --color-agent-sinapsis: var(--agent-sinapsis);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-fraunces);
@@ -84,11 +115,25 @@ body {
   }
 
   .field {
-    @apply rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm transition placeholder:text-zinc-500 focus-visible:border-accent dark:border-zinc-700;
+    @apply rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm transition placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus-visible:border-accent dark:border-zinc-700;
   }
 
   .card {
-    @apply rounded-xl border border-zinc-200 bg-surface shadow-sm dark:border-zinc-800;
+    @apply rounded-xl border border-line bg-surface shadow-sm;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center rounded-lg border border-danger/40 bg-danger-soft px-3 py-1.5 text-sm font-medium text-danger transition duration-150 hover:-translate-y-px active:translate-y-0 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  /* Placa de estado: pequeña, redondeada y con color de significado (ver components/ui/badge.tsx). */
+  .badge {
+    @apply inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap;
+  }
+
+  /* Esqueleto de carga: un bloque que late suavemente mientras llega el contenido. */
+  .skeleton {
+    @apply animate-pulse rounded-md bg-zinc-200/80 dark:bg-zinc-800;
   }
 }
 

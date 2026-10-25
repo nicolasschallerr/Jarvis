@@ -112,3 +112,57 @@ export function shortDate(iso: string | null, now: Date): string {
   const date = new Date(iso);
   return dayFormat.format(date) === dayFormat.format(now) ? timeFormat.format(date) : dayFormat.format(date);
 }
+
+// Primera letra en mayúscula y el resto como está. Reemplaza a la clase CSS `capitalize`, que pone en mayúscula
+// cada palabra ("24 De Octubre").
+export function capitalizeFirst(text: string): string {
+  return text.charAt(0).toLocaleUpperCase("es-AR") + text.slice(1);
+}
+
+// Nombre legible del tipo de un mensaje o adjunto ("image" → "Foto").
+export function typeLabel(type: string): string {
+  return TYPE_LABELS[type] ?? "Archivo";
+}
+
+const MIME_LABELS: Record<string, string> = {
+  "application/pdf": "PDF",
+  "image/jpeg": "imagen",
+  "image/png": "imagen",
+  "image/webp": "imagen",
+  "image/gif": "imagen",
+  "audio/ogg": "audio",
+  "audio/mpeg": "audio",
+  "audio/mp4": "audio",
+  "video/mp4": "video",
+};
+
+// Tipo de archivo para mostrar ("application/pdf" → "PDF").
+export function mimeLabel(mime: string): string {
+  return MIME_LABELS[mime.split(";")[0]?.trim().toLowerCase() ?? ""] ?? "archivo";
+}
+
+// Nombre legible de un dato juntado por el agente ("situacion_laboral" → "Situacion laboral").
+export function fieldLabel(key: string): string {
+  return capitalizeFirst(key.replace(/_/g, " ").trim());
+}
+
+const timeOnlyFormat = new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Argentina/Buenos_Aires" });
+const dayHeadingFormat = new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Argentina/Buenos_Aires" });
+
+// Hora corta (15:20).
+export function timeOnly(iso: string | null): string {
+  return iso ? timeOnlyFormat.format(new Date(iso)) : "";
+}
+
+// Encabezado de un día dentro de una conversación: "Hoy", "Ayer" o "Lunes 20 de octubre".
+export function dayHeading(iso: string, now: Date): string {
+  const day = dayFormat.format(new Date(iso));
+  if (day === dayFormat.format(now)) return "Hoy";
+  if (day === dayFormat.format(new Date(now.getTime() - 86_400_000))) return "Ayer";
+  return capitalizeFirst(dayHeadingFormat.format(new Date(iso)));
+}
+
+// Clave de día para agrupar mensajes (en horario de Argentina).
+export function dayKeyOf(iso: string): string {
+  return dayFormat.format(new Date(iso));
+}
