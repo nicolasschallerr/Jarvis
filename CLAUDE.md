@@ -4,9 +4,9 @@
 
 ## Producto
 
-Orbita AI es una plataforma SaaS multi-cliente con tres componentes (la marca y su manual están en
-`../orbita-ai-manual-de-marca.pptx`; la carpeta del repo se sigue llamando `jarvis`). Jarvis es el nombre del agente
-de atención de la organización propia; cada cliente le pone el nombre que quiera a sus agentes:
+Orbita AI es una plataforma SaaS multi-cliente con tres componentes (el manual de marca está en
+`../Orbita AI - Privado/marca/`). Jarvis es el nombre del agente de atención de la organización propia; cada cliente
+le pone el nombre que quiera a sus agentes:
 
 1. **Agente de atención**: atiende a los asociados del cliente por WhatsApp (y luego otros canales)
    24/7, entiende texto, audios, imágenes y PDF, resuelve con la base de conocimiento, junta los
@@ -23,7 +23,11 @@ métricas, evaluación automática de conversaciones, configuración por cliente
 
 - Next.js 16 (App Router, `src/`, alias `@/*`) + TypeScript estricto (`strict`, `noUncheckedIndexedAccess`), deploy en Vercel.
 - Base de Orbita AI: Supabase propio (Postgres, Auth, RLS, Realtime, Storage, pgvector, pg_cron).
-  Multi-tenant: `organization_id` en todas las tablas + RLS.
+  Multi-tenant: `organization_id` en todas las tablas + RLS. **Dos bases** (ADR-042):
+  - **Producción** `orbita-ai-prod` (São Paulo, `sa-east-1`): la usa Vercel en producción y tiene los datos reales.
+    Credenciales en `.env.produccion` (nunca se versiona). Nunca se corren las pruebas contra ella.
+  - **Desarrollo** `jarvis-dev` (Oregón): pruebas, vistas previas de Vercel y ensayos. Credenciales en `.env.local`.
+  - Cada migración nueva se aplica primero en desarrollo y, cuando las pruebas pasan, en producción.
 - Base del cliente: separada; el agente accede con permisos acotados, el Agente Analítico con un rol solo `SELECT`.
 - IA: Claude API con tool use (`@anthropic-ai/sdk`).
 - Canales: WhatsApp Cloud API directa de Meta; luego Instagram, Messenger, email y Telegram.
@@ -38,7 +42,10 @@ scripts/                  scripts de soporte (ej. test-claude.mts)
 clientes/
   README.md               cómo dar de alta un cliente
   _plantilla/             configuración de ejemplo con datos inventados
-  <slug>/                 configuración real: repo privado aparte, IGNORADO por este repo
+  <slug>/                 (opcional) configuración real clonada acá: IGNORADA por este repo
+
+Fuera del repo, al lado:  ../Orbita AI - Privado/clientes/<slug>/   configuración real de cada cliente
+                          ../Orbita AI - Privado/marca/             manual de marca
 docs/
   bitacora/               una entrada por fase (fase-XX-nombre.md)
   decisiones/             ADRs numerados (NNN-titulo.md)
@@ -84,7 +91,7 @@ docs/
 - Una fase a la vez; cada paso con objetivo, por qué, instrucciones exactas, verificación,
   errores comunes y checkpoint. Esperar confirmación antes de seguir.
 - Entorno: Windows 11 + PowerShell. Los comandos de `npm`, `npx` y `git` se ejecutan **dentro de
-  la carpeta del repo** (`...\Proyecto Jarvis\jarvis`), nunca en la carpeta padre.
+  la carpeta del repo** (`Escritorio\Orbita AI`). La carpeta vieja `Proyecto Jarvis\jarvis` ya no se usa.
 - Al terminar una fase: ejecutar `/cerrar-fase`.
 
 ## Comandos útiles
@@ -96,9 +103,12 @@ npm run lint                                         ESLint
 npx tsc --noEmit                                     chequeo de tipos
 npm test                                             pruebas contra jarvis-dev (datos descartables); pausa el trabajador real y lo reanuda al terminar
 npx tsx --env-file=.env.local scripts/trabajador.mts --estado|--pausar|--reanudar   trabajador de mensajes (si una corrida se corta y queda pausado)
-npx tsx --env-file=.env.local scripts/crear-superadmin.mts --org-slug <slug> --org-name "<nombre>" --email <email> --name "<nombre>"
+npx tsx --env-file=.env.produccion scripts/crear-superadmin.mts --org-slug <slug> --org-name "<nombre>" --email <email> --name "<nombre>"   (en producción)
+npx tsx --env-file=.env.produccion scripts/cargar-configuracion.mts --org-slug <slug> --dir "../Orbita AI - Privado/clientes/<slug>"
 npx tsx --env-file=.env.local scripts/test-claude.mts  prueba de la API key de Anthropic
-npx tsx --env-file=.env.local scripts/correr-evals.mts --dir clientes/<cliente>  evals del agente con Claude real (cuesta dinero)
+npx tsx --env-file=.env.local scripts/correr-evals.mts --dir "../Orbita AI - Privado/clientes/<slug>"  evals con Claude real (cuesta dinero)
 npx supabase migration new <nombre>                  crear una migración
-npx supabase db push                                 aplicar migraciones al proyecto enlazado
+npx supabase db push                                 aplicar migraciones en DESARROLLO (proyecto enlazado)
+npx tsx --env-file=.env.produccion scripts/migrar-produccion.mts [--aplicar]   después, en PRODUCCIÓN
+.\scripts\subir-variables-a-vercel.ps1 -Archivo .env.produccion -Entorno production   variables de producción en Vercel
 ```

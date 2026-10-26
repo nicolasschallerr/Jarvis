@@ -1,6 +1,6 @@
 # Clientes
 
-Jarvis es un solo producto para todos los clientes. Lo que cambia entre un cliente y otro
+Orbita AI es un solo producto para todos los clientes. Lo que cambia entre un cliente y otro
 (identidad del agente, conocimiento, sectores, reglas, plantillas, casos de prueba) es
 **configuración**, no código. Esta carpeta define el formato de esa configuración.
 
@@ -14,6 +14,23 @@ Jarvis es un solo producto para todos los clientes. Lo que cambia entre un clien
 
 La configuración real nunca entra a este repo: puede contener datos protegidos por
 acuerdos de confidencialidad. Ver [ADR-005](../docs/decisiones/005-config-de-cliente-en-repo-privado.md).
+
+## Dónde vive la configuración de cada cliente
+
+Esta carpeta del software **no tiene datos de ningún cliente**: es la plantilla para todos. La configuración real de
+cada cliente vive afuera, en una carpeta privada al lado del proyecto:
+
+```
+Escritorio/
+  Orbita AI/                     el software (este repo): igual para todos los clientes
+  Orbita AI - Privado/
+    clientes/<slug>/             configuración, conocimiento, evals y referencias de cada cliente
+    marca/                       manual de marca de Orbita AI
+```
+
+Los scripts leen la carpeta del cliente con `--dir`, por ejemplo
+`--dir "../Orbita AI - Privado/clientes/<slug>"`. Si una carpeta de cliente se clona dentro de `clientes/<slug>/`,
+`.gitignore` igual la deja afuera del repo.
 
 ## Cómo funciona en tiempo de ejecución
 
@@ -38,14 +55,10 @@ acuerdos de confidencialidad. Ver [ADR-005](../docs/decisiones/005-config-de-cli
 
 1. **Crear el repo privado** del cliente en GitHub, con el nombre `jarvis-cliente-<slug>`
    (`<slug>` en minúsculas y sin espacios, por ejemplo `cooperativa-ejemplo`).
-2. **Clonarlo dentro de esta carpeta**, en la terminal ubicada en la raíz de `jarvis`:
+2. **Crear su carpeta privada** (o clonar su repo) en `Orbita AI - Privado\clientes\<slug>` y **copiar la plantilla**,
+   desde la carpeta `Orbita AI`:
    ```
-   git clone https://github.com/<usuario>/jarvis-cliente-<slug>.git clientes/<slug>
-   ```
-   Queda ignorado por el repo del producto, pero tiene su propio historial.
-3. **Copiar la plantilla** dentro del repo del cliente:
-   ```
-   Copy-Item -Recurse clientes/_plantilla/* clientes/<slug>/
+   Copy-Item -Recurse clientes/_plantilla/* "../Orbita AI - Privado/clientes/<slug>/"
    ```
 4. **Completar cada archivo** con la información del cliente, siguiendo
    [`_plantilla/README.md`](_plantilla/README.md). Lo que el cliente todavía no definió se
@@ -53,10 +66,13 @@ acuerdos de confidencialidad. Ver [ADR-005](../docs/decisiones/005-config-de-cli
 5. **Escribir los evals** del cliente (`evals/casos.yaml`): al menos 3 casos por unidad de
    negocio, más los de temas sensibles. Siempre con datos personales inventados.
 6. **Commitear y pushear** en el repo del cliente (no en el del producto).
-7. **Cargar la configuración** en la base de Jarvis bajo su `organization_id`
-   Desde la carpeta `jarvis`: `npx tsx --env-file=.env.local scripts/cargar-configuracion.mts --org-slug <slug>`
-   (con `--validar-solo` solo revisa el archivo, sin tocar la base).
-8. **Seguir el playbook** de implementación: [`docs/playbook-implementacion.md`](../docs/playbook-implementacion.md).
+7. **Crear su organización y su superadministrador** en la base de **producción**:
+   `npx tsx --env-file=.env.produccion scripts/crear-superadmin.mts --org-slug <slug> --org-name "<Nombre>" --email <email> --name "<Nombre Apellido>"`
+8. **Cargar la configuración** en esa organización (con `--validar-solo` primero, para revisar sin tocar la base):
+   `npx tsx --env-file=.env.produccion scripts/cargar-configuracion.mts --org-slug <slug> --dir "../Orbita AI - Privado/clientes/<slug>"`
+   Para probar antes en desarrollo, el mismo comando con `--env-file=.env.local`.
+9. **Conectar sus canales** con `scripts/crear-canal.mts` (ver `docs/guia-conectar-meta.md`) y **encender el agente** desde Agentes.
+10. **Seguir el playbook** de implementación: [`docs/playbook-implementacion.md`](../docs/playbook-implementacion.md).
 
 ## Reglas
 
