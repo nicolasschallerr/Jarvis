@@ -101,9 +101,10 @@ async function saveMedia(admin: SupabaseClient<Database>, params: StoreMediaPara
     mime_type: mimeType,
     size_bytes: bytes.length,
     sha256,
-    provider_media_id: media.providerMediaId.slice(0, 500),
+    provider_media_id: withoutQuery(media.providerMediaId).slice(0, 500),
   });
-  if (insertError) throw new Error(`No se pudo registrar el archivo: ${insertError.message}`);
+  // Dos corridas del trabajador pueden bajar el mismo adjunto a la vez: la segunda choca con el índice único y no es un error.
+  if (insertError && insertError.code !== "23505") throw new Error(`No se pudo registrar el archivo: ${insertError.message}`);
 }
 
 async function alreadyStored(admin: SupabaseClient<Database>, messageId: string): Promise<boolean> {
@@ -127,11 +128,40 @@ export function isMetaFileUrl(value: string): boolean {
   }
 }
 
-async function readLimited(response: Response, maxBytes: number): Promise<Buffer | null> {
+// Tiempo máximo de cada pedido a Meta: un servidor lento no puede dejar colgada la corrida del trabajador.
+export const META_DOWNLOAD_TIMEOUT_MS = 20_000;
+
+// Lee el cuerpo de a pedazos y corta apenas pasa el tope, aunque la respuesta no declare su tamaño: no se baja a memoria
+// un archivo enorme para recién después compararlo.
+export async function readLimited(response: Response, maxBytes: number): Promise<Buffer | null> {
   const declared = Number(response.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > maxBytes) return null;
-  const bytes = Buffer.from(await response.arrayBuffer());
-  return bytes.length > maxBytes ? null : bytes;
+  if (!response.body) return Buffer.alloc(0);
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const reader = response.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+}
+
+// La dirección de un adjunto de Messenger o Instagram trae una firma en sus parámetros: se guarda sin ellos.
+export function withoutQuery(value: string): string {
+  try {
+    const url = new URL(value);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return value.slice(0, 200);
+  }
 }
 
 // Descarga el adjunto de un mensaje de Messenger o Instagram desde su dirección.
@@ -141,7 +171,7 @@ export async function storeUrlMedia(admin: SupabaseClient<Database>, params: Sto
   if (await alreadyStored(admin, params.messageId)) return "exists";
 
   const doFetch: Fetch = params.fetchImpl ?? fetch;
-  const response = await doFetch(url, { redirect: "error" });
+  const response = await doFetch(url, { redirect: "error", signal: AbortSignal.timeout(META_DOWNLOAD_TIMEOUT_MS) });
   if (!response.ok) throw new Error(`La descarga falló (${response.status})`);
 
   const bytes = await readLimited(response, META_MAX_DOWNLOAD_BYTES);
@@ -158,13 +188,13 @@ export async function storeWhatsAppMedia(admin: SupabaseClient<Database>, params
   const doFetch: Fetch = params.fetchImpl ?? fetch;
   const headers = { authorization: `Bearer ${params.token}` };
 
-  const infoResponse = await doFetch(`${params.graphBase}/${encodeURIComponent(params.media.providerMediaId)}`, { headers });
+  const infoResponse = await doFetch(`${params.graphBase}/${encodeURIComponent(params.media.providerMediaId)}`, { headers, signal: AbortSignal.timeout(META_DOWNLOAD_TIMEOUT_MS) });
   const info = (await infoResponse.json().catch(() => null)) as { url?: string; mime_type?: string; file_size?: number } | null;
   if (!infoResponse.ok || !info?.url) throw new Error(`No se pudo pedir el archivo a WhatsApp (${infoResponse.status})`);
   if ((info.file_size ?? 0) > META_MAX_DOWNLOAD_BYTES) return "too-large";
   if (!isMetaFileUrl(info.url)) throw new Error("La dirección del archivo no es de un servidor de archivos de Meta");
 
-  const fileResponse = await doFetch(info.url, { headers, redirect: "error" });
+  const fileResponse = await doFetch(info.url, { headers, redirect: "error", signal: AbortSignal.timeout(META_DOWNLOAD_TIMEOUT_MS) });
   if (!fileResponse.ok) throw new Error(`La descarga falló (${fileResponse.status})`);
 
   const bytes = await readLimited(fileResponse, META_MAX_DOWNLOAD_BYTES);

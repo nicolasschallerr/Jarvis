@@ -15,6 +15,10 @@ import type { Database } from "@/lib/supabase/database.types";
 
 export const MAX_SUGGESTION_LENGTH = 1500;
 
+// Tope de borradores por organización y por minuto: cada pedido paga una llamada al modelo y la acción se puede invocar en
+// bucle. Alcanza de sobra para un equipo atendiendo a mano.
+export const MAX_SUGGESTIONS_PER_MINUTE = 20;
+
 const COPILOT_NOTICE =
   "[Instrucción interna, no es un mensaje de la persona] Una persona del equipo va a responder esta conversación y te pide un borrador. Escribí SOLO el texto del próximo mensaje que mandaría el equipo, listo para enviar: sin explicaciones tuyas, sin comillas y sin avisar que sos un asistente ni que es un borrador. Respondé lo último que dijo la persona con lo que está en la base de conocimiento; si falta un dato que hay que confirmar, no lo inventes: escribí el mensaje pidiendo lo que falta o avisando que lo van a confirmar. Mensaje breve, en el tono de siempre.";
 
@@ -40,6 +44,14 @@ export async function suggestReply(params: {
     .eq("id", params.conversationId)
     .maybeSingle();
   if (!conversation) return { ok: false, error: "La conversación no existe." };
+
+  const { count: recent } = await params.admin
+    .from("ai_calls")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", params.profile.organizationId)
+    .eq("agent_kind", "copilot")
+    .gte("created_at", new Date(now.getTime() - 60_000).toISOString());
+  if ((recent ?? 0) >= MAX_SUGGESTIONS_PER_MINUTE) return { ok: false, error: "Se pidieron muchos borradores en el último minuto. Esperá un momento y probá de nuevo." };
 
   const loaded = await loadAttentionAgent(params.admin, params.profile.organizationId);
   if (!loaded.ok) {

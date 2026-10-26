@@ -7,7 +7,6 @@ export function formatForChannel(text: string, channelType: ChannelType): string
   const bold = channelType === "whatsapp" ? "*$1*" : "$1";
   return text
     .replace(/\*\*([^*\n]+)\*\*/g, bold)
-    .replace(/__([^_\n]+)__/g, bold)
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/`([^`\n]+)`/g, "$1")
     .replace(/\n{3,}/g, "\n\n")

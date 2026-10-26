@@ -7,7 +7,7 @@ import type { Json } from "../src/lib/supabase/database.types";
 import { buildSystemPrompt } from "../src/lib/agent/context";
 import { buildAttentionSettings } from "../src/lib/client-config/attention";
 import { parseClientConfig } from "../src/lib/client-config/load";
-import { isMetaFileUrl } from "../src/lib/inbound/media";
+import { isMetaFileUrl, readLimited, withoutQuery } from "../src/lib/inbound/media";
 import { normalizeMessagingEvent } from "../src/lib/inbound/messaging";
 import { extractWhatsAppMedia } from "../src/lib/inbound/whatsapp";
 import { extractMessagingEvents } from "../src/lib/meta/events";
@@ -95,9 +95,10 @@ describe("mensaje normalizado de Messenger e Instagram", () => {
     expect(normalizeMessagingEvent("instagram", payload({ mid: "ig_3" }), NOW).type).toBe("unsupported");
   });
 
-  it("si trae texto y adjunto, manda el texto", () => {
+  it("si trae texto y adjunto compatible, el tipo es el del adjunto y el texto es la leyenda", () => {
     const both = normalizeMessagingEvent("messenger", payload({ mid: "m_b", text: "mirá", attachments: [{ type: "image", payload: { url: "https://x.fbcdn.net/a.jpg" } }] }), NOW);
-    expect(both.type).toBe("text");
+    expect(both).toMatchObject({ type: "image", body: "mirá" });
+    expect(both.media).not.toBeNull();
   });
 
   it("rechaza un evento sin lo esencial", () => {
@@ -350,5 +351,81 @@ describe("el agente sabe por qué canal escribe la persona", () => {
   it("en WhatsApp no agrega nota de canal", () => {
     expect(buildSystemPrompt("x", settings, NOW, "whatsapp")).not.toContain("## Canal");
     expect(buildSystemPrompt("x", settings, NOW)).not.toContain("## Canal");
+  });
+});
+
+describe("texto partido en varias partes", () => {
+  const long = `${"a".repeat(1500)}
+
+${"b".repeat(1500)}`;
+
+  it("si falla una parte después de que la primera llegó, se da por enviado y se anota cuántas salieron (no se reenvía todo)", async () => {
+    const meta = fakeMeta((_, index) => (index === 0 ? json({ recipient_id: "P", message_id: "m_0" }) : json({ error: { message: "límite", code: 4 } }, 400)));
+    const sent = await sendMessagingText({ channel: "messenger", token: "t", recipientId: "P", text: long, fetchImpl: meta.fetchImpl });
+    expect(sent).toMatchObject({ externalId: "m_0", partial: { sent: 1, total: 2 } });
+  });
+
+  it("si falla la primera parte no llegó nada: es un error normal y se puede reintentar", async () => {
+    const meta = fakeMeta(() => json({ error: { message: "límite", code: 4 } }, 400));
+    await expect(sendMessagingText({ channel: "messenger", token: "t", recipientId: "P", text: long, fetchImpl: meta.fetchImpl })).rejects.toMatchObject({ retryable: true });
+  });
+
+  it("lo mismo en WhatsApp", async () => {
+    const meta = fakeMeta((_, index) => (index === 0 ? json({ messages: [{ id: "wamid.0" }] }) : new Response("", { status: 503 })));
+    const sent = await sendWhatsAppText({ token: "t", phoneNumberId: "P", to: "1", text: `${"a".repeat(3000)}
+
+${"b".repeat(3000)}`, fetchImpl: meta.fetchImpl });
+    expect(sent).toMatchObject({ externalId: "wamid.0", partial: { sent: 1, total: 2 } });
+
+    const none = fakeMeta(() => new Response("", { status: 503 }));
+    await expect(sendWhatsAppText({ token: "t", phoneNumberId: "P", to: "1", text: "hola", fetchImpl: none.fetchImpl })).rejects.toMatchObject({ retryable: true });
+  });
+
+  it("un texto que sale completo no trae marca de parcial", async () => {
+    const meta = fakeMeta((_, index) => json({ recipient_id: "P", message_id: `m_${index}` }));
+    const sent = await sendMessagingText({ channel: "messenger", token: "t", recipientId: "P", text: long, fetchImpl: meta.fetchImpl });
+    expect(sent.partial).toBeUndefined();
+  });
+});
+
+describe("adjuntos: leyenda, tamaño y firma", () => {
+  const withCaption = {
+    sender: { id: "PERSONA_1" },
+    recipient: { id: "CUENTA_1" },
+    timestamp: 1761490800000,
+    message: { mid: "m_c", text: "mi DNI", attachments: [{ type: "image", payload: { url: "https://x.fbcdn.net/a.jpg?oh=firma&oe=1" } }] },
+  } as Json;
+
+  it("una foto con leyenda guarda el adjunto y el texto queda como leyenda", () => {
+    const normalized = normalizeMessagingEvent("messenger", withCaption, NOW);
+    expect(normalized).toMatchObject({ type: "image", body: "mi DNI" });
+    expect(normalized.media?.url).toContain("oh=firma");
+  });
+
+  it("un adjunto no compatible con texto sigue siendo texto", () => {
+    const share = { sender: { id: "P" }, recipient: { id: "C" }, message: { mid: "m", text: "mirá", attachments: [{ type: "share", payload: { url: "https://instagram.com/p/x" } }] } } as Json;
+    expect(normalizeMessagingEvent("instagram", share, NOW)).toMatchObject({ type: "text", body: "mirá", media: null });
+  });
+
+  it("la dirección guardada no lleva la firma", () => {
+    expect(withoutQuery("https://x.fbcdn.net/v/a.jpg?oh=firma&oe=1")).toBe("https://x.fbcdn.net/v/a.jpg");
+  });
+
+  it("se corta la lectura apenas pasa el tope, aunque no declare su tamaño", async () => {
+    let produced = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        produced += 1000;
+        controller.enqueue(new Uint8Array(1000));
+        if (produced > 1_000_000) controller.close();
+      },
+    });
+    expect(await readLimited(new Response(body), 5000)).toBeNull();
+    // No leyó el millón de bytes: cortó cerca del tope.
+    expect(produced).toBeLessThan(100_000);
+
+    const small = await readLimited(new Response(new Uint8Array([1, 2, 3])), 5000);
+    expect(small?.length).toBe(3);
+    expect(await readLimited(new Response("x", { headers: { "content-length": "999999" } }), 5000)).toBeNull();
   });
 });

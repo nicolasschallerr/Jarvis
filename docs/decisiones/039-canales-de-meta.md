@@ -50,6 +50,14 @@ modo desarrollo, así que se puede construir y probar sin esperar la verificaci�
   (`WHATSAPP_ACCESS_TOKEN…`, `MESSENGER_ACCESS_TOKEN…`, `INSTAGRAM_ACCESS_TOKEN…`, con sufijo por cliente), con la forma
   cerrada que ya exigía la base (ADR-027).
 
+### Revisión de seguridad independiente (2026-10-26)
+Un revisor externo (solo lectura) encontró siete puntos y se corrigieron los reales: envío partido que podía duplicar
+texto (lección 65), estados de entrega no atómicos y avisos que llegan antes que el id (lección 66), descargas sin tiempo
+máximo ni tope real (lección 67), foto con leyenda que perdía el adjunto, firma del adjunto guardada en la base, y tope de
+borradores del copiloto. Sin hallazgos en: firma del webhook, SSRF y fuga de token, aislamiento entre organizaciones, uso de
+la etiqueta de agente humano, datos personales en logs y aislamiento del copiloto. Queda pendiente confirmar con una cuenta
+real de WhatsApp los dominios exactos de descarga de archivos.
+
 ## Alternativas descartadas
 - **Un webhook por canal:** triplica la configuración y el código de firma sin ganar nada; Meta permite una misma dirección.
 - **Usar la etiqueta de agente humano para el agente de IA:** es una violación de la política de Meta y arriesga perder el

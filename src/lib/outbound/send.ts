@@ -5,9 +5,9 @@ import type { Database, Json } from "@/lib/supabase/database.types";
 import { channelToken } from "./channel-token";
 import { ChannelSendError, OutsideWindowError } from "./errors";
 import { formatForChannel } from "./format";
-import { instagramApiFrom, sendMessagingText, sendWhatsAppText } from "./meta-messaging";
+import { instagramApiFrom, sendMessagingText, sendWhatsAppText, type SentParts } from "./meta-messaging";
 import { canSendFreeText, sendMode } from "./rules";
-import { sendTelegramText, type SentMessage } from "./telegram";
+import { sendTelegramText } from "./telegram";
 
 type Sender = Database["public"]["Enums"]["message_sender"];
 
@@ -94,7 +94,7 @@ export async function sendTextMessage(
 
   if (queueError || !queued) throw new Error(`No se pudo guardar el mensaje: ${queueError?.message}`);
 
-  let sent: SentMessage;
+  let sent: SentParts;
   try {
     sent = await sendByChannel(channel.type, {
       token,
@@ -127,6 +127,13 @@ export async function sendTextMessage(
 
   if (finalizeError) throw new Error(`No se pudo cerrar el mensaje enviado: ${finalizeError.message}`);
 
+  // Un texto partido en varios mensajes en el que falló una parte después de enviar la primera: se da por enviado (la
+  // persona recibió algo) y queda anotado cuántas partes salieron.
+  if (sent.partial) {
+    console.error(`envío parcial: salieron ${sent.partial.sent} de ${sent.partial.total} partes`);
+    await admin.from("messages").update({ error: { partial: true, ...sent.partial } as Json }).eq("id", queued.id);
+  }
+
   return { messageId: queued.id, externalId: sent.externalId };
 }
 
@@ -143,7 +150,7 @@ async function sendByChannel(
     fetchImpl?: SendTextParams["fetchImpl"];
     now: Date;
   },
-): Promise<SentMessage> {
+): Promise<SentParts> {
   if (type === "telegram") {
     return sendTelegramText({
       token: params.token,

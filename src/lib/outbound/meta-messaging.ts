@@ -4,6 +4,11 @@ import { DEFAULT_GRAPH_VERSION, graphBase, graphError, sendWhatsAppPayload } fro
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
+// Un texto largo sale en varias partes. Si una parte falla después de que otra ya llegó, la persona recibió algo: darlo por
+// fallido haría que el agente o un seguimiento reenviaran todo y la primera parte llegara dos veces. Se da por enviado y
+// se anota cuántas partes salieron.
+export type SentParts = SentMessage & { partial?: { sent: number; total: number } };
+
 // Límites de texto de cada canal de Meta. Instagram cuenta bytes (UTF-8), los otros cuentan caracteres.
 export const MESSAGE_LIMITS = {
   whatsapp: { maxChars: 4096, maxBytes: null },
@@ -46,21 +51,28 @@ export function splitText(text: string, limit: Limit): string[] {
 }
 
 // Envía un texto libre por WhatsApp (solo dentro de la ventana de 24 h; fuera de ella van plantillas).
-export async function sendWhatsAppText(params: { token: string; phoneNumberId: string; to: string; text: string; fetchImpl?: FetchLike; now?: Date }): Promise<SentMessage> {
+export async function sendWhatsAppText(params: { token: string; phoneNumberId: string; to: string; text: string; fetchImpl?: FetchLike; now?: Date }): Promise<SentParts> {
   const parts = splitText(params.text, MESSAGE_LIMITS.whatsapp);
   if (parts.length === 0) throw new ChannelSendError("El mensaje está vacío", "vacio", false);
 
   let last: SentMessage | null = null;
+  let sent = 0;
   for (const part of parts) {
-    last = await sendWhatsAppPayload({
-      token: params.token,
-      phoneNumberId: params.phoneNumberId,
-      payload: { messaging_product: "whatsapp", recipient_type: "individual", to: params.to, type: "text", text: { body: part, preview_url: false } },
-      fetchImpl: params.fetchImpl,
-      now: params.now,
-    });
+    try {
+      last = await sendWhatsAppPayload({
+        token: params.token,
+        phoneNumberId: params.phoneNumberId,
+        payload: { messaging_product: "whatsapp", recipient_type: "individual", to: params.to, type: "text", text: { body: part, preview_url: false } },
+        fetchImpl: params.fetchImpl,
+        now: params.now,
+      });
+      sent += 1;
+    } catch (error) {
+      if (last === null) throw error;
+      return { ...last, partial: { sent, total: parts.length } };
+    }
   }
-  return last as SentMessage;
+  return parts.length > sent ? { ...(last as SentMessage), partial: { sent, total: parts.length } } : (last as SentMessage);
 }
 
 // Qué API usa Instagram: con "inicio de sesión de Instagram" (graph.instagram.com y un token de la cuenta) o con
@@ -92,7 +104,7 @@ export async function sendMessagingText(params: {
   humanAgent?: boolean;
   fetchImpl?: FetchLike;
   now?: Date;
-}): Promise<SentMessage> {
+}): Promise<SentParts> {
   const { fetchImpl = fetch } = params;
   const label = params.channel === "instagram" ? "Instagram" : "Messenger";
   const parts = splitText(params.text, MESSAGE_LIMITS[params.channel]);
@@ -100,8 +112,22 @@ export async function sendMessagingText(params: {
 
   const url = `${apiBase(params.channel, params.api ?? "instagram_login")}/me/messages`;
   let last = "";
+  let sent = 0;
 
   for (const part of parts) {
+    try {
+      last = await sendOneMessagingPart(part);
+      sent += 1;
+    } catch (error) {
+      // Ya llegó al menos una parte: ver SentParts.
+      if (sent === 0) throw error;
+      return { externalId: last, providerTimestamp: (params.now ?? new Date()).toISOString(), partial: { sent, total: parts.length } };
+    }
+  }
+
+  return { externalId: last, providerTimestamp: (params.now ?? new Date()).toISOString() };
+
+  async function sendOneMessagingPart(part: string): Promise<string> {
     const body: Record<string, unknown> = {
       recipient: { id: params.recipientId },
       message: { text: part },
@@ -129,10 +155,8 @@ export async function sendMessagingText(params: {
       throw new ChannelSendError("Respuesta inválida del canal", response.status, false);
     }
     if (!data.message_id) throw new ChannelSendError("El canal no devolvió el id del mensaje", "sin-id", false);
-    last = data.message_id;
+    return data.message_id;
   }
-
-  return { externalId: last, providerTimestamp: (params.now ?? new Date()).toISOString() };
 }
 
 // Pide el nombre de la persona a Messenger o Instagram (el webhook no lo trae). Es de mejor esfuerzo: si falla o no

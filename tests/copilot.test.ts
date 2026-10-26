@@ -6,7 +6,7 @@ import { createScriptedClient } from "../src/lib/ai/scripted-client";
 import type { ModelClient } from "../src/lib/ai/types";
 import { syncAttentionConfig } from "../src/lib/client-config/attention";
 import { parseClientConfig, syncSectorsAndUnits } from "../src/lib/client-config/load";
-import { suggestReply } from "../src/lib/copilot/suggest";
+import { MAX_SUGGESTIONS_PER_MINUTE, suggestReply } from "../src/lib/copilot/suggest";
 import { adminClient, createTestUser, randomId, type TestUser } from "./helpers/supabase-test";
 
 // Copiloto: borrador de respuesta para una persona del equipo. Datos inventados (clientes/_plantilla) y modelo simulado.
@@ -158,5 +158,15 @@ describe("copiloto", () => {
   it("una respuesta vacía del modelo no se ofrece como borrador", async () => {
     const result = await ask({ modelClient: createScriptedClient([{ content: [] }]) });
     expect(result).toMatchObject({ ok: false });
+  });
+
+  it("pone un tope de borradores por minuto y no gasta el modelo al pasarlo", async () => {
+    const org = orgIds[0] ?? "";
+    await admin.from("ai_calls").insert(Array.from({ length: MAX_SUGGESTIONS_PER_MINUTE }, () => ({ organization_id: org, agent_kind: "copilot" as const, model: "modelo-de-prueba" })));
+    const client = reply("no debería llamarse");
+    const result = await ask({ modelClient: client });
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining("muchos borradores") });
+    expect(client.requests).toHaveLength(0);
+    await admin.from("ai_calls").delete().eq("organization_id", org).eq("agent_kind", "copilot");
   });
 });

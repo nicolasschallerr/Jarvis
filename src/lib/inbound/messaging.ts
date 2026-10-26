@@ -51,12 +51,15 @@ export function normalizeMessagingEvent(channelType: "messenger" | "instagram", 
   const attachmentType = attachment ? asString(attachment.type) : null;
   const text = asString(message.text);
 
+  // Una foto con leyenda llega con texto y adjunto: el tipo es el del adjunto y el texto queda como leyenda (igual que en
+  // WhatsApp). Si trae varios adjuntos se toma el primero; el resto no se guarda todavía.
   let type: MessageType = text ? "text" : "unsupported";
   let media: MediaRef | null = null;
-  if (!text && attachmentType) {
-    type = ATTACHMENT_TYPES[attachmentType] ?? "unsupported";
+  if (attachmentType) {
+    const attachmentKind = ATTACHMENT_TYPES[attachmentType] ?? "unsupported";
+    if (attachmentKind !== "unsupported" || !text) type = attachmentKind;
     const url = isRecord(attachment?.payload) ? asString(attachment.payload.url) : null;
-    if (url && type !== "unsupported" && type !== "location") {
+    if (url && attachmentKind !== "unsupported" && attachmentKind !== "location") {
       media = { providerMediaId: url, url, mimeType: MIME_BY_TYPE[attachmentType] ?? null, fileName: null, sizeBytes: null };
     }
   }

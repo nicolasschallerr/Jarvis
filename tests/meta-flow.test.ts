@@ -296,15 +296,47 @@ describe("estados de entrega de WhatsApp", () => {
     expect(failed?.error).toEqual({ code: 131026, message: "Message undeliverable" });
   });
 
-  it("un aviso de un mensaje que no existe se ignora sin romper", async () => {
+  it("un aviso de un mensaje que todavía no existe se deja pendiente un rato y después se descarta sin romper", async () => {
     await receive(
       JSON.stringify({ object: "whatsapp_business_account", entry: [{ id: "1", changes: [{ field: "messages", value: { metadata: { phone_number_id: whatsappAccount }, statuses: [{ id: `wamid.${runId}.fantasma`, status: "delivered", timestamp: "1800000000" }] } }] }] }),
     );
     const meta = fakeMeta();
     await drain(meta.fetchImpl);
-    const { data: event } = await admin.from("webhook_events").select("processed_at, error").eq("dedupe_key", `status:wamid.${runId}.fantasma:delivered`).single();
+
+    // Recién llegado: el envío puede estar todavía guardándose su id, así que no se da por perdido.
+    const key = `status:wamid.${runId}.fantasma:delivered`;
+    const { data: waiting } = await admin.from("webhook_events").select("processed_at, error, claimed_at").eq("dedupe_key", key).single();
+    expect(waiting?.processed_at).toBeNull();
+    expect(waiting?.error).toBeNull();
+    expect(waiting?.claimed_at).toBeNull();
+
+    // Pasado el tiempo de espera, se descarta sin error.
+    await admin.from("webhook_events").update({ received_at: new Date(Date.now() - 20 * 60 * 1000).toISOString() }).eq("dedupe_key", key);
+    await drain(meta.fetchImpl);
+    const { data: event } = await admin.from("webhook_events").select("processed_at, error").eq("dedupe_key", key).single();
     expect(event?.error).toBeNull();
     expect(event?.processed_at).not.toBeNull();
+  });
+
+  it("un aviso llega antes de que el envío termine de guardarse: se aplica cuando aparece el id", async () => {
+    const conversation = await seedConversation("whatsapp", whatsappAccount, `549${runId}7`, 1);
+    const meta = fakeMeta();
+    const wamid = `wamid.${runId}.adelantado`;
+    // El aviso llega primero.
+    await receive(
+      JSON.stringify({ object: "whatsapp_business_account", entry: [{ id: "1", changes: [{ field: "messages", value: { metadata: { phone_number_id: whatsappAccount }, statuses: [{ id: wamid, status: "delivered", timestamp: "1800000000" }] } }] }] }),
+    );
+    await drain(meta.fetchImpl);
+    // Después se guarda el mensaje con ese id (lo que hace el cierre del envío).
+    const { data: queued } = await admin
+      .from("messages")
+      .insert({ organization_id: organizationId, conversation_id: conversation, direction: "outbound", sender: "agent", type: "text", body: "hola", status: "queued", provider_timestamp: new Date().toISOString() })
+      .select("id")
+      .single();
+    await admin.rpc("finalize_outbound_message", { p_message_id: queued?.id ?? "", p_external_id: wamid, p_provider_timestamp: new Date().toISOString() });
+    await admin.from("webhook_events").update({ claimed_at: null }).eq("dedupe_key", `status:${wamid}:delivered`);
+    await drain(meta.fetchImpl);
+    expect((await messageByExternalId(wamid))?.status).toBe("delivered");
   });
 });
 

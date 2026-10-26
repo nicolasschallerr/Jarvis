@@ -407,3 +407,18 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** al borrar la organización en cascada, los disparadores de auditoría (ADR-035) registraban "canal borrado" con el id de una organización que ya no existía, y la clave foránea de `audit_log` lo rechazaba. La limpieza de las pruebas no avisaba del error.
 - **Solución:** esos disparadores omiten el registro si la organización ya no existe (migración `20261026130000`), y se borraron las organizaciones de prueba acumuladas.
 - **Cómo evitarlo:** todo disparador que escribe en otra tabla tiene que sobrevivir a un borrado en cascada; probar el borrado de una organización completa; y que la limpieza de las pruebas falle fuerte si no puede borrar.
+
+### 65. Un envío en partes puede fallar a la mitad
+- **Problema (revisión de seguridad independiente):** un texto largo sale en varios mensajes; si la segunda parte fallaba, todo se daba por fallido y el agente o un seguimiento reenviaban el texto completo: la persona recibía la primera parte dos veces.
+- **Solución:** si ya salió una parte, el envío se da por hecho y queda anotado cuántas partes salieron (`messages.error = {partial, sent, total}`); solo si falla la primera es un error que se puede reintentar.
+- **Cómo evitarlo:** cuando una operación tiene efectos externos en varios pasos, decidir qué pasa si se corta a la mitad antes de poner un reintento automático.
+
+### 66. Un aviso de estado puede llegar antes que el dato al que se refiere
+- **Problema:** Meta puede avisar "entregado" antes de que el envío termine de guardar el id del mensaje; el aviso no encontraba nada y se descartaba para siempre. Además, dos pasadas del trabajador podían pisarse el estado.
+- **Solución:** un aviso de un mensaje que todavía no existe se deja pendiente unos minutos antes de descartarlo, y la actualización está condicionada al estado leído.
+- **Cómo evitarlo:** con eventos externos asincrónicos, no suponer el orden de llegada y actualizar con condición (comparar y cambiar en una sola operación).
+
+### 67. Leer "hasta el tope" no es leer todo y después comparar
+- **Problema:** las descargas de adjuntos bajaban el cuerpo entero a memoria cuando la respuesta no declaraba su tamaño, y no tenían tiempo máximo.
+- **Solución:** lectura por pedazos que corta al pasar el tope y `AbortSignal.timeout` en cada pedido; un índice único por mensaje evita registrar dos veces el mismo archivo.
+- **Cómo evitarlo:** todo pedido a un servidor externo lleva tiempo máximo y tope de tamaño aplicados mientras se lee.

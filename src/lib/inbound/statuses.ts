@@ -16,16 +16,23 @@ const RANK: Record<MessageStatus, number> = { queued: 0, sent: 1, delivered: 2, 
 
 export type StatusEvent = { organization_id: string | null; payload: Json };
 
+// Qué pasó con un aviso: "applied" cambió el mensaje, "ignored" no hacía falta (estado viejo o repetido), "not_found" el
+// mensaje todavía no existe con ese id (el aviso puede llegar antes de que el envío termine de guardarse).
+export type StatusOutcome = "applied" | "ignored" | "not_found";
+
 // Aplica los avisos de estado de WhatsApp (enviado, entregado, leído, fallido) a los mensajes que mandó el sistema.
-// Un aviso de un mensaje que no existe (o de otra organización) se ignora. Devuelve cuántos mensajes cambiaron.
-export async function applyWhatsAppStatuses(admin: SupabaseClient<Database>, events: StatusEvent[]): Promise<number> {
-  let changed = 0;
+// Un aviso de un mensaje de otra organización no lo encuentra. Devuelve qué pasó con cada uno, en el mismo orden.
+export async function applyWhatsAppStatuses(admin: SupabaseClient<Database>, events: StatusEvent[]): Promise<StatusOutcome[]> {
+  const outcomes: StatusOutcome[] = [];
 
   for (const event of events) {
     const status = isRecord(event.payload) && isRecord(event.payload.status) ? event.payload.status : null;
     const externalId = status && typeof status.id === "string" ? status.id : null;
     const next = status && typeof status.status === "string" ? (status.status as MessageStatus) : null;
-    if (!event.organization_id || !externalId || !next || !(next in RANK)) continue;
+    if (!event.organization_id || !externalId || !next || !(next in RANK)) {
+      outcomes.push("ignored");
+      continue;
+    }
 
     const { data: message } = await admin
       .from("messages")
@@ -34,10 +41,16 @@ export async function applyWhatsAppStatuses(admin: SupabaseClient<Database>, eve
       .eq("external_id", externalId)
       .eq("direction", "outbound")
       .maybeSingle();
-    if (!message) continue;
+    if (!message) {
+      outcomes.push("not_found");
+      continue;
+    }
 
     // Un mensaje ya fallido no se "recupera" por un aviso suelto, y uno leído no vuelve a "entregado".
-    if (message.status === "failed" || (next !== "failed" && RANK[next] <= RANK[message.status])) continue;
+    if (message.status === "failed" || (next !== "failed" && RANK[next] <= RANK[message.status])) {
+      outcomes.push("ignored");
+      continue;
+    }
 
     const errors: unknown[] = status && Array.isArray(status.errors) ? status.errors : [];
     const first: JsonRecord = isRecord(errors[0]) ? errors[0] : {};
@@ -46,13 +59,16 @@ export async function applyWhatsAppStatuses(admin: SupabaseClient<Database>, eve
         ? { code: typeof first.code === "number" ? first.code : null, message: typeof first.title === "string" ? first.title.slice(0, 200) : "WhatsApp no pudo entregar el mensaje" }
         : null;
 
-    const { error } = await admin
+    // Condicionado al estado que se leyó: si otra pasada del trabajador lo adelantó mientras tanto, esta no lo hace retroceder.
+    const { data: updated, error } = await admin
       .from("messages")
       .update({ status: next, status_updated_at: new Date().toISOString(), ...(detail ? { error: detail as Json } : {}) })
-      .eq("id", message.id);
+      .eq("id", message.id)
+      .eq("status", message.status)
+      .select("id");
     if (error) throw new Error(`No se pudo actualizar el estado del mensaje: ${error.message}`);
-    changed += 1;
+    outcomes.push(updated && updated.length > 0 ? "applied" : "ignored");
   }
 
-  return changed;
+  return outcomes;
 }

@@ -36,6 +36,9 @@ export type ProcessResult = {
   failed: number;
 };
 
+// Cuánto tiempo se sigue esperando que aparezca el mensaje de un aviso de estado (el envío tarda en guardarse su id).
+const STATUS_GRACE_MS = 10 * 60 * 1000;
+
 // Prefijo de la clave de deduplicación de cada canal (ver las funciones que arman los eventos).
 const CHANNEL_PREFIXES = ["msg:%", "tg:%", `${MESSENGER_PREFIX}%`, `${INSTAGRAM_PREFIX}%`] as const;
 
@@ -287,7 +290,14 @@ export async function processPendingMessages(
   const { data: statuses } = await admin.rpc("claim_webhook_events", { p_prefix: "status:%", p_limit: limit });
   for (const event of statuses ?? []) {
     try {
-      await applyWhatsAppStatuses(admin, [event]);
+      const [outcome] = await applyWhatsAppStatuses(admin, [event]);
+      // El aviso puede llegar antes de que el envío termine de guardarse (todavía sin el id de WhatsApp): se deja pendiente
+      // unos minutos para volver a intentarlo, en vez de perder el estado.
+      const recent = Date.now() - new Date(event.received_at).getTime() < STATUS_GRACE_MS;
+      if (outcome === "not_found" && recent) {
+        await admin.from("webhook_events").update({ claimed_at: null }).eq("id", event.id);
+        continue;
+      }
       await admin.from("webhook_events").update({ processed_at: new Date().toISOString(), error: null }).eq("id", event.id);
     } catch (error) {
       await admin.from("webhook_events").update({ error: error instanceof Error ? error.message : "Error desconocido" }).eq("id", event.id);
