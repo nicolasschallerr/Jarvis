@@ -20,9 +20,9 @@ está escrita en ningún documento del repositorio: se listan por tema.
 
 | Fase | Qué falta |
 |------|-----------|
-| 6 Agente de atención | Probarlo con Claude real (necesita la API key) y ajustar el prompt; después cerrar con su tag |
+| 6 Agente de atención | Probado con Claude real (2026-10-26): 17/17 evals y prueba por Telegram, con dos fallas halladas y corregidas (ADR-040). Falta probarlo con personas reales, cargar los datos `[COMPLETAR]` del cliente y la confirmación del dueño para el tag |
 | 7 Multimedia | Elegir el servicio de transcripción de audios y probar con audios reales (imágenes y PDF ya andan) |
-| 8 Evaluaciones | Correr los casos del cliente con Claude real (necesita la API key) |
+| 8 Evaluaciones | Corridos con Claude real: 17/17 (bitácora `fase-08`). Falta la confirmación del dueño para el tag |
 | 9 Plantillas y seguimientos | Probar con el número de WhatsApp verificado: crear las plantillas en Meta, sincronizar y enviar una |
 | 11 Consumo | Hecho: límites con avisos y exportar a CSV (ADR-036). Falta decidir con el cliente si al llegar al límite se corta al agente |
 | Agente analítico | Encenderlo y probarlo con Claude real; después, conectarlo a la base del cliente |

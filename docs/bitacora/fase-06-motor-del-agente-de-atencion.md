@@ -88,3 +88,18 @@ Escaneo completo de las fases, la interfaz y el CRM, con tres revisiones (interf
   `agent-fields`.
 - **Pendientes de la auditoría, ya hechos (2026-10-25):** respuestas rápidas, "cargar mensajes anteriores", ficha editable
   desde Contactos y estado "Disponible" del agente (ADR-028).
+
+## Prueba con Claude real (2026-10-26)
+
+- **API key** cargada en `.env.local` y en Vercel (variable sensible); `scripts/test-claude.mts` responde.
+- **Evals del cliente piloto con Claude real** (`claude-sonnet-5-5` como agente y como juez): **17 de 17**. Las fallas que aparecieron en el camino eran de contenido o de criterios, no del motor: el conocimiento del hotel contradecía al de Turismo, dos expectativas chocaban con "datos juntos en un mensaje" y un criterio negativo confundía al juez (lecciones 57 y 58).
+- **Prueba real por Telegram** (con el agente encendido) encontró dos problemas que los evals no veían, ya corregidos:
+  1. El agente anunciaba la derivación con sus palabras y además el sistema agregaba el aviso oficial (duplicado). Ahora el modelo ve el aviso oficial y no lo repite, y los evals juzgan el mismo mensaje que recibe la persona (`composeReply`, lección 57).
+  2. Un segundo tema para otro sector pisaba el sector y el resumen del primero (ADR-040).
+- **Conocimiento del cliente piloto** completado con la web pública y con el prompt del chatbot anterior (referencia, no guion); los datos contradictorios quedaron como `DECISIÓN PENDIENTE` en comentarios que el modelo no ve (lección 59).
+- **Canales:** el agente sabe por qué canal escribe la persona y su texto se adapta (ADR-039). **Copiloto:** borrador de respuesta para el equipo (ADR-041).
+
+### Falta para poner el tag
+- Probar con conversaciones reales de personas (no solo las del dueño del proyecto) y ajustar el prompt según lo que se vea.
+- Cargar los datos `[COMPLETAR]` del cliente (tarifas del hotel, requisitos para asociarse).
+- Confirmación del dueño del proyecto para `/cerrar-fase` y el tag `fase-06`.

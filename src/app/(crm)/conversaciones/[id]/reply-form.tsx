@@ -4,7 +4,9 @@ import { useActionState, useEffect, useRef, useState, useTransition } from "reac
 
 import type { QuickReply } from "@/lib/crm/quick-replies";
 
-import { sendReply, type ReplyState } from "./actions";
+import { SparkIcon } from "@/components/ui/icons";
+
+import { sendReply, suggestReplyAction, type ReplyState } from "./actions";
 import { editQuickReply, removeQuickReply, saveQuickReply } from "./quick-reply-actions";
 
 const INITIAL: ReplyState = { error: null, sentAt: null };
@@ -27,6 +29,8 @@ export function ReplyForm({
   const [title, setTitle] = useState("");
   const [quickError, setQuickError] = useState<string | null>(null);
   const [quickPending, startQuick] = useTransition();
+  const [suggesting, startSuggest] = useTransition();
+  const [suggestError, setSuggestError] = useState<string | null>(null);
 
   // Después de un envío correcto se vacía el cuadro.
   useEffect(() => {
@@ -41,6 +45,24 @@ export function ReplyForm({
     if (!area) return;
     area.value = area.value.trim() ? `${area.value.trimEnd()}\n${body}` : body;
     area.focus();
+  }
+
+  // El copiloto redacta un borrador en el cuadro de respuesta; la persona lo lee, lo edita y lo envía ella.
+  function suggest() {
+    const area = textRef.current;
+    if (area && area.value.trim() && !window.confirm("El cuadro tiene texto: el borrador lo va a reemplazar. ¿Seguir?")) return;
+    setSuggestError(null);
+    startSuggest(async () => {
+      const result = await suggestReplyAction(conversationId);
+      if (result.error || !result.text) {
+        setSuggestError(result.error ?? "No se pudo pedir el borrador.");
+        return;
+      }
+      if (area) {
+        area.value = result.text;
+        area.focus();
+      }
+    });
   }
 
   function save() {
@@ -156,6 +178,19 @@ export function ReplyForm({
           ) : null}
         </div>
       </details>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={suggest} disabled={suggesting || pending} className="btn-secondary !px-2.5 !py-1 text-xs">
+          <SparkIcon className="size-3.5" aria-hidden="true" /> {suggesting ? "Redactando..." : "Sugerir respuesta"}
+        </button>
+        {suggestError ? (
+          <p role="alert" className="text-xs text-danger">
+            {suggestError}
+          </p>
+        ) : (
+          <span className="text-xs text-muted">Es un borrador: revisalo antes de enviar.</span>
+        )}
+      </div>
 
       <div className="flex items-end gap-2">
         <textarea
