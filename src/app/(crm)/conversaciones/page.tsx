@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { channelLabel, messagePreview, shortDate, waitingTime } from "@/lib/crm/format";
 import { getAgentNames } from "@/lib/crm/agent-names";
-import { inboxQueryFrom, lastSenderPrefix, listInbox, type InboxFilter, type InboxQuery } from "@/lib/crm/inbox";
+import { INBOX_CHANNELS, inboxQueryFrom, lastSenderPrefix, listInbox, type InboxFilter, type InboxQuery } from "@/lib/crm/inbox";
 import { createClient } from "@/lib/supabase/server";
 
 import { LiveRefresh } from "../live-refresh";
@@ -92,8 +92,7 @@ export default async function ConversacionesPage({ searchParams }: PageProps<"/c
             label="Canal"
             items={[
               { href: inboxHref(query, { canal: null }), label: "Todos", active: query.channel === null },
-              { href: inboxHref(query, { canal: "whatsapp" }), label: "WhatsApp", active: query.channel === "whatsapp" },
-              { href: inboxHref(query, { canal: "telegram" }), label: "Telegram", active: query.channel === "telegram" },
+              ...INBOX_CHANNELS.map((channel) => ({ href: inboxHref(query, { canal: channel }), label: channelLabel(channel), active: query.channel === channel })),
             ]}
           />
         </div>
@@ -107,7 +106,7 @@ export default async function ConversacionesPage({ searchParams }: PageProps<"/c
         <EmptyState
           icon={<ChatIcon className="size-5" />}
           title={filtered ? "No hay conversaciones con estos filtros" : "Todavía no hay conversaciones"}
-          description={filtered ? "Probá con otro filtro o buscá otro nombre." : "Cuando un asociado escriba por WhatsApp o Telegram, su conversación va a aparecer acá."}
+          description={filtered ? "Probá con otro filtro o buscá otro nombre." : "Cuando un asociado escriba por WhatsApp, Instagram, Messenger o Telegram, su conversación va a aparecer acá."}
           action={
             filtered ? (
               <Link href="/conversaciones" className="btn-secondary">

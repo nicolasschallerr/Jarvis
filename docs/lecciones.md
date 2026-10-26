@@ -379,3 +379,31 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Problema:** las notas de `DECISIÓN PENDIENTE` dentro del conocimiento del cliente le llegaban al modelo, que podía repetirlas.
 - **Solución:** la carga de la carpeta del cliente quita los comentarios HTML (`<!-- … -->`) antes de guardar el prompt y el conocimiento.
 - **Cómo evitarlo:** las dudas abiertas sobre datos del cliente van en comentarios HTML; lo que sí debe saber el agente va en texto.
+
+## Canales de Meta (2026-10-26)
+
+### 60. El Markdown del modelo no lo entiende ningún canal
+- **Problema:** el agente escribe `**negrita**`; en Telegram, Instagram y Messenger la persona vería los asteriscos tal cual, y WhatsApp usa un solo asterisco.
+- **Solución:** `formatForChannel` adapta el texto del agente al canal antes de enviarlo, y el prompt le avisa por qué canal escribe.
+- **Cómo evitarlo:** cada vez que se suma un canal, preguntarse qué formato, qué largo y qué datos del contacto (teléfono, nombre) trae realmente.
+
+### 61. Una dirección de descarga que llega por un webhook es un dato de un tercero
+- **Problema:** Messenger e Instagram mandan la URL del adjunto; bajar cualquier URL que llegue permite que alguien haga que el servidor pida direcciones internas (SSRF).
+- **Solución:** solo se descarga de los servidores de archivos de Meta, por https, sin seguir redirecciones y con tope de tamaño; el resto se ignora sin romper el mensaje.
+- **Cómo evitarlo:** toda URL que viene en un evento externo se valida contra una lista de dominios antes de hacer el pedido.
+
+### 62. Un reintento no arregla algo que caduca
+- **Problema:** si la descarga de un adjunto fallaba, el evento se reintentaba durante horas y mientras tanto el agente no contestaba.
+- **Solución:** en los canales de Meta un adjunto que no se pudo bajar no frena nada: el mensaje se guarda, el agente lo ve sin adjunto y pide que lo reenvíen.
+- **Cómo evitarlo:** antes de dejar que algo se reintente, preguntarse si en el próximo intento puede salir distinto.
+
+### 63. Los avisos de estado llegan desordenados
+- **Problema:** Meta puede mandar "sent" después de "delivered".
+- **Solución:** el estado de un mensaje solo avanza (queued → sent → delivered → read); un fallo se guarda con su motivo.
+- **Cómo evitarlo:** con avisos de un proveedor externo, definir el orden de los estados y aplicar solo los que avanzan.
+
+### 64. Un disparador de auditoría no puede apuntar a lo que se está borrando
+- **Problema:** las pruebas dejaban cientos de organizaciones de prueba sin borrar (179) y la base se fue poniendo lenta, hasta que pruebas que antes pasaban agotaban el tiempo. Borrar una organización con canales o integrantes de sector fallaba.
+- **Causa real:** al borrar la organización en cascada, los disparadores de auditoría (ADR-035) registraban "canal borrado" con el id de una organización que ya no existía, y la clave foránea de `audit_log` lo rechazaba. La limpieza de las pruebas no avisaba del error.
+- **Solución:** esos disparadores omiten el registro si la organización ya no existe (migración `20261026130000`), y se borraron las organizaciones de prueba acumuladas.
+- **Cómo evitarlo:** todo disparador que escribe en otra tabla tiene que sobrevivir a un borrado en cascada; probar el borrado de una organización completa; y que la limpieza de las pruebas falle fuerte si no puede borrar.

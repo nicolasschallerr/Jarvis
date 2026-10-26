@@ -11,9 +11,13 @@ export type InboxFilter = (typeof INBOX_FILTERS)[number];
 export const INBOX_PAGE_SIZE = 50;
 const MAX_LIMIT = 500;
 
+// Canales por los que se puede filtrar la bandeja.
+export const INBOX_CHANNELS = ["whatsapp", "instagram", "messenger", "telegram"] as const;
+export type InboxChannel = (typeof INBOX_CHANNELS)[number];
+
 export type InboxQuery = {
   filter: InboxFilter;
-  channel: "whatsapp" | "telegram" | null;
+  channel: InboxChannel | null;
   search: string;
   limit: number;
 };
@@ -29,7 +33,7 @@ export function inboxQueryFrom(params: Record<string, string | string[] | undefi
   const limit = Number(first(params.ver));
   return {
     filter: (INBOX_FILTERS as readonly string[]).includes(filter ?? "") ? (filter as InboxFilter) : "todas",
-    channel: channel === "whatsapp" || channel === "telegram" ? channel : null,
+    channel: (INBOX_CHANNELS as readonly string[]).includes(channel ?? "") ? (channel as InboxChannel) : null,
     search: (first(params.q) ?? "").trim().slice(0, 80),
     limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, MAX_LIMIT) : INBOX_PAGE_SIZE,
   };

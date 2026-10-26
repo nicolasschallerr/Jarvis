@@ -8,11 +8,19 @@ import { handleOptOutKeyword, isOptOutKeyword } from "@/lib/consent";
 import { channelToken } from "@/lib/outbound/channel-token";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
-import { storeTelegramMedia } from "./media";
+import { fetchProfileName, instagramApiFrom } from "@/lib/outbound/meta-messaging";
+import { graphBase } from "@/lib/outbound/whatsapp";
+import { INSTAGRAM_PREFIX, MESSENGER_PREFIX } from "@/lib/meta/events";
+
+import { storeTelegramMedia, storeUrlMedia, storeWhatsAppMedia } from "./media";
+import { normalizeMessagingEvent } from "./messaging";
+import { applyWhatsAppStatuses } from "./statuses";
 import { transcribeAudioMessage } from "./transcribe";
 import { normalizeTelegramEvent } from "./telegram";
 import type { MediaRef, NormalizedMessage } from "./types";
 import { normalizeWhatsAppEvent } from "./whatsapp";
+
+type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 type ClaimedEvent = {
   id: string;
@@ -29,12 +37,13 @@ export type ProcessResult = {
 };
 
 // Prefijo de la clave de deduplicación de cada canal (ver las funciones que arman los eventos).
-const CHANNEL_PREFIXES = ["msg:%", "tg:%"] as const;
+const CHANNEL_PREFIXES = ["msg:%", "tg:%", `${MESSENGER_PREFIX}%`, `${INSTAGRAM_PREFIX}%`] as const;
 
 function normalize(event: ClaimedEvent, now: Date): NormalizedMessage {
-  return event.dedupe_key.startsWith("tg:")
-    ? normalizeTelegramEvent(event.payload, now)
-    : normalizeWhatsAppEvent(event.payload, now);
+  if (event.dedupe_key.startsWith("tg:")) return normalizeTelegramEvent(event.payload, now);
+  if (event.dedupe_key.startsWith(MESSENGER_PREFIX)) return normalizeMessagingEvent("messenger", event.payload, now);
+  if (event.dedupe_key.startsWith(INSTAGRAM_PREFIX)) return normalizeMessagingEvent("instagram", event.payload, now);
+  return normalizeWhatsAppEvent(event.payload, now);
 }
 
 // Procesa el mensaje de un evento: lo guarda con su contacto, conversación y ventana de crédito.
@@ -45,6 +54,7 @@ async function processMessageEvent(
   now: Date,
   modelClient: ModelClient | null,
   transcriber: TranscriptionClient | null,
+  fetchImpl?: FetchLike,
 ): Promise<boolean> {
   if (!event.organization_id) {
     throw new Error("Evento sin organización");
@@ -54,7 +64,7 @@ async function processMessageEvent(
 
   const { data: channel, error: channelError } = await admin
     .from("channels")
-    .select("id, secret_ref")
+    .select("id, secret_ref, config")
     .eq("organization_id", event.organization_id)
     .eq("type", message.channelType)
     .eq("external_id", message.channelExternalId)
@@ -82,8 +92,17 @@ async function processMessageEvent(
   // (la función de guardado devuelve null) pero el archivo todavía no. Si falla, el evento queda
   // con su error y se reintenta; el mensaje ya está guardado y no se duplica.
   let storedMessageId: string | null = null;
-  if (message.media && message.channelType === "telegram") {
-    storedMessageId = await storeMessageMedia(admin, event.organization_id, message, message.media, channel.secret_ref);
+  if (message.media) {
+    if (message.channelType === "telegram") {
+      storedMessageId = await storeMessageMedia(admin, event.organization_id, message, message.media, channel.secret_ref, fetchImpl);
+    } else {
+      // En los canales de Meta la dirección del archivo caduca: reintentar durante horas no sirve y dejaría al asociado
+      // sin respuesta. Si no se puede bajar, el mensaje queda guardado, el agente lo ve sin adjunto y le pide que lo reenvíe.
+      storedMessageId = await storeMessageMedia(admin, event.organization_id, message, message.media, channel.secret_ref, fetchImpl).catch((error: unknown) => {
+        console.error("adjunto:", message.channelType, error instanceof Error ? error.message : "Error desconocido");
+        return null;
+      });
+    }
   }
 
   // Un audio se transcribe antes de que el agente responda, así lo entiende como si fuera texto.
@@ -92,6 +111,13 @@ async function processMessageEvent(
   }
 
   const created = messageId !== null;
+
+  // Messenger e Instagram no mandan el nombre en el webhook: se pide una sola vez, cuando la ficha todavía no lo tiene.
+  if (created && (message.channelType === "messenger" || message.channelType === "instagram")) {
+    await fillContactName(admin, event.organization_id, message, channel, fetchImpl).catch((error: unknown) => {
+      console.error("nombre del contacto:", error instanceof Error ? error.message : "Error desconocido");
+    });
+  }
 
   // "STOP" y frases equivalentes: se registra la baja y se confirma; el agente no contesta ese mensaje (ADR-038).
   if (created && messageId && message.type === "text" && isOptOutKeyword(message.body)) {
@@ -107,10 +133,38 @@ async function processMessageEvent(
   // dos veces: solo responde si lo último de la conversación sigue siendo del asociado.
   if (modelClient) {
     const replyTo = messageId ?? (await findMessageId(admin, event.organization_id, message.externalId));
-    if (replyTo) await replyWithAgent(admin, modelClient, replyTo, now);
+    if (replyTo) await replyWithAgent(admin, modelClient, replyTo, now, fetchImpl);
   }
 
   return created;
+}
+
+async function fillContactName(
+  admin: SupabaseClient<Database>,
+  organizationId: string,
+  message: NormalizedMessage,
+  channel: { secret_ref: string | null; config: Json },
+  fetchImpl?: FetchLike,
+): Promise<void> {
+  if (message.channelType !== "messenger" && message.channelType !== "instagram") return;
+
+  const { data: identity } = await admin
+    .from("contact_identities")
+    .select("contact_id, contacts(display_name)")
+    .eq("organization_id", organizationId)
+    .eq("channel_type", message.channelType)
+    .eq("identifier", message.identifier)
+    .maybeSingle();
+  if (!identity || identity.contacts?.display_name) return;
+
+  const name = await fetchProfileName({
+    channel: message.channelType,
+    token: channelToken(channel.secret_ref),
+    personId: message.identifier,
+    api: instagramApiFrom(channel.config),
+    fetchImpl,
+  });
+  if (name) await admin.from("contacts").update({ display_name: name }).eq("id", identity.contact_id).is("display_name", null);
 }
 
 async function findMessageId(admin: SupabaseClient<Database>, organizationId: string, externalId: string): Promise<string | null> {
@@ -124,9 +178,8 @@ async function storeMessageMedia(
   message: NormalizedMessage,
   media: MediaRef,
   secretRef: string | null,
+  fetchImpl?: FetchLike,
 ): Promise<string> {
-  const token = channelToken(secretRef);
-
   const { data: stored, error } = await admin
     .from("messages")
     .select("id, conversation_id")
@@ -135,13 +188,15 @@ async function storeMessageMedia(
     .maybeSingle();
   if (error || !stored) throw new Error("No se encontró el mensaje para guardar su adjunto");
 
-  await storeTelegramMedia(admin, {
-    organizationId,
-    conversationId: stored.conversation_id,
-    messageId: stored.id,
-    token,
-    media,
-  });
+  const params = { organizationId, conversationId: stored.conversation_id, messageId: stored.id, media, fetchImpl };
+  if (message.channelType === "telegram") {
+    await storeTelegramMedia(admin, { ...params, token: channelToken(secretRef) });
+  } else if (message.channelType === "whatsapp") {
+    await storeWhatsAppMedia(admin, { ...params, token: channelToken(secretRef), graphBase: graphBase() });
+  } else {
+    // Messenger e Instagram: la dirección del archivo ya trae su propia autorización.
+    await storeUrlMedia(admin, { ...params, token: "" });
+  }
 
   return stored.id;
 }
@@ -167,12 +222,13 @@ async function replyWithAgent(
   modelClient: ModelClient,
   messageId: string,
   now: Date,
+  fetchImpl?: FetchLike,
 ): Promise<void> {
   try {
     const { data: stored } = await admin.from("messages").select("conversation_id").eq("id", messageId).maybeSingle();
     if (!stored) return;
 
-    const result = await respondToMessage(admin, modelClient, { conversationId: stored.conversation_id, messageId, now });
+    const result = await respondToMessage(admin, modelClient, { conversationId: stored.conversation_id, messageId, now, fetchImpl });
     if (result.status === "failed") console.error("agente:", result.reason);
   } catch (error) {
     console.error("agente:", error instanceof Error ? error.message : "Error desconocido");
@@ -190,6 +246,8 @@ export async function processPendingMessages(
   modelClient: ModelClient | null = anthropicClientFromEnv(),
   // Por defecto, el transcriptor configurado (hoy ninguno); null = audios sin transcribir.
   transcriber: TranscriptionClient | null = transcriptionClientFromEnv(),
+  // Para las llamadas a Meta (adjuntos, nombre del contacto): las pruebas pasan uno falso.
+  fetchImpl?: FetchLike,
 ): Promise<ProcessResult> {
   const result: ProcessResult = { claimed: 0, processed: 0, duplicates: 0, failed: 0 };
 
@@ -207,7 +265,7 @@ export async function processPendingMessages(
 
     for (const event of claimed ?? []) {
       try {
-        const created = await processMessageEvent(admin, event, now, modelClient, transcriber);
+        const created = await processMessageEvent(admin, event, now, modelClient, transcriber, fetchImpl);
         if (created) result.processed += 1;
         else result.duplicates += 1;
 
@@ -224,14 +282,16 @@ export async function processPendingMessages(
     }
   }
 
-  // Estados de entrega de WhatsApp (enviado, entregado, leído): se procesan en la Fase 14. Mientras tanto se
-  // marcan como vistos para que no queden pendientes para siempre ni frenen la bandeja.
+  // Avisos de estado de WhatsApp (enviado, entregado, leído, fallido): actualizan el mensaje que mandó el sistema.
+  // Si uno falla queda con su error y se reintenta; no frena a los mensajes.
   const { data: statuses } = await admin.rpc("claim_webhook_events", { p_prefix: "status:%", p_limit: limit });
-  if (statuses && statuses.length > 0) {
-    await admin
-      .from("webhook_events")
-      .update({ processed_at: new Date().toISOString(), error: null })
-      .in("id", statuses.map((event) => event.id));
+  for (const event of statuses ?? []) {
+    try {
+      await applyWhatsAppStatuses(admin, [event]);
+      await admin.from("webhook_events").update({ processed_at: new Date().toISOString(), error: null }).eq("id", event.id);
+    } catch (error) {
+      await admin.from("webhook_events").update({ error: error instanceof Error ? error.message : "Error desconocido" }).eq("id", event.id);
+    }
   }
 
   return result;

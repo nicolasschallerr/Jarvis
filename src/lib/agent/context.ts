@@ -92,7 +92,16 @@ function fill(template: string, values: Record<string, string>): string {
 // Arma las instrucciones completas: el prompt del cliente (con sus variables), el contexto de la
 // organización, el estado del horario y el conocimiento de cada unidad. Es igual en todos los turnos
 // de un cliente salvo la línea del horario, que va al final para no romper la caché del resto.
-export function buildSystemPrompt(prompt: string, settings: AttentionSettings, now: Date): string {
+// Lo que cambia según el canal por el que escribe la persona. WhatsApp no necesita nota: es el canal base de las reglas.
+const CHANNEL_NOTES: Record<string, string> = {
+  instagram:
+    "La persona te escribe por Instagram (mensajes directos). No tenés su teléfono: si hace falta, pedilo junto con los demás datos. Escribí en texto plano, sin negritas ni símbolos de formato, y con mensajes cortos (el canal admite pocos caracteres por mensaje).",
+  messenger:
+    "La persona te escribe por Facebook Messenger. No tenés su teléfono: si hace falta, pedilo junto con los demás datos. Escribí en texto plano, sin negritas ni símbolos de formato.",
+  telegram: "La persona te escribe por Telegram. Escribí en texto plano, sin negritas ni símbolos de formato.",
+};
+
+export function buildSystemPrompt(prompt: string, settings: AttentionSettings, now: Date, channel?: string | null): string {
   const sections = [
     fill(prompt, { nombre_agente: settings.agentName, nombre_organizacion: settings.organizationName }),
   ];
@@ -169,6 +178,11 @@ export function buildSystemPrompt(prompt: string, settings: AttentionSettings, n
       ].join("\n"),
     );
   }
+
+  const channelNote = CHANNEL_NOTES[channel ?? ""];
+  if (channelNote) sections.push(`## Canal
+
+${channelNote}`);
 
   sections.push(
     "## Cómo conversar\n\n- Antes de derivar, asegurate de entender qué necesita y a qué área corresponde; si es ambiguo, hacé una sola pregunta corta.\n- Si la persona trae un tema nuevo, atendé ese tema primero. Retomá uno anterior que quedó a medias solo con una frase corta al final, una sola vez.\n- No repitas en un mensaje lo que ya dijiste en el anterior.\n- Mensajes cortos, como en un chat: sin listas largas salvo que pida el detalle.",

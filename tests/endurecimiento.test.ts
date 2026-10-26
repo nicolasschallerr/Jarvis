@@ -292,11 +292,11 @@ describe("turno del agente por conversación", () => {
 
 describe("se puede escribir antes de llamar al modelo", () => {
   it("Telegram dentro de la conversación: sí", async () => {
-    expect(await checkSendable(admin, telegramConversation, new Date())).toEqual({ ok: true });
+    expect(await checkSendable(admin, telegramConversation, new Date())).toEqual({ ok: true, channel: "telegram" });
   });
 
-  it("WhatsApp todavía no tiene envío: no se gasta el modelo", async () => {
-    expect(await checkSendable(admin, whatsappConversation, new Date())).toEqual({ ok: false, reason: "canal_sin_envio" });
+  it("WhatsApp con la ventana de 24 h vencida: no se gasta el modelo", async () => {
+    expect(await checkSendable(admin, whatsappConversation, new Date())).toEqual({ ok: false, reason: "fuera_de_ventana" });
   });
 
   it("una conversación que no existe: no", async () => {

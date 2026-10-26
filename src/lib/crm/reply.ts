@@ -64,7 +64,7 @@ export async function sendOperatorReply(params: ReplyParams): Promise<ReplyResul
     if (error instanceof OutsideWindowError) {
       return {
         ok: false,
-        error: "Pasaron más de 24 horas desde el último mensaje del contacto: solo se pueden enviar plantillas.",
+        error: "Pasaron más de 24 horas desde el último mensaje de la persona: en WhatsApp solo se pueden enviar plantillas, y en Messenger e Instagram hay que esperar a que vuelva a escribir.",
       };
     }
     if (error instanceof ChannelSendError) {

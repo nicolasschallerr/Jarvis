@@ -1,6 +1,9 @@
 const CHANNEL_LABELS: Record<string, string> = {
   whatsapp: "WhatsApp",
   telegram: "Telegram",
+  instagram: "Instagram",
+  messenger: "Facebook Messenger",
+  email: "Correo",
 };
 
 const TYPE_LABELS: Record<string, string> = {

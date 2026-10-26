@@ -79,6 +79,13 @@ export async function storeTelegramMedia(
   if (bytes.length > TELEGRAM_MAX_DOWNLOAD_BYTES) return "too-large";
 
   const mimeType = media.mimeType ?? fileResponse.headers.get("content-type") ?? "application/octet-stream";
+  await saveMedia(admin, params, bytes, mimeType);
+  return "stored";
+}
+
+// Guarda los bytes en el bucket privado "media" y los registra en media_files (común a todos los canales).
+async function saveMedia(admin: SupabaseClient<Database>, params: StoreMediaParams, bytes: Buffer, mimeType: string): Promise<void> {
+  const { media } = params;
   const sha256 = createHash("sha256").update(bytes).digest("hex");
   const storagePath = `${params.organizationId}/${params.conversationId}/${params.messageId}.${extensionFor(media, mimeType)}`;
 
@@ -94,9 +101,75 @@ export async function storeTelegramMedia(
     mime_type: mimeType,
     size_bytes: bytes.length,
     sha256,
-    provider_media_id: media.providerMediaId,
+    provider_media_id: media.providerMediaId.slice(0, 500),
   });
   if (insertError) throw new Error(`No se pudo registrar el archivo: ${insertError.message}`);
+}
 
+async function alreadyStored(admin: SupabaseClient<Database>, messageId: string): Promise<boolean> {
+  const { data } = await admin.from("media_files").select("id").eq("message_id", messageId).maybeSingle();
+  return Boolean(data);
+}
+
+// Límite que se aplica a los adjuntos de Meta: el agente solo mira archivos chicos y el resto no hace falta guardarlo.
+export const META_MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024;
+
+// Los adjuntos de Messenger e Instagram llegan como una dirección de descarga de corta vida. Solo se descarga de los
+// servidores de archivos de Meta: una dirección armada por un tercero no debe hacer que el servidor pida otro sitio.
+const META_FILE_HOST = /(^|\.)(fbcdn\.net|cdninstagram\.com|fbsbx\.com)$/i;
+
+export function isMetaFileUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && META_FILE_HOST.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+async function readLimited(response: Response, maxBytes: number): Promise<Buffer | null> {
+  const declared = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) return null;
+  const bytes = Buffer.from(await response.arrayBuffer());
+  return bytes.length > maxBytes ? null : bytes;
+}
+
+// Descarga el adjunto de un mensaje de Messenger o Instagram desde su dirección.
+export async function storeUrlMedia(admin: SupabaseClient<Database>, params: StoreMediaParams): Promise<"stored" | "exists" | "too-large"> {
+  const url = params.media.url;
+  if (!url || !isMetaFileUrl(url)) throw new Error("La dirección del adjunto no es de un servidor de archivos de Meta");
+  if (await alreadyStored(admin, params.messageId)) return "exists";
+
+  const doFetch: Fetch = params.fetchImpl ?? fetch;
+  const response = await doFetch(url, { redirect: "error" });
+  if (!response.ok) throw new Error(`La descarga falló (${response.status})`);
+
+  const bytes = await readLimited(response, META_MAX_DOWNLOAD_BYTES);
+  if (!bytes) return "too-large";
+
+  await saveMedia(admin, params, bytes, params.media.mimeType ?? response.headers.get("content-type") ?? "application/octet-stream");
+  return "stored";
+}
+
+// Descarga un adjunto de WhatsApp: primero se pide a Meta la dirección del archivo con su id y después se baja con el
+// token del canal. El token va solo en el encabezado y nunca en un error.
+export async function storeWhatsAppMedia(admin: SupabaseClient<Database>, params: StoreMediaParams & { graphBase: string }): Promise<"stored" | "exists" | "too-large"> {
+  if (await alreadyStored(admin, params.messageId)) return "exists";
+  const doFetch: Fetch = params.fetchImpl ?? fetch;
+  const headers = { authorization: `Bearer ${params.token}` };
+
+  const infoResponse = await doFetch(`${params.graphBase}/${encodeURIComponent(params.media.providerMediaId)}`, { headers });
+  const info = (await infoResponse.json().catch(() => null)) as { url?: string; mime_type?: string; file_size?: number } | null;
+  if (!infoResponse.ok || !info?.url) throw new Error(`No se pudo pedir el archivo a WhatsApp (${infoResponse.status})`);
+  if ((info.file_size ?? 0) > META_MAX_DOWNLOAD_BYTES) return "too-large";
+  if (!isMetaFileUrl(info.url)) throw new Error("La dirección del archivo no es de un servidor de archivos de Meta");
+
+  const fileResponse = await doFetch(info.url, { headers, redirect: "error" });
+  if (!fileResponse.ok) throw new Error(`La descarga falló (${fileResponse.status})`);
+
+  const bytes = await readLimited(fileResponse, META_MAX_DOWNLOAD_BYTES);
+  if (!bytes) return "too-large";
+
+  await saveMedia(admin, params, bytes, params.media.mimeType ?? info.mime_type ?? fileResponse.headers.get("content-type") ?? "application/octet-stream");
   return "stored";
 }

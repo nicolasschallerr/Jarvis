@@ -111,7 +111,7 @@ export async function runEvalCase(params: EvalRunParams, evalCase: EvalCase): Pr
       fields: params.settings.fields,
       maxFieldRetries: params.settings.maxFieldRetries,
     });
-    const system = buildSystemPrompt(params.prompt, params.settings, params.now ?? new Date());
+    const system = buildSystemPrompt(params.prompt, params.settings, params.now ?? new Date(), params.channel?.type);
     const history: ChatMessage[] = [];
 
     for (const message of evalCase.mensajes) {

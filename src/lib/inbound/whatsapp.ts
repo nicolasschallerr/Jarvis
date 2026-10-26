@@ -1,6 +1,6 @@
 import type { Json } from "@/lib/supabase/database.types";
 
-import type { MessageType, NormalizedMessage } from "./types";
+import type { MediaRef, MessageType, NormalizedMessage } from "./types";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -52,6 +52,16 @@ export function extractBody(message: JsonRecord): string | null {
   return null;
 }
 
+// Adjunto descargable: Meta manda el id del archivo (no la dirección); la descarga pide primero esa dirección.
+export function extractWhatsAppMedia(message: JsonRecord): MediaRef | null {
+  const type = asString(message.type);
+  if (type !== "audio" && type !== "image" && type !== "video" && type !== "document") return null;
+  const content = message[type];
+  const id = isRecord(content) ? asString(content.id) : null;
+  if (!isRecord(content) || !id) return null;
+  return { providerMediaId: id, mimeType: asString(content.mime_type), fileName: asString(content.filename), sizeBytes: null };
+}
+
 // Meta manda la hora en segundos desde 1970, como texto.
 export function parseProviderTimestamp(value: unknown, fallback: Date): string {
   const seconds = typeof value === "string" ? Number(value) : typeof value === "number" ? value : NaN;
@@ -88,8 +98,7 @@ export function normalizeWhatsAppEvent(payload: Json, now: Date): NormalizedMess
     type: mapMessageType(asString(message.type)),
     body: extractBody(message),
     providerTimestamp: parseProviderTimestamp(message.timestamp, now),
-    // La descarga de adjuntos de WhatsApp se implementa en la Fase 14.
-    media: null,
+    media: extractWhatsAppMedia(message),
     raw: message as Json,
   };
 }

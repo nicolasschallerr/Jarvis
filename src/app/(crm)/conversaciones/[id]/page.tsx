@@ -13,7 +13,7 @@ import { listQuickReplies } from "@/lib/crm/quick-replies";
 import { createClient } from "@/lib/supabase/server";
 
 import type { ChannelType } from "@/lib/inbound/types";
-import { canSendFreeText } from "@/lib/outbound/rules";
+import { sendMode } from "@/lib/outbound/rules";
 
 import { AiSwitch } from "./ai-switch";
 import { CasePanel } from "./case-panel";
@@ -69,7 +69,7 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
   // Tanda 1: todo lo que depende solo del id de la conversación y de la sesión, junto. Cada consulta es un viaje a la
   // base: hacerlas en fila sumaba la demora de cada una.
   // RLS limita todo a la organización del usuario: un id ajeno simplemente no existe.
-  const [{ data: conversation }, { data: latest }, agentNames, quickReplies, { data: templates }] = await Promise.all([
+  const [{ data: conversation }, { data: latest }, agentNames, quickReplies, { data: templates }, { data: channelRow }] = await Promise.all([
     supabase
       .from("conversation_summaries")
       .select("id, contact_id, contact_name, contact_document, channel_type, last_inbound_at, ai_enabled")
@@ -91,6 +91,8 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
     profile.role === "viewer"
       ? Promise.resolve({ data: [] })
       : supabase.from("message_templates").select("id, name, language, body, category").eq("meta_status", "approved").order("name"),
+    // La configuración del canal: dice si la cuenta puede responder a mano hasta 7 días después (Messenger e Instagram).
+    supabase.from("conversations").select("channels(config)").eq("id", id).maybeSingle(),
   ]);
   if (!conversation) notFound();
 
@@ -130,7 +132,10 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
   const aiEnabled = conversation.ai_enabled ?? false;
 
   // Qué se le muestra al usuario debajo de los mensajes. La autorización real está en la acción.
-  const freeTextAllowed = canSendFreeText(channel, conversation.last_inbound_at ? new Date(conversation.last_inbound_at) : null, now);
+  const channelConfig = channelRow?.channels?.config;
+  const humanAgentTag = typeof channelConfig === "object" && channelConfig !== null && !Array.isArray(channelConfig) && channelConfig.human_agent === true;
+  const mode = sendMode(channel, conversation.last_inbound_at ? new Date(conversation.last_inbound_at) : null, now, { humanAgentTag });
+  const hasWindow = channel === "whatsapp" || channel === "messenger" || channel === "instagram";
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -156,11 +161,15 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
                 {aiEnabled ? `Atiende ${agentName}` : "Atiende una persona"}
               </Badge>
               {conversation.contact_document ? <span>Doc. {conversation.contact_document}</span> : null}
-              {/* La ventana de 24 h es una regla de WhatsApp: en los demás canales no aplica. */}
-              {channel === "whatsapp" ? (
-                freeTextAllowed ? (
+              {/* La ventana de 24 h es una regla de WhatsApp, Messenger e Instagram: Telegram no la tiene. */}
+              {hasWindow ? (
+                mode === "free" ? (
                   <Badge tone="success" dot>
                     Ventana de 24 h abierta
+                  </Badge>
+                ) : mode === "human_agent" ? (
+                  <Badge tone="info" dot>
+                    Solo respuesta manual (hasta 7 días)
                   </Badge>
                 ) : (
                   <Badge tone="warning" dot>
@@ -208,7 +217,11 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
 
         {profile.role === "viewer" ? (
           <p className="border-t border-line px-6 py-4 text-sm text-muted">Tu rol es de consulta: podés leer la conversación pero no responder.</p>
-        ) : !freeTextAllowed ? (
+        ) : mode === "closed" && channel !== "whatsapp" ? (
+          <p className="border-t border-line px-6 py-4 text-sm text-muted">
+            Pasaron más de 24 horas desde el último mensaje de la persona y {channelLabel(channel)} no permite escribirle hasta que vuelva a escribir.
+          </p>
+        ) : mode === "closed" ? (
           <TemplateForm
             conversationId={conversation.id ?? id}
             templates={approvedTemplates}
@@ -216,7 +229,14 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
             canManage={profile.role === "superadmin"}
           />
         ) : (
-          <ReplyForm conversationId={conversation.id ?? id} agentName={agentName} aiEnabled={aiEnabled} quickReplies={quickReplies} />
+          <>
+            {mode === "human_agent" ? (
+              <p className="border-t border-line px-6 py-2 text-xs text-muted">
+                Pasaron más de 24 horas: tu respuesta sale como mensaje manual de una persona del equipo (hasta 7 días). {agentName} no puede escribir en esta conversación.
+              </p>
+            ) : null}
+            <ReplyForm conversationId={conversation.id ?? id} agentName={agentName} aiEnabled={aiEnabled} quickReplies={quickReplies} />
+          </>
         )}
       </main>
       <Suspense fallback={<aside className="hidden w-80 shrink-0 border-l border-line p-4 lg:block xl:w-96" aria-busy="true"><div className="skeleton h-40" /></aside>}>

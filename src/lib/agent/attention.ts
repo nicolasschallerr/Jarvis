@@ -148,7 +148,7 @@ async function respondOnce(context: TurnContext): Promise<AttentionResult | "new
 
   let result;
   try {
-    result = await runAgentLoop({ client: context.client, model: config.model, system: buildSystemPrompt(config.prompt, settings, now), history, tools });
+    result = await runAgentLoop({ client: context.client, model: config.model, system: buildSystemPrompt(config.prompt, settings, now, sendable.channel), history, tools });
   } catch (error) {
     // Solo el motivo, nunca el contenido de la conversación.
     const reason = error instanceof Error ? error.message : "Error desconocido";

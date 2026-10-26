@@ -7,7 +7,8 @@ export type MessageType = Database["public"]["Enums"]["message_type"];
 // (webhook_events). dedupeKey evita procesarlo dos veces si el proveedor reintenta.
 export type InboundEvent = {
   channelType: ChannelType;
-  // Identificador del canal en el proveedor: phone_number_id (WhatsApp) o id del bot (Telegram).
+  // Identificador del canal en el proveedor: phone_number_id (WhatsApp), id de la página (Messenger), id de la cuenta
+  // (Instagram) o id del bot (Telegram).
   channelExternalId: string;
   dedupeKey: string;
   payload: Json;
@@ -15,8 +16,10 @@ export type InboundEvent = {
 
 // Archivo adjunto de un mensaje entrante, aún sin descargar.
 export type MediaRef = {
-  // Identificador para pedírselo al proveedor (file_id en Telegram).
+  // Identificador para pedírselo al proveedor (file_id en Telegram, id del archivo en WhatsApp).
   providerMediaId: string;
+  // Messenger e Instagram mandan directamente la dirección de descarga (de corta vida) en vez de un identificador.
+  url?: string | null;
   mimeType: string | null;
   fileName: string | null;
   sizeBytes: number | null;
@@ -27,7 +30,8 @@ export type MediaRef = {
 export type NormalizedMessage = {
   channelType: ChannelType;
   channelExternalId: string;
-  // Cómo se identifica al contacto en ese canal (teléfono en WhatsApp, id de chat en Telegram).
+  // Cómo se identifica al contacto en ese canal (teléfono en WhatsApp, id de chat en Telegram, id de la persona para
+  // esa página o cuenta en Messenger e Instagram).
   identifier: string;
   contactName: string | null;
   externalId: string;

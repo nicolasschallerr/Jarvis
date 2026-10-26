@@ -1,6 +1,6 @@
 # Estado de las fases
 
-Actualizado el 2026-10-25. "Cerrada" = construida, probada y documentada; las fases 0 a 5 además tienen su tag (`fase-XX`).
+Actualizado el 2026-10-26. "Cerrada" = construida, probada y documentada; las fases 0 a 5 además tienen su tag (`fase-XX`).
 Los tags de las demás se ponen solo con la confirmación del dueño del proyecto. La numeración de las fases 10 y 13 no
 está escrita en ningún documento del repositorio: se listan por tema.
 
@@ -45,7 +45,7 @@ Probado con servicios falsos; la prueba real espera al número verificado y a la
 
 | Tema | Notas |
 |------|-------|
-| 14 WhatsApp saliente | Texto libre, adjuntos y estados por la API de Meta; depende de la verificación de negocio |
+| 14 Canales de Meta | **Construida con un Meta falso (ADR-039, 2026-10-26):** WhatsApp (texto libre, adjuntos y estados de entrega), Instagram y Facebook Messenger por un solo webhook. Falta conectar cuentas reales de Meta y probar (guía: `docs/guia-conectar-meta.md`); producción pide verificación del negocio y revisión de la app |
 | 13 Producción | Base de producción separada, región (São Paulo recomendado), rotar claves, copias de respaldo, dominio propio, monitoreo |
 | Integración con la base del cliente | Lectura con permisos acotados; necesita acceso del cliente |
 | Avisos por email o WhatsApp | Los avisos ya se ven en la aplicación (pantalla Avisos); falta enviarlos por afuera, necesita un servicio de email |

@@ -2,7 +2,7 @@
 // verifica que el nombre tenga la forma de un token de canal: así un valor manipulado no puede hacer que el
 // sistema lea (y mande a un proveedor) otra variable, como la clave de servicio de la base. La base aplica la
 // misma regla (restricción channels_secret_ref_format) y solo deja definirla al servidor (ADR-027).
-const CHANNEL_TOKEN_REF = /^(TELEGRAM_BOT_TOKEN|WHATSAPP_ACCESS_TOKEN|CHANNEL_TOKEN)(_[A-Z0-9]+)*$/;
+const CHANNEL_TOKEN_REF = /^(TELEGRAM_BOT_TOKEN|WHATSAPP_ACCESS_TOKEN|MESSENGER_ACCESS_TOKEN|INSTAGRAM_ACCESS_TOKEN|CHANNEL_TOKEN)(_[A-Z0-9]+)*$/;
 
 export function isChannelTokenRef(secretRef: string | null | undefined): secretRef is string {
   return typeof secretRef === "string" && CHANNEL_TOKEN_REF.test(secretRef);

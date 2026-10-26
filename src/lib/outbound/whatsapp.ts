@@ -15,14 +15,15 @@ type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 type GraphError = { error?: { message?: string; code?: number; error_subcode?: number } };
 
 // Un pedido rechazado por Meta: se reintenta solo si fue un límite de velocidad o una falla del lado de Meta.
-async function graphError(response: Response, fallback: string): Promise<ChannelSendError> {
+export async function graphError(response: Response, fallback: string): Promise<ChannelSendError> {
   let detail: GraphError = {};
   try {
     detail = (await response.json()) as GraphError;
   } catch {
     // sin cuerpo legible
   }
-  const retryable = response.status === 429 || response.status >= 500;
+  // Límites de velocidad de Meta: de la aplicación (4), del usuario (17), de la cuenta (32) y de llamadas muy seguidas (613).
+  const retryable = response.status === 429 || response.status >= 500 || [4, 17, 32, 613].includes(detail.error?.code ?? -1);
   const message = detail.error?.message ? `Meta: ${detail.error.message.slice(0, 200)}` : `${fallback} (${response.status})`;
   return new ChannelSendError(message, detail.error?.code ?? response.status, retryable);
 }

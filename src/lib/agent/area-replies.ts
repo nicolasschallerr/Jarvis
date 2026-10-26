@@ -132,7 +132,7 @@ async function deliverOne(
   const { data: turn } = await admin.rpc("claim_agent_turn", { p_conversation_id: conversationId });
   if (!turn) return "skipped";
   try {
-    return await deliverClaimed(admin, client, query, conversationId, loaded.agent, now, fetchImpl);
+    return await deliverClaimed(admin, client, query, conversationId, loaded.agent, sendable.channel, now, fetchImpl);
   } finally {
     await admin.rpc("release_agent_turn", { p_conversation_id: conversationId });
   }
@@ -146,6 +146,7 @@ async function deliverClaimed(
   query: PendingAnswer,
   conversationId: string,
   agent: LoadedAgent,
+  channel: string,
   now: Date,
   fetchImpl: Params["fetchImpl"],
 ): Promise<keyof AreaRepliesResult> {
@@ -195,7 +196,7 @@ async function deliverClaimed(
     const run = await runAgentLoop({
       client,
       model: config.model,
-      system: buildSystemPrompt(config.prompt, settings, now),
+      system: buildSystemPrompt(config.prompt, settings, now, channel),
       history,
       tools: [],
     });
