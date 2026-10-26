@@ -15,14 +15,14 @@ está escrita en ningún documento del repositorio: se listan por tema.
 | 4 | Bandeja del CRM |
 | 5 | Sectores, casos y rediseño |
 | 12 | Unir contactos duplicados (tag `fase-12`, 2026-10-25) |
+| 6 | Motor del agente de atención: probado con Claude real, 17/17 evals (tag `fase-06`, 2026-10-26; el dueño sigue probando y pide los ajustes) |
+| 8 | Evaluaciones del agente: runner con juez, 17/17 con Claude real (tag `fase-08`, 2026-10-26) |
 
 ## Construidas, falta una o dos tareas para cerrar
 
 | Fase | Qué falta |
 |------|-----------|
-| 6 Agente de atención | Probado con Claude real (2026-10-26): 17/17 evals y prueba por Telegram, con dos fallas halladas y corregidas (ADR-040). Falta probarlo con personas reales, cargar los datos `[COMPLETAR]` del cliente y la confirmación del dueño para el tag |
 | 7 Multimedia | Elegir el servicio de transcripción de audios y probar con audios reales (imágenes y PDF ya andan) |
-| 8 Evaluaciones | Corridos con Claude real: 17/17 (bitácora `fase-08`). Falta la confirmación del dueño para el tag |
 | 9 Plantillas y seguimientos | Probar con el número de WhatsApp verificado: crear las plantillas en Meta, sincronizar y enviar una |
 | 11 Consumo | Hecho: límites con avisos y exportar a CSV (ADR-036). Falta decidir con el cliente si al llegar al límite se corta al agente |
 | Agente analítico | Encenderlo y probarlo con Claude real; después, conectarlo a la base del cliente |

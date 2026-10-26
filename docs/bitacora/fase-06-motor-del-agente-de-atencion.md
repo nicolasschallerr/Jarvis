@@ -1,6 +1,6 @@
 # Fase 6: Motor del agente de atención
 
-**Estado:** en curso (circuito construido y probado con un modelo simulado; falta la prueba con Claude real)
+**Estado:** cerrada el 2026-10-26 (tag `fase-06`); el dueño del proyecto sigue probando con personas y pide los ajustes
 **Fechas:** desde 2026-10-24
 
 ## Objetivo

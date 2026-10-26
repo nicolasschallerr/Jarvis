@@ -1,6 +1,6 @@
 # Fase 8: Evaluaciones del agente
 
-**Estado:** construida y corrida con Claude real; falta la confirmación del dueño del proyecto para el tag
+**Estado:** cerrada el 2026-10-26 (tag `fase-08`)
 **Fechas:** 2026-10-24 a 2026-10-26
 
 ## Objetivo
