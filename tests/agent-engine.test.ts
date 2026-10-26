@@ -57,6 +57,12 @@ describe("instrucciones del agente", () => {
     expect(text).toContain("dentro del horario");
     expect(buildSystemPrompt("x", settings, new Date("2026-10-31T15:00:00Z"))).toContain("FUERA del horario");
   });
+
+  it("si hay aviso oficial de derivación, le pide al modelo que no lo anuncie con sus palabras", () => {
+    expect(buildSystemPrompt("x", { ...settings, handoffMessage: "Te derivo a {{sector}}." }, monday)).toContain("No anuncies la derivación");
+    const silent = { ...settings, handoffMessage: null, units: settings.units.map((unit) => ({ ...unit, handoffMessage: null })) };
+    expect(buildSystemPrompt("x", silent, monday)).not.toContain("No anuncies la derivación");
+  });
 });
 
 describe("historial", () => {

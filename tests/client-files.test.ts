@@ -66,4 +66,15 @@ describe("conocimiento por unidad", () => {
     expect(Object.keys(files?.knowledge ?? {}).sort()).toEqual(["creditos", "viajes"]);
     expect(files?.knowledge.creditos).toContain("6 meses de antigüedad");
   });
+
+  it("quita los comentarios HTML: son notas del equipo, no contenido para el modelo", () => {
+    const root = makeClient({
+      "agente-prompt.md": "Sos el asistente.\n<!-- nota interna -->\nRespondé breve.",
+      "conocimiento/viajes.md": "Hasta 12 cuotas.\n\n<!-- DECISIÓN PENDIENTE: confirmar el tope -->\n\n\nSalidas en enero.",
+    });
+    const files = readAttentionFiles(root);
+    expect(files?.prompt).not.toContain("nota interna");
+    expect(files?.knowledge.viajes).not.toContain("DECISIÓN PENDIENTE");
+    expect(files?.knowledge.viajes).toBe("Hasta 12 cuotas.\n\nSalidas en enero.");
+  });
 });

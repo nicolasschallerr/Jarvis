@@ -360,3 +360,22 @@ Una entrada por problema real. Se agregan al cerrar cada fase (comando `/cerrar-
 - **Causa real:** los destinatarios se toman por el orden de su identificador (aleatorio).
 - **Solución:** que la prueba use solo datos para los que el resultado no depende del orden (aquí, un filtro que deja solo contactos con nombre) y repetirla varias veces para ver que es estable.
 - **Cómo evitarlo:** si un resultado depende de cuál fila sale primero, o se ordena de forma explícita o se arma el caso para que todas den lo mismo.
+
+## Agente con Claude real (2026-10-26)
+
+### 57. El eval tiene que ver exactamente lo que recibe la persona
+- **Problema:** en la prueba real por Telegram el agente decía dos veces "ya pasé tu consulta", pero los evals daban todo bien.
+- **Causa real:** el mensaje oficial de derivación lo agrega el sistema al final del texto del modelo; el runner de evals juzgaba solo el texto del modelo, sin ese agregado, y el modelo no sabía que el sistema lo agregaba.
+- **Solución:** una sola función (`composeReply`) arma el mensaje que se envía y la usan el agente real y los evals; el prompt le muestra al modelo el aviso oficial y le pide no repetirlo, tampoco el horario.
+- **Cómo evitarlo:** todo lo que el sistema le agrega o le saca a la respuesta del modelo tiene que pasar también por los evals; si no, se evalúa otra conversación.
+
+### 58. Al juez, criterios positivos y concretos
+- **Problema:** con un criterio de "no debe" lleno de matices, el juez explicaba que no había falta y aun así la marcaba.
+- **Causa real:** las negaciones con condiciones ("además de…", "en el último mensaje…") confunden al modelo juez.
+- **Solución:** reescribir el criterio en positivo y verificable ("el último mensaje avisa una sola vez que…") y correr el caso varias veces.
+- **Cómo evitarlo:** un criterio por idea, en positivo cuando se pueda, que describa algo que se ve en el texto; si un caso falla con una explicación que lo contradice, el problema es el criterio.
+
+### 59. Los comentarios del conocimiento son para el equipo, no para el modelo
+- **Problema:** las notas de `DECISIÓN PENDIENTE` dentro del conocimiento del cliente le llegaban al modelo, que podía repetirlas.
+- **Solución:** la carga de la carpeta del cliente quita los comentarios HTML (`<!-- … -->`) antes de guardar el prompt y el conocimiento.
+- **Cómo evitarlo:** las dudas abiertas sobre datos del cliente van en comentarios HTML; lo que sí debe saber el agente va en texto.

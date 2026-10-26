@@ -1,4 +1,4 @@
-import { buildSystemPrompt, type AttentionSettings } from "@/lib/agent/context";
+import { buildSystemPrompt, composeReply, type AttentionSettings } from "@/lib/agent/context";
 import { runAgentLoop } from "@/lib/agent/loop";
 import { createAttentionTools } from "@/lib/agent/tools";
 import type { ChatMessage, ModelClient } from "@/lib/ai/types";
@@ -121,9 +121,11 @@ export async function runEvalCase(params: EvalRunParams, evalCase: EvalCase): Pr
         tokens.input += step.response.usage.inputTokens;
         tokens.output += step.response.usage.outputTokens;
       }
-      replies.push(run.text);
+      // Lo mismo que recibe el asociado: el texto del agente más el aviso oficial si derivó.
+      const reply = composeReply(params.settings, run);
+      replies.push(reply);
       // Igual que en producción, el historial solo conserva el texto de cada turno.
-      history.push({ role: "assistant", content: [{ type: "text", text: run.text || "(sin respuesta)" }] });
+      history.push({ role: "assistant", content: [{ type: "text", text: reply || "(sin respuesta)" }] });
     }
 
     const judgement = await judge({

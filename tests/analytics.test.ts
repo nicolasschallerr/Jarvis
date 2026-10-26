@@ -190,10 +190,10 @@ beforeAll(async () => {
     organization_id: orgA,
     contact_id: consumer,
     initiated_by: "contact",
-    opened_at: "2026-10-26T15:00:00Z",
-    expires_at: "2026-10-27T15:00:00Z",
+    opened_at: "2026-10-20T15:00:00Z",
+    expires_at: "2026-10-21T15:00:00Z",
   });
-  await admin.from("ai_calls").insert({ organization_id: orgA, agent_kind: "attention", model: "modelo-de-prueba", input_tokens: 1000, output_tokens: 200, cost_usd: 0.5, created_at: "2026-10-26T15:10:00Z" });
+  await admin.from("ai_calls").insert({ organization_id: orgA, agent_kind: "attention", model: "modelo-de-prueba", input_tokens: 1000, output_tokens: 200, cost_usd: 0.5, created_at: "2026-10-20T15:10:00Z" });
 });
 
 afterAll(async () => {
@@ -277,7 +277,7 @@ describe("otras herramientas", () => {
   });
 
   it("resumen_de_consumo suma créditos y uso de IA, y rechaza períodos demasiado largos", async () => {
-    const result = await parsed(tools(superadmin)("resumen_de_consumo", { desde: "2026-10-26", hasta: "2026-10-26" }));
+    const result = await parsed(tools(superadmin)("resumen_de_consumo", { desde: "2026-10-20", hasta: "2026-10-20" }));
     expect(result).toMatchObject({ dias: 1, creditos: 1, llamadas_a_ia: 1, tokens_de_entrada: 1000, tokens_de_salida: 200, costo_estimado_usd: 0.5 });
 
     const tooLong = await tools(superadmin)("resumen_de_consumo", { desde: "2026-01-01", hasta: TODAY });
@@ -287,7 +287,7 @@ describe("otras herramientas", () => {
 
   it("un operador ve los casos y los créditos pero no el gasto en IA", async () => {
     expect((await parsed(tools(operator)("contar_casos", { agrupar_por: "estado" }))).total).toBe(4);
-    const result = await parsed(tools(operator)("resumen_de_consumo", { desde: "2026-10-26", hasta: "2026-10-26" }));
+    const result = await parsed(tools(operator)("resumen_de_consumo", { desde: "2026-10-20", hasta: "2026-10-20" }));
     expect(result).toMatchObject({ creditos: 1, llamadas_a_ia: 0, costo_estimado_usd: 0 });
   });
 

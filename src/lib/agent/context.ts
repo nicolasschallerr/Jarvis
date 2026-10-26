@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import type { ChatMessage, DocumentBlock, ImageBlock } from "@/lib/ai/types";
 
+import type { LoopResult } from "./loop";
+
 // Lo que el agente necesita saber de la configuración del cliente. Se guarda en agent_configs.settings
 // (cargado desde clientes/<slug>/); nada de esto está escrito en el código.
 export const attentionSettingsSchema = z.object({
@@ -150,10 +152,34 @@ export function buildSystemPrompt(prompt: string, settings: AttentionSettings, n
     "## Cómo usar las herramientas\n\nGuardá los datos con `guardar_datos_del_caso` apenas el asociado los dé. Cuando tengas todo lo que pide la unidad, usá `derivar_a_sector`. Si falta un dato que solo sabe el área, usá `consultar_al_area`. Después de usar una herramienta, escribile al asociado un mensaje breve que diga qué pasó y qué sigue. Respondé siempre con el texto que se le envía al asociado, sin explicar tu razonamiento.",
   );
 
+  const handoffNotices = [
+    settings.handoffMessage,
+    ...settings.units.map((unit) => unit.handoffMessage),
+  ].filter((text, index, all): text is string => Boolean(text) && all.indexOf(text) === index);
+  const hasHandoffNotice = handoffNotices.length > 0;
+  if (hasHandoffNotice) {
+    sections.push(
+      [
+        "## Aviso de derivación",
+        "",
+        "Cuando usás `derivar_a_sector`, el sistema agrega solo, al final de tu mensaje, el aviso oficial de que la consulta pasó al equipo:",
+        ...handoffNotices.map((text) => `> ${text.replace(/\{\{sector\}\}/g, "<sector>").replace(/\s+/g, " ").trim()}`),
+        "",
+        "No anuncies la derivación vos ni repitas lo que ya dice el aviso (que pasó al equipo, que le van a responder, el horario), tampoco con otras palabras. Escribí solo lo que aporta, por ejemplo qué registraste o la respuesta a otra pregunta. Si no tenés nada más que decir, no escribas texto.",
+      ].join("\n"),
+    );
+  }
+
+  sections.push(
+    "## Cómo conversar\n\n- Antes de derivar, asegurate de entender qué necesita y a qué área corresponde; si es ambiguo, hacé una sola pregunta corta.\n- Si la persona trae un tema nuevo, atendé ese tema primero. Retomá uno anterior que quedó a medias solo con una frase corta al final, una sola vez.\n- No repitas en un mensaje lo que ya dijiste en el anterior.\n- Mensajes cortos, como en un chat: sin listas largas salvo que pida el detalle.",
+  );
+
   sections.push(
     isWithinBusinessHours(now, settings)
       ? "## Horario\n\nAhora el equipo está dentro del horario de atención."
-      : "## Horario\n\nAhora el equipo está FUERA del horario de atención: tomá la consulta completa, derivala y avisá que el equipo la va a ver en el próximo horario hábil.",
+      : hasHandoffNotice
+        ? "## Horario\n\nAhora el equipo está FUERA del horario de atención: tomá la consulta completa y derivala. Si te preguntan cuándo les van a responder, decí que el equipo la ve en el próximo horario hábil."
+        : "## Horario\n\nAhora el equipo está FUERA del horario de atención: tomá la consulta completa, derivala y avisá que el equipo la va a ver en el próximo horario hábil.",
   );
 
   return sections.join("\n\n");
@@ -258,4 +284,19 @@ export function handoffText(settings: AttentionSettings, sectorId: string, unitI
   if (!template) return null;
   const sectorName = settings.sectors.find((sector) => sector.id === sectorId)?.name ?? sectorId;
   return template.replace(/\{\{sector\}\}/g, sectorName).trim();
+}
+
+// El mensaje que recibe el asociado en un turno: el texto del agente y, si derivó, el aviso oficial a continuación
+// (todo en un solo mensaje: menos mensajes seguidos se sienten más como hablar con una persona). Lo usan el agente
+// real y los evals, para que se evalúe exactamente lo que se envía.
+export function composeReply(settings: AttentionSettings, result: Pick<LoopResult, "text" | "steps">): string {
+  const handoff = result.steps
+    .flatMap((step) => step.toolCalls)
+    .filter((call) => call.decision?.action === "handoff" && !call.isError)
+    .at(-1)?.decision;
+  const official =
+    handoff && typeof handoff.sector === "string"
+      ? handoffText(settings, handoff.sector, typeof handoff.unit === "string" ? handoff.unit : null)
+      : null;
+  return [result.text, official].filter((text): text is string => Boolean(text)).join("\n\n");
 }

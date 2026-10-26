@@ -91,7 +91,7 @@ describe("notas internas", () => {
     if (!created.ok) return;
 
     expect((await addNote({ ...as(operator), conversationId: conversationA, body: "Pidió el formulario" })).ok).toBe(true);
-    const { data } = await admin.from("internal_notes").select("case_id").eq("body", "Pidió el formulario").single();
+    const { data } = await admin.from("internal_notes").select("case_id").eq("conversation_id", conversationA).eq("body", "Pidió el formulario").single();
     expect(data?.case_id).toBe(created.caseId);
   });
 

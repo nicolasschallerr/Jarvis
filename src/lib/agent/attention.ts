@@ -4,7 +4,7 @@ import type { ModelClient } from "@/lib/ai/types";
 import { checkSendable, sendTextMessage } from "@/lib/outbound/send";
 import type { Database } from "@/lib/supabase/database.types";
 
-import { buildHistory, buildSystemPrompt, handoffText, isMenuCommand, sinceLastMenu } from "./context";
+import { buildHistory, buildSystemPrompt, composeReply, isMenuCommand, sinceLastMenu } from "./context";
 import { loadAttentionAgent, loadHistoryRows, loadInlineMedia } from "./load";
 import { runAgentLoop } from "./loop";
 import { recordAiCalls } from "./record";
@@ -158,16 +158,6 @@ async function respondOnce(context: TurnContext): Promise<AttentionResult | "new
 
   await recordAiCalls(admin, { ...record, steps: result.steps });
 
-  // Mensaje oficial de derivación: lo manda el sistema, no el modelo, para que salga idéntico siempre.
-  const handoff = result.steps
-    .flatMap((step) => step.toolCalls)
-    .filter((call) => call.decision?.action === "handoff" && !call.isError)
-    .at(-1)?.decision;
-  const official =
-    handoff && typeof handoff.sector === "string"
-      ? handoffText(settings, handoff.sector, typeof handoff.unit === "string" ? handoff.unit : null)
-      : null;
-
   // Si mientras el modelo pensaba llegó otro mensaje del asociado, se vuelve a empezar con el contexto completo
   // (las herramientas ya guardaron lo que correspondía; la respuesta se arma de nuevo).
   // Y si mientras tanto una persona del equipo tomó el chat o contestó, el agente no escribe encima.
@@ -186,12 +176,10 @@ async function respondOnce(context: TurnContext): Promise<AttentionResult | "new
   if (!current?.ai_enabled) return skipped("una_persona_tomo_el_chat");
   if (newest && newest.id !== latest.id) return newest.direction === "inbound" ? "newer-message" : skipped("una_persona_respondio");
 
-  const texts = [result.text, official].filter((text): text is string => Boolean(text));
-  if (texts.length === 0) return skipped("el_modelo_no_escribio_respuesta");
+  // El mensaje oficial de derivación lo agrega el sistema, no el modelo, para que salga idéntico siempre.
+  const reply = composeReply(settings, result);
+  if (!reply) return skipped("el_modelo_no_escribio_respuesta");
 
-  // Todo en un solo mensaje: la respuesta del agente y, si derivó, el mensaje oficial a continuación.
-  // Menos mensajes seguidos se sienten más como hablar con una persona.
-  const reply = texts.join("\n\n");
   await sendTextMessage(admin, { conversationId, text: reply.slice(0, 4000), sender: "agent", now, fetchImpl: context.fetchImpl });
 
   return { status: "replied", text: reply };

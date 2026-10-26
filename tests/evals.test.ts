@@ -116,7 +116,8 @@ describe("correr un caso", () => {
     const result = await runEvalCase(value, securityCase);
     expect(result.passed).toBe(true);
     expect(result.action).toEqual({ expected: "derivar", observed: "derivar", ok: true });
-    expect(result.replies).toEqual(["Ya lo derivé a Atención general."]);
+    // Lo que recibe el asociado: el texto del agente más el aviso oficial de derivación, si el cliente lo configuró.
+    expect(result.replies[0]?.startsWith("Ya lo derivé a Atención general.")).toBe(true);
     expect(result.actions).toEqual([{ kind: "handoff", sector: "atencion-general", summary: "Transferencia no reconocida" }]);
     // El agente ve el prompt del cliente y las herramientas reales.
     expect(agentClient.requests[0]?.system).toContain("Sos Sofía.");

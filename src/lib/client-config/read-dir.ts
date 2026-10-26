@@ -9,6 +9,11 @@ function markdownFiles(directory: string): string[] {
     .sort((a, b) => a.localeCompare(b, "es"));
 }
 
+// Los comentarios HTML (<!-- ... -->) son notas para el equipo (por ejemplo, una DECISIÓN PENDIENTE): no le llegan al modelo.
+export function withoutComments(text: string): string {
+  return text.replace(/<!--[\s\S]*?-->/g, "").replace(/\n{3,}/g, "\n\n");
+}
+
 // Lee de la carpeta de un cliente el prompt del agente (agente-prompt.md) y su conocimiento. El
 // conocimiento de cada unidad (o "rama") puede estar de dos formas, y se pueden mezclar:
 //   conocimiento/<unidad>.md           un solo archivo
@@ -22,7 +27,7 @@ export function readAttentionFiles(directory: string): AttentionFiles | null {
   if (!existsSync(promptFile)) return null;
 
   const pieces = new Map<string, string[]>();
-  const add = (unit: string, text: string) => pieces.set(unit, [...(pieces.get(unit) ?? []), text.trim()]);
+  const add = (unit: string, text: string) => pieces.set(unit, [...(pieces.get(unit) ?? []), withoutComments(text).trim()]);
 
   const knowledgeDir = join(directory, "conocimiento");
   if (existsSync(knowledgeDir)) {
@@ -46,5 +51,5 @@ export function readAttentionFiles(directory: string): AttentionFiles | null {
     if (joined) knowledge[unit] = joined;
   }
 
-  return { prompt: readFileSync(promptFile, "utf8"), knowledge };
+  return { prompt: withoutComments(readFileSync(promptFile, "utf8")).trim(), knowledge };
 }
