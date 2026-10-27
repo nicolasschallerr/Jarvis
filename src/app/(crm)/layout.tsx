@@ -4,7 +4,6 @@ import { Suspense } from "react";
 
 import { signOut } from "@/app/actions";
 import { Avatar } from "@/components/ui/avatar";
-import { BellIcon, BotIcon, CaseIcon, ChartIcon, ChatIcon, ContactsIcon, HomeIcon, InboxIcon, LockIcon, SendIcon, SparkIcon, StockIcon, TeamIcon } from "@/components/ui/icons";
 import { Logo } from "@/components/ui/logo";
 import { MotionToggle } from "@/components/ui/motion-toggle";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -13,6 +12,7 @@ import { countUnreadNotifications } from "@/lib/crm/notifications";
 import { createClient } from "@/lib/supabase/server";
 
 import { NavLink } from "./nav-link";
+import { sectionsFor } from "./sections";
 import { Shell } from "./shell";
 
 const ROLE_LABELS = {
@@ -68,8 +68,8 @@ async function UserBlock() {
 // login. Migrar más lecturas a `use cache: private` haría las navegaciones instantáneas (deuda).
 export const instant = false;
 
-// El menú depende del rol: "Equipo" y "Agentes" son solo del superadmin; "Analítico" y "Consumo", del superadmin
-// y de consulta y reportes. Ocultarlo es comodidad: la seguridad real está en la página, las acciones y RLS.
+// El menú depende del rol y de si la organización tiene catálogo (ver sections.tsx). Ocultarlo es comodidad: la
+// seguridad real está en la página, las acciones y RLS.
 async function MainNav() {
   // El contador de avisos se lee en cada pedido (la hora y la sesión cambian): connection() lo deja claro.
   await connection();
@@ -77,66 +77,27 @@ async function MainNav() {
   const supabase = await createClient();
   const [unread, { count: stockCount }] = await Promise.all([
     countUnreadNotifications({ userClient: supabase, userId: profile.id }),
-    // "Stock" solo aparece en las organizaciones que tienen catálogo (ADR-043).
     supabase.from("catalog_items").select("id", { count: "exact", head: true }),
   ]);
 
   return (
-    <nav className="flex flex-col gap-0.5" aria-label="Principal">
-      <NavLink href="/inicio" icon={<HomeIcon />}>
-        Inicio
-      </NavLink>
-      <NavLink href="/avisos" icon={<BellIcon />} count={unread} countLabel={`${unread} avisos sin leer`}>
-        Avisos
-      </NavLink>
-      <NavLink href="/conversaciones" icon={<ChatIcon />}>
-        Conversaciones
-      </NavLink>
-      <NavLink href="/casos" icon={<CaseIcon />}>
-        Casos
-      </NavLink>
-      <NavLink href="/contactos" icon={<ContactsIcon />}>
-        Contactos
-      </NavLink>
-      {stockCount ? (
-        <NavLink href="/stock" icon={<StockIcon />}>
-          Stock
-        </NavLink>
-      ) : null}
-      {profile.role === "superadmin" ? (
-        <>
-          <p className="mt-4 mb-1 px-3 text-xs font-semibold tracking-wide text-muted uppercase">Administración</p>
-          <NavLink href="/equipo" icon={<TeamIcon />}>
-            Equipo
-          </NavLink>
-          <NavLink href="/agentes" icon={<BotIcon />}>
-            Agentes
-          </NavLink>
-          <NavLink href="/plantillas" icon={<InboxIcon />}>
-            Plantillas
-          </NavLink>
-          <NavLink href="/envios" icon={<SendIcon />}>
-            Envíos
-          </NavLink>
-          <NavLink href="/auditoria" icon={<LockIcon />}>
-            Auditoría
-          </NavLink>
-        </>
-      ) : null}
-      {profile.role !== "operator" ? (
-        <>
-          {profile.role !== "superadmin" ? <p className="mt-4 mb-1 px-3 text-xs font-semibold tracking-wide text-muted uppercase">Reportes</p> : null}
-          <NavLink href="/analitico" icon={<SparkIcon />}>
-            Analítico
-          </NavLink>
-          <NavLink href="/reportes" icon={<ChartIcon />}>
-            Reportes
-          </NavLink>
-          <NavLink href="/consumo" icon={<ChartIcon />}>
-            Consumo
-          </NavLink>
-        </>
-      ) : null}
+    <nav className="flex flex-col gap-4" aria-label="Principal">
+      {sectionsFor(profile.role, Boolean(stockCount)).map((group) => (
+        <div key={group.title} className="flex flex-col gap-0.5">
+          <p className="eyebrow mb-1 px-3 !text-[0.65rem]">{group.title}</p>
+          {group.sections.map((section) => (
+            <NavLink
+              key={section.href}
+              href={section.href}
+              icon={section.icon}
+              description={section.description}
+              {...(section.href === "/avisos" ? { count: unread, countLabel: `${unread} avisos sin leer` } : {})}
+            >
+              {section.label}
+            </NavLink>
+          ))}
+        </div>
+      ))}
     </nav>
   );
 }
@@ -154,12 +115,15 @@ function NavSkeleton() {
 function Sidebar() {
   return (
     <>
-      <div className="flex flex-col gap-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-6">
         <Logo className="px-3" />
-        {/* El rol y usePathname() son datos de pedido: van dentro de <Suspense>. */}
-        <Suspense fallback={<NavSkeleton />}>
-          <MainNav />
-        </Suspense>
+        {/* Si la pantalla es baja, el menú se desplaza y el bloque del usuario queda siempre a la vista. */}
+        <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-4">
+          {/* El rol y usePathname() son datos de pedido: van dentro de <Suspense>. */}
+          <Suspense fallback={<NavSkeleton />}>
+            <MainNav />
+          </Suspense>
+        </div>
       </div>
       <Suspense fallback={<div className="skeleton h-12" />}>
         <UserBlock />

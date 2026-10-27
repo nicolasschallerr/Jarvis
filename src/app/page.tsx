@@ -1,8 +1,8 @@
 import Link from "next/link";
 
-import { Mascot } from "@/components/agents/mascot";
+import { OrbitVisual } from "@/components/ui/orbit-visual";
 import { BotIcon, CaseIcon, ChartIcon, ChatIcon, ContactsIcon, SparkIcon } from "@/components/ui/icons";
-import { Logo, LogoMark } from "@/components/ui/logo";
+import { Logo } from "@/components/ui/logo";
 
 // Página pública de Orbita AI: qué hace el producto y la entrada al panel. No lee la sesión, así que se
 // prerenderiza entera (es estática y carga al instante).
@@ -92,15 +92,8 @@ export default function LandingPage() {
             </dl>
           </div>
 
-          {/* Los dos agentes, en órbita. */}
-          <div className="relative mx-auto aspect-square w-full max-w-md">
-            <LogoMark animated className="absolute inset-0 size-full opacity-40" title="" />
-            <div className="absolute inset-[12%] rounded-full border border-line bg-surface/40 backdrop-blur-sm" aria-hidden="true" />
-            <Mascot kind="attention" status="working" className="absolute top-[14%] left-[4%] size-[52%]" />
-            <Mascot kind="analytic" status="paused" blinkDelay={1.7} className="absolute right-[4%] bottom-[8%] size-[46%]" />
-            <span className="eyebrow absolute top-[10%] right-[6%] rounded-full border border-line bg-surface px-3 py-1">Atención · en línea</span>
-            <span className="eyebrow absolute bottom-[6%] left-[8%] rounded-full border border-line bg-surface px-3 py-1">Análisis · listo</span>
-          </div>
+          {/* Los agentes, en órbita. */}
+          <OrbitVisual className="mx-auto w-full max-w-md text-zinc-400 dark:text-zinc-600" labels={{ top: "Atención · en línea", bottom: "Análisis · listo" }} />
         </section>
 
         <section id="producto" className="border-t border-line bg-surface/60 py-20">

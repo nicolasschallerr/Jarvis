@@ -1,14 +1,9 @@
-import { Mascot, type AgentKind, type AgentStatus } from "./mascot";
+export type AgentKind = "attention" | "analytic";
+export type AgentStatus = "paused" | "working" | "waiting_approval";
 
 const ROLES: Record<AgentKind, string> = {
   attention: "Agente de atención",
   analytic: "Agente analítico",
-};
-
-const STATUS: Record<AgentStatus, { label: string; dot: string }> = {
-  paused: { label: "En pausa", dot: "bg-zinc-400" },
-  working: { label: "Trabajando", dot: "bg-success" },
-  waiting_approval: { label: "Esperando aprobación", dot: "bg-warning" },
 };
 
 export type AgentView = {
@@ -19,38 +14,85 @@ export type AgentView = {
   isEnabled: boolean;
 };
 
-// Tarjeta de un agente: su mascota, su rol, su estado en vivo y una frase suya. La frase es de
-// personalidad (la configura el cliente): no cuenta cosas que el agente no hizo.
-export function AgentCard({ agent, blinkDelay = 0 }: { agent: AgentView; blinkDelay?: number }) {
-  // "En pausa" en la base significa "no está trabajando ahora": un agente encendido en reposo está disponible, y uno
-  // apagado, apagado.
-  const status = !agent.isEnabled
-    ? { label: "Apagado", dot: "bg-zinc-400" }
-    : agent.status === "paused"
-      ? { label: "Disponible", dot: "bg-success/60" }
-      : STATUS[agent.status];
+export type StatusTone = "off" | "ready" | "busy" | "waiting";
+
+// "En pausa" en la base significa "no está trabajando ahora": un agente encendido en reposo está disponible, y uno
+// apagado, apagado.
+export function agentStatus(agent: Pick<AgentView, "status" | "isEnabled">): { label: string; tone: StatusTone } {
+  if (!agent.isEnabled) return { label: "Apagado", tone: "off" };
+  if (agent.status === "working") return { label: "Trabajando", tone: "busy" };
+  if (agent.status === "waiting_approval") return { label: "Esperando aprobación", tone: "waiting" };
+  return { label: "Disponible", tone: "ready" };
+}
+
+const DOT: Record<StatusTone, string> = {
+  off: "bg-zinc-400",
+  ready: "bg-success",
+  busy: "bg-accent",
+  waiting: "bg-warning",
+};
+
+// Punto de estado: cuando el agente está encendido, un anillo late alrededor (en vivo).
+export function StatusDot({ tone }: { tone: StatusTone }) {
+  return (
+    <span className="relative inline-flex size-2.5 shrink-0" aria-hidden="true">
+      {tone !== "off" ? <span className={`live-ping absolute inset-0 rounded-full ${DOT[tone]}`} /> : null}
+      <span className={`relative size-2.5 rounded-full ${DOT[tone]}`} />
+    </span>
+  );
+}
+
+// Emblema del agente: su inicial dentro de las órbitas de la marca, en el color del agente. Las órbitas giran cuando
+// está encendido, y más rápido cuando está trabajando.
+export function AgentEmblem({ kind, name, tone, className = "size-14" }: { kind: AgentKind; name: string; tone: StatusTone; className?: string }) {
+  const color = kind === "attention" ? "var(--agent-jarvis)" : "var(--agent-sinapsis)";
+  const off = tone === "off";
+  return (
+    <span className={`relative grid shrink-0 place-items-center ${className}`} aria-hidden="true">
+      <svg viewBox="0 0 48 48" className="absolute inset-0 size-full" fill="none" style={{ color }}>
+        <g
+          className={off ? undefined : "orbit-ring"}
+          style={{ transformOrigin: "24px 24px", ["--orbit-speed" as string]: tone === "busy" ? "6s" : "22s" }}
+        >
+          <ellipse cx="24" cy="24" rx="21" ry="8" transform="rotate(-58 24 24)" stroke="currentColor" strokeOpacity={off ? 0.25 : 0.55} strokeWidth="1.2" />
+          <ellipse cx="24" cy="24" rx="21" ry="8.5" transform="rotate(18 24 24)" stroke="currentColor" strokeOpacity={off ? 0.2 : 0.4} strokeWidth="1.2" />
+          {off ? null : <circle cx="24" cy="3.5" r="2" fill="currentColor" />}
+        </g>
+      </svg>
+      <span
+        className="relative grid size-[52%] place-items-center rounded-full text-sm font-bold"
+        style={{ background: `color-mix(in srgb, ${color} 16%, transparent)`, color }}
+      >
+        {name.trim().charAt(0).toUpperCase() || "A"}
+      </span>
+    </span>
+  );
+}
+
+// Tarjeta de un agente: su emblema, su rol, su estado en vivo y una frase suya. La frase es de personalidad (la
+// configura el cliente): no cuenta cosas que el agente no hizo.
+export function AgentCard({ agent }: { agent: AgentView }) {
+  const status = agentStatus(agent);
   const accent = agent.kind === "attention" ? "bg-agent-jarvis" : "bg-agent-sinapsis";
 
   return (
-    <article className="card relative flex items-center gap-4 overflow-hidden p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
-      <span className={`absolute inset-y-0 left-0 w-1.5 ${accent}`} aria-hidden="true" />
-      <Mascot kind={agent.kind} status={agent.status} asleep={!agent.isEnabled} className="size-28 shrink-0 sm:size-32" blinkDelay={blinkDelay} slot={agent.kind} />
+    <article className="card spotlight flex items-center gap-4 overflow-hidden p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <span className={`absolute inset-y-0 left-0 w-1 ${accent}`} aria-hidden="true" />
+      <AgentEmblem kind={agent.kind} name={agent.name} tone={status.tone} className="size-20" />
 
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div>
-          <h3 className="font-display text-xl font-semibold leading-tight">{agent.name}</h3>
+          <h3 className="font-display text-lg font-semibold leading-tight">{agent.name}</h3>
           <p className="text-sm text-muted">{ROLES[agent.kind]}</p>
         </div>
 
         <p className="flex items-center gap-2 text-sm">
-          <span className={`size-2.5 rounded-full ${status.dot}`} aria-hidden="true" />
+          <StatusDot tone={status.tone} />
           <span>{status.label}</span>
         </p>
 
-        <p className="relative rounded-xl rounded-tl-sm bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-800">
-          {agent.isEnabled
-            ? (agent.tagline ?? "Acá estoy.")
-            : "Todavía no estoy activo: cuando me conecten, voy a trabajar con tu equipo."}
+        <p className="text-sm text-muted italic">
+          {agent.isEnabled ? `“${agent.tagline ?? "Acá estoy."}”` : "Todavía no está activo: cuando lo enciendas, va a trabajar con tu equipo."}
         </p>
       </div>
     </article>

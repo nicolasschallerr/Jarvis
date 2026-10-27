@@ -3,7 +3,7 @@
 import { motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Mascot, type AgentKind, type AgentStatus } from "@/components/agents/mascot";
+import { AgentEmblem, StatusDot, agentStatus, type AgentKind, type AgentStatus } from "@/components/agents/agent-card";
 import { Logo } from "@/components/ui/logo";
 
 export type WelcomeAgent = { kind: AgentKind; name: string; status: AgentStatus; line: string };
@@ -53,7 +53,6 @@ export default function WelcomeOverlay({ mode, greeting, agents, onDone }: Props
   const [phase, setPhase] = useState<Phase>("enter");
   const [leaving, setLeaving] = useState(false);
   const doneRef = useRef(false);
-  const mascotRefs = useRef(new Map<AgentKind, HTMLDivElement>());
   const typed = useTypewriter(greeting, 900, 38, full);
 
   const finish = useCallback(() => {
@@ -62,41 +61,12 @@ export default function WelcomeOverlay({ mode, greeting, agents, onDone }: Props
     onDone();
   }, [onDone]);
 
-  // Cada mascota vuela hasta su lugar en la tarjeta del Inicio (marcado con data-mascot-slot). Si ese lugar
-  // no está a la vista (por ejemplo, abajo en un celular), simplemente se desvanece.
-  const settle = useCallback(() => {
-    mascotRefs.current.forEach((element, kind) => {
-      // Navegadores muy viejos no tienen element.animate: la mascota simplemente no se mueve.
-      if (typeof element.animate !== "function") return;
-
-      const target = document.querySelector<HTMLElement>(`[data-mascot-slot="${kind}"]`);
-      const from = element.getBoundingClientRect();
-      const to = target?.getBoundingClientRect();
-      const visible = to && to.width > 0 && to.top >= 0 && to.bottom <= window.innerHeight;
-
-      if (!visible || !to) {
-        element.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, fill: "forwards" });
-        return;
-      }
-
-      const dx = to.left + to.width / 2 - (from.left + from.width / 2);
-      const dy = to.top + to.height / 2 - (from.top + from.height / 2);
-      element.animate(
-        [{ transform: "translate(0, 0) scale(1)" }, { transform: `translate(${dx}px, ${dy}px) scale(${to.width / from.width})` }],
-        { duration: 650, easing: "cubic-bezier(0.3, 0.9, 0.3, 1)", fill: "forwards" },
-      );
-    });
-  }, []);
-
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
     if (full) {
       timers.push(setTimeout(() => setPhase("bubbles"), FULL.bubbles));
       timers.push(
-        setTimeout(() => {
-          setPhase("settle");
-          settle();
-        }, FULL.settle),
+        setTimeout(() => setPhase("settle"), FULL.settle),
       );
       timers.push(setTimeout(finish, FULL.done));
     } else {
@@ -104,7 +74,7 @@ export default function WelcomeOverlay({ mode, greeting, agents, onDone }: Props
       timers.push(setTimeout(finish, SHORT.done));
     }
     return () => timers.forEach(clearTimeout);
-  }, [full, settle, finish]);
+  }, [full, finish]);
 
   // "Saltar" (o Esc): todo se desvanece rápido y se termina.
   const skip = useCallback(() => {
@@ -126,7 +96,7 @@ export default function WelcomeOverlay({ mode, greeting, agents, onDone }: Props
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-hidden px-4" role="status" aria-live="polite">
-      {/* Fondo: se desvanece al final para dejar ver el Inicio mientras las mascotas aterrizan. */}
+      {/* Fondo: se desvanece al final para dejar ver el Panorama. */}
       <motion.div
         aria-hidden="true"
         className="absolute inset-0 bg-background"
@@ -158,7 +128,7 @@ export default function WelcomeOverlay({ mode, greeting, agents, onDone }: Props
           <span className="sr-only">{greeting}</span>
           <span aria-hidden="true" className="inline-flex items-center">
             {typed}
-            {full && typed.length < greeting.length ? <span className="mascot-pulse ml-0.5 inline-block h-8 w-0.5 bg-accent" /> : null}
+            {full && typed.length < greeting.length ? <span className="caret-blink ml-0.5 inline-block h-8 w-0.5 bg-accent" /> : null}
           </span>
         </motion.h1>
 
@@ -167,17 +137,13 @@ export default function WelcomeOverlay({ mode, greeting, agents, onDone }: Props
             {agents.map((agent, index) => (
               <li key={agent.kind} className="flex items-center gap-3">
                 <motion.div
-                  ref={(element) => {
-                    if (element) mascotRefs.current.set(agent.kind, element);
-                    else mascotRefs.current.delete(agent.kind);
-                  }}
-                  className="size-24 shrink-0"
-                  // Entran de a una, con un rebote suave y una leve inclinación.
-                  initial={{ opacity: 0, y: 56, rotate: -12, scale: 0.7 }}
-                  animate={leaving ? { opacity: 0 } : { opacity: 1, y: 0, rotate: 0, scale: 1 }}
-                  transition={{ type: "spring", stiffness: 320, damping: 12, mass: 0.8, delay: leaving ? 0 : 0.5 + index * 0.12 }}
+                  className="shrink-0"
+                  // Entran de a uno, con un rebote suave.
+                  initial={{ opacity: 0, y: 24, scale: 0.8 }}
+                  animate={leaving || settling ? { opacity: 0, scale: 0.9 } : { opacity: 1, y: 0, scale: 1 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 18, delay: leaving || settling ? 0 : 0.5 + index * 0.12 }}
                 >
-                  <Mascot kind={agent.kind} status={agent.status} className="size-24" blinkDelay={index * 1.7} />
+                  <AgentEmblem kind={agent.kind} name={agent.name} tone={agentStatus({ status: agent.status, isEnabled: true }).tone} className="size-16" />
                 </motion.div>
 
                 <motion.p
@@ -186,7 +152,8 @@ export default function WelcomeOverlay({ mode, greeting, agents, onDone }: Props
                   animate={{ opacity: phase === "enter" || fadeContent ? 0 : 1, scale: phase === "enter" ? 0.9 : 1, x: phase === "enter" ? -8 : 0 }}
                   transition={{ type: "spring", stiffness: 300, damping: 20, delay: phase === "bubbles" ? index * 0.15 : 0 }}
                 >
-                  <span className="block text-xs font-semibold" style={{ color: agent.kind === "attention" ? "var(--agent-jarvis)" : "var(--agent-sinapsis)" }}>
+                  <span className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: agent.kind === "attention" ? "var(--agent-jarvis)" : "var(--agent-sinapsis)" }}>
+                    <StatusDot tone={agentStatus({ status: agent.status, isEnabled: true }).tone} />
                     {agent.name}
                   </span>
                   {agent.line}

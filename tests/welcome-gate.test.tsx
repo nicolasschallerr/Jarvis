@@ -78,10 +78,10 @@ describe("bienvenida animada", () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
-  it("la primera vez del día pone la cortina, esconde las mascotas de las tarjetas y quita el parámetro", async () => {
+  it("la primera vez del día pone la cortina, marca la bienvenida y quita el parámetro", async () => {
     const { container } = mount(true);
 
-    // Antes de decidir ya hay una cortina (el servidor la dibuja) y las mascotas de las tarjetas están escondidas.
+    // Antes de decidir ya hay una cortina (el servidor la dibuja).
     expect(container.querySelector(".welcome-fallback")).not.toBeNull();
     expect(document.documentElement.dataset.welcome).toBe("playing");
 
@@ -114,7 +114,7 @@ describe("bienvenida animada", () => {
     expect(document.documentElement.dataset.welcome).toBeUndefined();
   });
 
-  it("el resto del día es la versión corta: sin mascotas y termina a los 0,8 s", async () => {
+  it("el resto del día es la versión corta: sin agentes y termina a los 0,8 s", async () => {
     localStorage.setItem(STORAGE_KEY, TODAY);
     mount(true);
     await advance(50);

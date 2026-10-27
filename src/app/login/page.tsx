@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { signOut } from "@/app/actions";
 import Link from "next/link";
 
-import { Mascot } from "@/components/agents/mascot";
+import { OrbitVisual } from "@/components/ui/orbit-visual";
 import { Logo, LogoMark } from "@/components/ui/logo";
 
 import { LoginForm } from "./login-form";
@@ -57,11 +57,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
             </span>
           </span>
         </Link>
-        <div className="relative z-10 mx-auto flex aspect-square w-full max-w-sm items-center justify-center">
-          <LogoMark animated className="absolute inset-0 size-full opacity-30" title="" />
-          <Mascot kind="attention" status="working" className="absolute top-[10%] left-0 size-[58%]" />
-          <Mascot kind="analytic" status="paused" blinkDelay={1.4} className="absolute right-0 bottom-[6%] size-[50%]" />
-        </div>
+        <OrbitVisual className="relative z-10 mx-auto w-full max-w-sm text-zinc-500" />
         <div className="relative z-10 flex flex-col gap-2">
           <p className="font-mono text-xs tracking-wider text-[#22b8c9] uppercase">Tu equipo, ampliado</p>
           <p className="max-w-sm text-2xl font-semibold tracking-tight">Los agentes atienden; tu equipo decide.</p>

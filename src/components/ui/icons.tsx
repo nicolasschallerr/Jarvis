@@ -157,3 +157,25 @@ export const AlertIcon = (props: IconProps) => (
     <path d="M12 10v4M12 17h.01" />
   </Svg>
 );
+
+export const GridIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <rect x="3" y="3" width="7" height="9" rx="1.5" />
+    <rect x="14" y="3" width="7" height="5" rx="1.5" />
+    <rect x="14" y="12" width="7" height="9" rx="1.5" />
+    <rect x="3" y="16" width="7" height="5" rx="1.5" />
+  </Svg>
+);
+
+export const GaugeIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M4 18a9 9 0 1 1 16 0" />
+    <path d="m12 14 4-5" />
+  </Svg>
+);
+
+export const ArrowRightIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M5 12h14M13 6l6 6-6 6" />
+  </Svg>
+);

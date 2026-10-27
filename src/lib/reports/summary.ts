@@ -79,7 +79,8 @@ export function parseReport(raw: unknown): Report | null {
   };
 }
 
-export async function getReport(params: { userClient: SupabaseClient<Database>; days: ReportDays }) {
+// `days` suele ser uno de REPORT_RANGES; el Panorama pide 14. La base lo limita a 1-90.
+export async function getReport(params: { userClient: SupabaseClient<Database>; days: number }) {
   const { data, error } = await params.userClient.rpc("report_last_days", { p_days: params.days });
   return { report: parseReport(data), failed: Boolean(error) };
 }

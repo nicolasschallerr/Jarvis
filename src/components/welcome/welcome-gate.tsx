@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import type { WelcomeAgent } from "./welcome-overlay";
 
@@ -37,7 +38,7 @@ export function WelcomeGate({ play, todayKey, greeting, firstName, agents }: Pro
   useEffect(() => {
     if (!play) return;
 
-    // Las mascotas de las tarjetas se esconden mientras dura la animación (ver globals.css).
+    // Marca que la bienvenida está en pantalla (sirve para depurar y para las pruebas).
     document.documentElement.dataset.welcome = "playing";
     // Se quita el parámetro de la dirección: al recargar la página no se repite.
     window.history.replaceState(window.history.state, "", window.location.pathname);
@@ -80,7 +81,8 @@ export function WelcomeGate({ play, todayKey, greeting, firstName, agents }: Pro
   }
 
   if (status === "playing") {
-    return <WelcomeOverlay mode={mode} greeting={`${greeting}, ${firstName}`} agents={agents} onDone={done} />;
+    // Va directo en <body>: así cubre toda la pantalla, menú incluido, sin depender de dónde esté el Panorama.
+    return createPortal(<WelcomeOverlay mode={mode} greeting={`${greeting}, ${firstName}`} agents={agents} onDone={done} />, document.body);
   }
 
   return null;
