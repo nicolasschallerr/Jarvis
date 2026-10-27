@@ -54,10 +54,13 @@ export const SECTION_GROUPS: SectionGroup[] = [
 ];
 
 // Las secciones que ve una persona según su rol y si la organización tiene stock conectado (ADR-047: lo conecta el
-// equipo de Orbita AI, no el cliente). Los grupos vacíos no se muestran.
+// equipo de Orbita AI, no el cliente). El superadmin ve Stock siempre, para poder revisarlo aunque todavía esté vacío.
+// Los grupos vacíos no se muestran.
 export function sectionsFor(role: Role, hasCatalog: boolean): SectionGroup[] {
   return SECTION_GROUPS.map((group) => ({
     title: group.title,
-    sections: group.sections.filter((section) => section.roles.includes(role) && (!section.needsCatalog || hasCatalog)),
+    sections: group.sections.filter(
+      (section) => section.roles.includes(role) && (!section.needsCatalog || hasCatalog || role === "superadmin"),
+    ),
   })).filter((group) => group.sections.length > 0);
 }
