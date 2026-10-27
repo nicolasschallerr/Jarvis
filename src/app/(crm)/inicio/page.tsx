@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { markNoticesRead } from "../avisos-actions";
 import { LiveRefresh } from "../live-refresh";
+import { ModuleMap, type ModuleMetric } from "@/components/overview/module-map";
 import { sectionsFor } from "../sections";
 
 export const metadata = { title: "Panorama" };
@@ -56,7 +57,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
     getHomeSummary({ userClient: supabase, userId: profile.id }),
     getUnreadNotifications({ userClient: supabase, userId: profile.id }),
     getReport({ userClient: supabase, days: ACTIVITY_DAYS }),
-    supabase.from("catalog_items").select("id", { count: "exact", head: true }),
+    supabase.from("catalog_items").select("id", { count: "exact", head: true }).eq("is_available", true),
   ]);
   const report = activity.report;
 
@@ -93,7 +94,20 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
     count: report?.openByStatus[status.key] ?? 0,
   }));
   const openTotal = openCases.reduce((total, status) => total + status.count, 0);
-  const modules = sectionsFor(profile.role, Boolean(catalog.count)).flatMap((group) => group.sections.filter((section) => section.href !== "/inicio"));
+  const moduleGroups = sectionsFor(profile.role, Boolean(catalog.count));
+  // El dato en vivo que muestra cada tarjeta del mapa. Solo hay donde hay algo que contar.
+  const moduleMetrics: Record<string, ModuleMetric | undefined> = {
+    "/conversaciones":
+      summary.counts.awaitingReply > 0
+        ? { text: `${summary.counts.awaitingReply} esperando respuesta`, tone: "warning" }
+        : { text: "Al día", tone: "success" },
+    "/casos":
+      summary.counts.urgentCases > 0
+        ? { text: `${openTotal} abiertos · ${summary.counts.urgentCases} urgente${summary.counts.urgentCases === 1 ? "" : "s"}`, tone: "danger" }
+        : { text: `${openTotal} abiertos`, tone: "info" },
+    "/avisos": notices.unread > 0 ? { text: `${notices.unread} sin leer`, tone: "warning" } : undefined,
+    "/stock": catalog.count ? { text: `${number.format(catalog.count)} productos`, tone: "accent" } : undefined,
+  };
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
@@ -421,34 +435,11 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
       </section>
 
       {/* El mapa del CRM: cada sección con lo que hace. Se muestran las que la persona puede usar. */}
-      <section aria-labelledby="todo" className="flex flex-col gap-3">
+      <section aria-labelledby="todo" className="flex flex-col gap-4">
         <h2 id="todo" className="eyebrow">
-          Todo lo que podés hacer
+          Explorá Orbita
         </h2>
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {modules.map((section, index) => (
-            <li key={section.href} className="rise-in" style={stagger(12 + index)}>
-              <Link
-                href={section.href}
-                className="card spotlight group flex h-full items-start gap-3 p-4 transition duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-md"
-              >
-                <span
-                  className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent transition duration-200 group-hover:scale-110"
-                  aria-hidden="true"
-                >
-                  {section.icon}
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="flex items-center justify-between gap-2 text-sm font-semibold">
-                    {section.label}
-                    <ArrowRightIcon className="size-3.5 -translate-x-1 text-accent opacity-0 transition duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
-                  </span>
-                  <span className="text-sm text-muted">{section.description}</span>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <ModuleMap groups={moduleGroups} metrics={moduleMetrics} />
       </section>
     </main>
   );
