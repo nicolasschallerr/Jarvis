@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import Link from "next/link";
 
-import { AgentCard, AgentEmblem, StatusDot, agentStatus, type AgentView } from "@/components/agents/agent-card";
+import { AgentCard, AgentEmblem, StatusDot, agentStatus, toAgentKind, type AgentView } from "@/components/agents/agent-card";
 import { ActivityChart } from "@/components/overview/activity-chart";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { Avatar } from "@/components/ui/avatar";
@@ -66,13 +66,11 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
   const now = new Date();
   const firstName = profile.fullName.trim().split(/\s+/)[0] ?? "";
 
-  const agents: AgentView[] = summary.agents.map((agent) => ({
-    kind: agent.kind === "analytic" ? "analytic" : "attention",
-    name: agent.name,
-    tagline: agent.tagline,
-    status: agent.status as AgentView["status"],
-    isEnabled: agent.is_enabled,
-  }));
+  // Solo los agentes visibles del equipo; la base tiene otros tipos internos.
+  const agents: AgentView[] = summary.agents.flatMap((agent) => {
+    const kind = toAgentKind(agent.kind);
+    return kind ? [{ kind, name: agent.name, tagline: agent.tagline, status: agent.status as AgentView["status"], isEnabled: agent.is_enabled }] : [];
+  });
 
   const tiles: Tile[] = [
     { label: "Esperando respuesta", value: summary.counts.awaitingReply, href: "/conversaciones?filtro=esperando", hint: "conversaciones", icon: <ChatIcon /> },
@@ -108,7 +106,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
           kind: agent.kind,
           name: agent.name,
           status: agent.status,
-          line: welcomeLine(agent.kind, summary.counts),
+          line: welcomeLine(agent.kind, summary.counts, catalog.count ?? 0),
         }))}
       />
       <LiveRefresh organizationId={profile.organizationId} agents />

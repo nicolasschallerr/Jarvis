@@ -1,9 +1,28 @@
-export type AgentKind = "attention" | "analytic";
+export type AgentKind = "attention" | "analytic" | "stock";
 export type AgentStatus = "paused" | "working" | "waiting_approval";
 
 const ROLES: Record<AgentKind, string> = {
   attention: "Agente de atención",
   analytic: "Agente analítico",
+  stock: "Agente de stock",
+};
+
+// Los agentes que se muestran en el CRM. La base tiene otros tipos de agente internos (resumen, clasificador...) que no
+// son compañeros de equipo visibles: para esos devuelve null.
+export function toAgentKind(kind: string): AgentKind | null {
+  return kind === "attention" || kind === "analytic" || kind === "stock" ? kind : null;
+}
+
+export const AGENT_COLOR: Record<AgentKind, string> = {
+  attention: "var(--agent-jarvis)",
+  analytic: "var(--agent-sinapsis)",
+  stock: "var(--agent-stock)",
+};
+
+const AGENT_BAR: Record<AgentKind, string> = {
+  attention: "bg-agent-jarvis",
+  analytic: "bg-agent-sinapsis",
+  stock: "bg-agent-stock",
 };
 
 export type AgentView = {
@@ -45,7 +64,7 @@ export function StatusDot({ tone }: { tone: StatusTone }) {
 // Emblema del agente: su inicial dentro de las órbitas de la marca, en el color del agente. Las órbitas giran cuando
 // está encendido, y más rápido cuando está trabajando.
 export function AgentEmblem({ kind, name, tone, className = "size-14" }: { kind: AgentKind; name: string; tone: StatusTone; className?: string }) {
-  const color = kind === "attention" ? "var(--agent-jarvis)" : "var(--agent-sinapsis)";
+  const color = AGENT_COLOR[kind];
   const off = tone === "off";
   return (
     <span className={`relative grid shrink-0 place-items-center ${className}`} aria-hidden="true">
@@ -73,7 +92,7 @@ export function AgentEmblem({ kind, name, tone, className = "size-14" }: { kind:
 // configura el cliente): no cuenta cosas que el agente no hizo.
 export function AgentCard({ agent }: { agent: AgentView }) {
   const status = agentStatus(agent);
-  const accent = agent.kind === "attention" ? "bg-agent-jarvis" : "bg-agent-sinapsis";
+  const accent = AGENT_BAR[agent.kind];
 
   return (
     <article className="card spotlight flex items-center gap-4 overflow-hidden p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-md">

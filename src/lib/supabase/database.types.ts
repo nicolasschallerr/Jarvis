@@ -2359,6 +2359,7 @@ export type Database = {
         | "classifier"
         | "analytic"
         | "evaluator"
+        | "stock"
       app_role: "superadmin" | "operator" | "viewer"
       area_query_status: "pending" | "answered" | "cancelled" | "expired"
       broadcast_status: "draft" | "scheduled" | "sending" | "done" | "cancelled"
@@ -2535,6 +2536,7 @@ export const Constants = {
         "classifier",
         "analytic",
         "evaluator",
+        "stock",
       ],
       app_role: ["superadmin", "operator", "viewer"],
       area_query_status: ["pending", "answered", "cancelled", "expired"],

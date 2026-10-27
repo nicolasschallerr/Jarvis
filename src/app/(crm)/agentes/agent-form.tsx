@@ -8,7 +8,13 @@ import { saveAgent, type AgentFormState } from "./actions";
 
 const INITIAL: AgentFormState = { error: null, saved: false };
 
-export function AgentForm({ id, agent }: { id: string; agent: AgentView }) {
+const ENABLE_LABEL = {
+  attention: "Encendido (atiende las conversaciones)",
+  analytic: "Encendido (responde las preguntas del equipo)",
+  stock: "Encendido (el agente de atención consulta el stock para responder)",
+} as const;
+
+export function AgentForm({ id, agent, children }: { id: string; agent: AgentView; children?: React.ReactNode }) {
   const [state, action, pending] = useActionState(saveAgent.bind(null, id), INITIAL);
 
   return (
@@ -28,8 +34,10 @@ export function AgentForm({ id, agent }: { id: string; agent: AgentView }) {
 
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="isEnabled" defaultChecked={agent.isEnabled} className="size-4 accent-accent" />
-          {agent.kind === "attention" ? "Encendido (atiende las conversaciones)" : "Encendido (responde las preguntas del equipo)"}
+          {ENABLE_LABEL[agent.kind]}
         </label>
+
+        {children}
 
         <div className="flex items-center gap-3">
           <button type="submit" disabled={pending} className="btn-primary">

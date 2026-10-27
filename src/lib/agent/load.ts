@@ -41,9 +41,23 @@ export async function loadAttentionAgent(
   const settings = attentionSettingsSchema.safeParse(config.settings);
   if (!settings.success) return { ok: false, status: "failed", reason: "La configuración del agente no es válida" };
 
+  // El agente de stock (ADR-046) decide si el de atención consulta el catálogo: encendido, tiene las herramientas;
+  // apagado, no. Una organización sin fila de stock (anterior a ese agente) sigue como dice su configuración.
+  const { data: stockAgent } = await admin
+    .from("agents")
+    .select("is_enabled")
+    .eq("organization_id", organizationId)
+    .eq("kind", "stock")
+    .maybeSingle();
+  const catalog = stockAgent ? { ...settings.data.catalog, enabled: stockAgent.is_enabled } : settings.data.catalog;
+
   return {
     ok: true,
-    agent: { agentId: agent.id, config: { id: config.id, model: config.model, prompt: config.prompt }, settings: settings.data },
+    agent: {
+      agentId: agent.id,
+      config: { id: config.id, model: config.model, prompt: config.prompt },
+      settings: { ...settings.data, catalog },
+    },
   };
 }
 

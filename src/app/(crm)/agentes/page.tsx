@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { connection } from "next/server";
-import type { AgentView } from "@/components/agents/agent-card";
+import { toAgentKind, type AgentView } from "@/components/agents/agent-card";
 import { EmptyState, NoAccess } from "@/components/ui/empty-state";
 import { BotIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
@@ -23,10 +24,13 @@ export default async function AgentesPage() {
   }
 
   const supabase = await createClient();
-  const { data: agents, error } = await supabase
-    .from("agents")
-    .select("id, kind, name, tagline, status, is_enabled")
-    .order("kind");
+  const [{ data: allAgents, error }, { count: products }, { count: sources }] = await Promise.all([
+    supabase.from("agents").select("id, kind, name, tagline, status, is_enabled").order("kind"),
+    supabase.from("catalog_items").select("id", { count: "exact", head: true }).eq("is_available", true),
+    supabase.from("catalog_sources").select("id", { count: "exact", head: true }),
+  ]);
+  // Solo los agentes que son compañeros visibles del equipo (la base tiene otros tipos internos).
+  const agents = (allAgents ?? []).filter((agent) => toAgentKind(agent.kind) !== null);
 
   return (
     <main className="flex flex-1 flex-col">
@@ -36,23 +40,35 @@ export default async function AgentesPage() {
         <p role="alert" className="p-6 text-sm text-danger">
           No se pudieron cargar los agentes. Probá recargar.
         </p>
-      ) : (agents ?? []).length === 0 ? (
+      ) : agents.length === 0 ? (
         <EmptyState
           icon={<BotIcon className="size-6" />}
           title="Todavía no hay agentes"
           description="Se cargan con el script de configuración del cliente."
         />
       ) : (
-        <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-2">
-          {(agents ?? []).map((agent) => {
+        <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-2 2xl:grid-cols-3">
+          {agents.map((agent) => {
+            const kind = toAgentKind(agent.kind) ?? "attention";
             const view: AgentView = {
-              kind: agent.kind === "attention" ? "attention" : "analytic",
+              kind,
               name: agent.name,
               tagline: agent.tagline,
               status: agent.status === "working" || agent.status === "waiting_approval" ? agent.status : "paused",
               isEnabled: agent.is_enabled,
             };
-            return <AgentForm key={agent.id} id={agent.id} agent={view} />;
+            return (
+              <AgentForm key={agent.id} id={agent.id} agent={view}>
+                {kind === "stock" ? (
+                  <p className="text-sm text-muted">
+                    {products ?? 0} productos disponibles en {sources ?? 0} {sources === 1 ? "fuente" : "fuentes"}.{" "}
+                    <Link href="/stock" className="font-medium text-accent hover:underline">
+                      Administrar el stock
+                    </Link>
+                  </p>
+                ) : null}
+              </AgentForm>
+            );
           })}
         </div>
       )}
