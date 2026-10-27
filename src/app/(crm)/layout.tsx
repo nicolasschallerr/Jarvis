@@ -4,7 +4,7 @@ import { Suspense } from "react";
 
 import { signOut } from "@/app/actions";
 import { Avatar } from "@/components/ui/avatar";
-import { BellIcon, BotIcon, CaseIcon, ChartIcon, ChatIcon, ContactsIcon, HomeIcon, InboxIcon, LockIcon, SendIcon, SparkIcon, TeamIcon } from "@/components/ui/icons";
+import { BellIcon, BotIcon, CaseIcon, ChartIcon, ChatIcon, ContactsIcon, HomeIcon, InboxIcon, LockIcon, SendIcon, SparkIcon, StockIcon, TeamIcon } from "@/components/ui/icons";
 import { Logo } from "@/components/ui/logo";
 import { MotionToggle } from "@/components/ui/motion-toggle";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -74,7 +74,12 @@ async function MainNav() {
   // El contador de avisos se lee en cada pedido (la hora y la sesión cambian): connection() lo deja claro.
   await connection();
   const profile = await getCurrentProfile();
-  const unread = await countUnreadNotifications({ userClient: await createClient(), userId: profile.id });
+  const supabase = await createClient();
+  const [unread, { count: stockCount }] = await Promise.all([
+    countUnreadNotifications({ userClient: supabase, userId: profile.id }),
+    // "Stock" solo aparece en las organizaciones que tienen catálogo (ADR-043).
+    supabase.from("catalog_items").select("id", { count: "exact", head: true }),
+  ]);
 
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Principal">
@@ -93,6 +98,11 @@ async function MainNav() {
       <NavLink href="/contactos" icon={<ContactsIcon />}>
         Contactos
       </NavLink>
+      {stockCount ? (
+        <NavLink href="/stock" icon={<StockIcon />}>
+          Stock
+        </NavLink>
+      ) : null}
       {profile.role === "superadmin" ? (
         <>
           <p className="mt-4 mb-1 px-3 text-xs font-semibold tracking-wide text-muted uppercase">Administración</p>

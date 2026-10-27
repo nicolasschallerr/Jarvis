@@ -51,6 +51,14 @@ export const ContactsIcon = (props: IconProps) => (
   </Svg>
 );
 
+export const StockIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M3 10.5 12 4l9 6.5" />
+    <path d="M5 9v11h14V9" />
+    <path d="M10 20v-5h4v5" />
+  </Svg>
+);
+
 export const TeamIcon = (props: IconProps) => (
   <Svg {...props}>
     <rect x="3" y="4" width="18" height="16" rx="2" />
