@@ -10,6 +10,9 @@ vi.mock("@/app/(crm)/casos/actions", () => ({ moveCaseAction }));
 
 const base = { priority: "normal", sectorName: "Sector de prueba", assigneeName: null, contactName: "Ana Prueba", conversationId: "c1", updatedAt: "2026-10-23T12:00:00.000Z" };
 
+// Hora fija: el tablero recibe la hora del servidor para que las fechas relativas no cambien al hidratar.
+const NOW = "2026-10-24T12:00:00.000Z";
+
 const cases: BoardCase[] = [
   { ...base, id: "a", title: "Caso A", status: "new" },
   { ...base, id: "b", title: "Caso B", status: "new", priority: "urgent" },
@@ -29,7 +32,7 @@ describe("tablero de casos", () => {
   afterEach(() => cleanup());
 
   it("reparte los casos en cinco columnas con su cantidad", () => {
-    render(<Board cases={cases} canEdit />);
+    render(<Board cases={cases} now={NOW} canEdit />);
 
     expect(screen.getAllByRole("region")).toHaveLength(5);
     expect(column(/^Nuevo: 2 casos/)).not.toBeNull();
@@ -41,14 +44,14 @@ describe("tablero de casos", () => {
   });
 
   it("enlaza cada caso con su conversación", () => {
-    render(<Board cases={cases} canEdit />);
+    render(<Board cases={cases} now={NOW} canEdit />);
     expect(screen.getByRole("link", { name: "Caso A" }).getAttribute("href")).toBe("/conversaciones/c1");
   });
 
   it("con el selector mueve el caso al instante y llama a la acción", async () => {
     let finish!: (value: { error: string | null }) => void;
     moveCaseAction.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
-    render(<Board cases={cases} canEdit />);
+    render(<Board cases={cases} now={NOW} canEdit />);
 
     fireEvent.change(moveSelect("Caso A"), { target: { value: "in_progress" } });
 
@@ -63,7 +66,7 @@ describe("tablero de casos", () => {
   it("si el servidor lo rechaza, el caso vuelve a su columna y se avisa el motivo", async () => {
     let finish!: (value: { error: string | null }) => void;
     moveCaseAction.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
-    render(<Board cases={cases} canEdit />);
+    render(<Board cases={cases} now={NOW} canEdit />);
 
     fireEvent.change(moveSelect("Caso B"), { target: { value: "waiting_area" } });
     await waitFor(() => expect(within(column(/^Esperando al área/)).getByText("Caso B")).not.toBeNull());
@@ -76,7 +79,7 @@ describe("tablero de casos", () => {
   });
 
   it("al resolver pregunta cómo se resolvió y recién entonces llama a la acción", async () => {
-    render(<Board cases={cases} canEdit />);
+    render(<Board cases={cases} now={NOW} canEdit />);
 
     fireEvent.change(moveSelect("Caso C"), { target: { value: "resolved" } });
     expect(moveCaseAction).not.toHaveBeenCalled();
@@ -90,7 +93,7 @@ describe("tablero de casos", () => {
   });
 
   it("cancelar la pregunta no mueve nada", () => {
-    render(<Board cases={cases} canEdit />);
+    render(<Board cases={cases} now={NOW} canEdit />);
 
     fireEvent.change(moveSelect("Caso C"), { target: { value: "resolved" } });
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
@@ -101,7 +104,7 @@ describe("tablero de casos", () => {
   });
 
   it("quien solo consulta ve el tablero pero no tiene manijas ni selectores", () => {
-    render(<Board cases={cases} canEdit={false} />);
+    render(<Board cases={cases} now={NOW} canEdit={false} />);
 
     expect(screen.queryAllByRole("combobox")).toHaveLength(0);
     expect(screen.queryByRole("button", { name: /Mover el caso/ })).toBeNull();
@@ -110,7 +113,7 @@ describe("tablero de casos", () => {
   });
 
   it("cada caso con permiso tiene una manija accesible para arrastrar o mover con el teclado", () => {
-    render(<Board cases={cases} canEdit />);
+    render(<Board cases={cases} now={NOW} canEdit />);
     expect(screen.getAllByRole("button", { name: /^Mover el caso/ })).toHaveLength(4);
   });
 });

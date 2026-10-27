@@ -32,12 +32,23 @@ export function Badge({ tone = "neutral", dot = false, children, title }: { tone
   );
 }
 
-const STATUS_TONES: Record<string, Tone> = {
+export const STATUS_TONES: Record<string, Tone> = {
   new: "info",
   in_progress: "accent",
   waiting_contact: "warning",
   waiting_area: "warning",
   resolved: "success",
+};
+
+// Color de identidad de cada estado para el tablero: punto del título y borde superior de la columna. Clases
+// completas (no armadas con plantillas) para que Tailwind las encuentre. "Esperando al área" usa el ámbar del
+// agente analítico así no se confunde con "Esperando al contacto" cuando las columnas están una al lado de la otra.
+export const STATUS_ACCENTS: Record<string, { dot: string; border: string }> = {
+  new: { dot: "bg-info", border: "border-t-info" },
+  in_progress: { dot: "bg-accent", border: "border-t-accent" },
+  waiting_contact: { dot: "bg-warning", border: "border-t-warning" },
+  waiting_area: { dot: "bg-agent-sinapsis", border: "border-t-agent-sinapsis" },
+  resolved: { dot: "bg-success", border: "border-t-success" },
 };
 
 export function StatusBadge({ status }: { status: string }) {
@@ -53,6 +64,20 @@ const PRIORITY_TONES: Record<string, Tone> = {
   normal: "neutral",
   high: "warning",
   urgent: "danger",
+};
+
+// Punto de color de cada prioridad (filtros) y franja lateral de las tarjetas que piden atención. Las prioridades
+// bajas no llevan franja: si todo resalta, nada resalta.
+export const PRIORITY_DOTS: Record<string, string> = {
+  urgent: "bg-danger",
+  high: "bg-warning",
+  normal: "bg-zinc-400",
+  low: "bg-zinc-300 dark:bg-zinc-600",
+};
+
+export const PRIORITY_STRIPES: Record<string, string> = {
+  urgent: "border-l-4 border-l-danger",
+  high: "border-l-4 border-l-warning",
 };
 
 export function PriorityBadge({ priority }: { priority: string }) {

@@ -2,8 +2,11 @@ import { connection } from "next/server";
 import Link from "next/link";
 
 import { NoAccess } from "@/components/ui/empty-state";
+import { ErrorBanner } from "@/components/ui/error-banner";
+import { ArrowLeftIcon, ArrowRightIcon, BotIcon, ChartIcon, ChatIcon, GaugeIcon, SparkIcon } from "@/components/ui/icons";
 import { LimitsCard } from "./limits-card";
 import { PageHeader } from "@/components/ui/page-header";
+import { StatTile, type StatTone } from "@/components/ui/stat-tile";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { getConsumption } from "@/lib/crm/consumption";
 import { capitalizeFirst } from "@/lib/crm/format";
@@ -58,28 +61,37 @@ export default async function ConsumoPage({ searchParams }: PageProps<"/consumo"
         ? "Sin precios configurados: el costo no se calcula."
         : `Parcial: ${number.format(totals.callsWithoutCost)} llamadas sin precio no se incluyen.`;
 
-  const tiles = [
-    { label: "Créditos", value: number.format(totals.credits), hint: "conversaciones de 24 h abiertas" },
+  const tiles: Array<{ label: string; value: number | string; hint: string; icon: React.ReactNode; tone: StatTone }> = [
+    { label: "Créditos", value: totals.credits, hint: "conversaciones de 24 h abiertas", icon: <GaugeIcon className="size-4" />, tone: "accent" },
     {
       label: "Conversaciones",
-      value: number.format(totals.windows),
+      value: totals.windows,
       hint: `${number.format(totals.windowsByContact)} del asociado · ${number.format(totals.windowsByBusiness)} de la organización`,
+      icon: <ChatIcon className="size-4" />,
+      tone: "info",
     },
     {
       label: "Llamadas a IA",
-      value: number.format(totals.aiCalls),
+      value: totals.aiCalls,
       hint: totals.aiErrors > 0 ? `${number.format(totals.aiErrors)} con error` : "sin errores",
+      icon: <SparkIcon className="size-4" />,
+      tone: totals.aiErrors > 0 ? "warning" : "success",
     },
     {
       label: "Tokens",
-      value: number.format(totals.inputTokens + totals.outputTokens),
+      value: totals.inputTokens + totals.outputTokens,
       hint: `${number.format(totals.inputTokens)} de entrada · ${number.format(totals.outputTokens)} de salida`,
+      icon: <BotIcon className="size-4" />,
+      tone: "accent",
     },
-    { label: "Costo estimado de IA", value: totals.costUsd > 0 ? usd.format(totals.costUsd) : "—", hint: costNote ?? "según los precios configurados" },
+    // El costo va como texto: el formato de moneda (con decimales) no se anima.
+    { label: "Costo estimado de IA", value: totals.costUsd > 0 ? usd.format(totals.costUsd) : "—", hint: costNote ?? "según los precios configurados", icon: <ChartIcon className="size-4" />, tone: "info" },
   ];
 
   // La tabla muestra solo los días con movimiento; el gráfico, el mes entero.
   const activeDays = days.filter((day) => day.credits > 0 || day.ai_calls > 0);
+  // En el mes en curso, el último día consultado es hoy: su barra se resalta.
+  const today = range.isCurrent ? range.to : null;
 
   return (
     <main className="flex flex-1 flex-col">
@@ -88,54 +100,73 @@ export default async function ConsumoPage({ searchParams }: PageProps<"/consumo"
         description={<>Un crédito es una conversación de 24 h con un contacto. {range.isCurrent ? "Mes en curso, hasta hoy." : null}</>}
         actions={
           <>
-          <a href={`/exportar/consumo?mes=${range.month}`} className="btn-secondary !px-3 !py-1.5 text-sm" download>
-            Exportar CSV
-          </a>
-          <nav aria-label="Meses" className="flex gap-2">
-            <Link href={`/consumo?mes=${range.previous}`} className="btn-secondary !px-3 !py-1.5 text-sm">
-              ← {monthLabel(range.previous)}
-            </Link>
-            {range.next ? (
-              <Link href={`/consumo?mes=${range.next}`} className="btn-secondary !px-3 !py-1.5 text-sm">
-                {monthLabel(range.next)} →
+            {/* En el celular queda solo el ícono; el nombre accesible sigue siendo "Exportar CSV". */}
+            <a href={`/exportar/consumo?mes=${range.month}`} className="btn-secondary gap-1.5 !px-3 !py-1.5 text-sm" aria-label="Exportar CSV" title="Exportar CSV" download>
+              <ArrowRightIcon className="size-4 rotate-90" />
+              <span className="hidden sm:inline">Exportar CSV</span>
+            </a>
+            <nav aria-label="Meses" className="flex items-center gap-1 rounded-lg border border-zinc-300 bg-surface p-0.5 dark:border-zinc-700">
+              <Link
+                href={`/consumo?mes=${range.previous}`}
+                aria-label={`Mes anterior: ${monthLabel(range.previous)}`}
+                className="grid size-7 place-items-center rounded-md transition hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                <ArrowLeftIcon className="size-4" />
               </Link>
-            ) : null}
-          </nav>
+              <span className="min-w-28 px-1 text-center text-sm font-medium">{monthLabel(range.month)}</span>
+              {range.next ? (
+                <Link
+                  href={`/consumo?mes=${range.next}`}
+                  aria-label={`Mes siguiente: ${monthLabel(range.next)}`}
+                  className="grid size-7 place-items-center rounded-md transition hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  <ArrowRightIcon className="size-4" />
+                </Link>
+              ) : (
+                // Mes en curso: no hay siguiente. Se deja el lugar para que el control no cambie de ancho.
+                <span className="grid size-7 place-items-center text-muted opacity-40" aria-hidden="true">
+                  <ArrowRightIcon className="size-4" />
+                </span>
+              )}
+            </nav>
           </>
         }
       />
+
+      {/* Si la carga falló no se muestran tarjetas en cero ni un gráfico vacío: parecería que no hubo consumo. */}
+      {failed ? (
+        <ErrorBanner>No se pudo cargar el consumo. Probá recargar la página.</ErrorBanner>
+      ) : (
       <div className="flex flex-col gap-6 p-4 sm:p-6">
 
-      {failed ? (
-        <p role="alert" className="text-sm text-danger">
-          No se pudo cargar el consumo. Probá recargar la página.
-        </p>
-      ) : null}
-
       <section aria-label="Resumen" className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {tiles.map((tile) => (
-          <div key={tile.label} className="card flex flex-col gap-1 p-4">
-            <span className="font-display text-2xl font-semibold">{tile.value}</span>
-            <span className="text-sm font-medium">{tile.label}</span>
-            <span className="text-xs text-muted">{tile.hint}</span>
-          </div>
+        {tiles.map((tile, index) => (
+          <StatTile key={tile.label} index={index} label={tile.label} value={tile.value} hint={tile.hint} icon={tile.icon} tone={tile.tone} />
         ))}
       </section>
 
       <LimitsCard limits={limits} used={{ credits: totals.credits, costUsd: totals.costUsd }} canEdit={profile.role === "superadmin"} />
 
       <section aria-labelledby="por-dia" className="flex flex-col gap-3">
-        <h2 id="por-dia" className="text-sm font-semibold uppercase tracking-wide text-muted">
-          Créditos por día
-        </h2>
-        {/* Gráfico del mes: decorativo, los números están en la tabla de abajo. */}
+        <div className="flex items-center justify-between gap-2">
+          <h2 id="por-dia" className="text-sm font-semibold uppercase tracking-wide text-muted">
+            Créditos por día
+          </h2>
+          {today ? (
+            <span className="flex items-center gap-1.5 text-xs text-muted" aria-hidden="true">
+              <span className="size-2 rounded-full bg-accent" />
+              Hoy
+            </span>
+          ) : null}
+        </div>
+        {/* Gráfico del mes: decorativo, los números están en la tabla de abajo. Las barras entran escalonadas. */}
         <div className="card flex h-36 items-end gap-[3px] px-4 pt-4 pb-3" aria-hidden="true">
-          {days.map((day) => (
+          {days.map((day, index) => (
             <div
               key={day.day}
               title={`${capitalizeFirst(dayName.format(new Date(`${day.day}T00:00:00Z`)))}: ${number.format(day.credits)} créditos`}
-              className={`flex-1 rounded-t-sm ${day.credits > 0 ? "bg-agent-jarvis" : "bg-line"}`}
-              style={{ height: `${Math.max(3, Math.round((day.credits / maxCredits) * 100))}%` }}
+              className={`rise-in flex-1 rounded-t-sm ${day.day === today ? "bg-accent" : day.credits > 0 ? "bg-accent/35" : "bg-line"}`}
+              style={{ height: `${Math.max(3, Math.round((day.credits / maxCredits) * 100))}%`, animationDelay: `${index * 0.015}s` }}
             />
           ))}
         </div>
@@ -184,6 +215,7 @@ export default async function ConsumoPage({ searchParams }: PageProps<"/consumo"
         )}
       </section>
       </div>
+      )}
     </main>
   );
 }

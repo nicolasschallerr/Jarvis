@@ -3,7 +3,9 @@ import { connection } from "next/server";
 
 import { Avatar } from "@/components/ui/avatar";
 import { Badge, PriorityBadge, StatusBadge } from "@/components/ui/badge";
+import { ChannelDot } from "@/components/conversations/channel-dot";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { ChatIcon, PauseIcon, SearchIcon } from "@/components/ui/icons";
 import { LinkTabs, SegmentedLinks } from "@/components/ui/link-tabs";
 import { PageHeader } from "@/components/ui/page-header";
@@ -99,9 +101,7 @@ export default async function ConversacionesPage({ searchParams }: PageProps<"/c
       </PageHeader>
 
       {failed ? (
-        <p role="alert" className="m-4 rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger sm:m-6">
-          No se pudieron cargar las conversaciones. Probá recargar la página.
-        </p>
+        <ErrorBanner>No se pudieron cargar las conversaciones. Probá recargar la página.</ErrorBanner>
       ) : items.length === 0 ? (
         <EmptyState
           icon={<ChatIcon className="size-5" />}
@@ -123,11 +123,18 @@ export default async function ConversacionesPage({ searchParams }: PageProps<"/c
               const wait = waiting ? waitingTime(conversation.last_message_at, now) : null;
               return (
                 <li key={conversation.id}>
+                  {/* Las que esperan respuesta llevan una barra de acento a la izquierda y un fondo apenas teñido: se
+                      encuentran bajando la vista por el borde, sin leer cada fila. */}
                   <Link
                     href={`/conversaciones/${conversation.id}`}
-                    className="flex items-start gap-3 px-4 py-3.5 transition hover:bg-zinc-100/80 sm:px-6 dark:hover:bg-zinc-900"
+                    className={`relative flex items-start gap-3 px-4 py-3.5 transition hover:bg-zinc-100/80 sm:px-6 dark:hover:bg-zinc-900 ${
+                      waiting ? "bg-accent-soft/20 before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-accent" : ""
+                    }`}
                   >
-                    <Avatar name={conversation.contact_name} />
+                    <span className="relative shrink-0">
+                      <Avatar name={conversation.contact_name} />
+                      <ChannelDot channel={conversation.channel_type ?? ""} />
+                    </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className={`truncate ${waiting ? "font-semibold" : "font-medium"}`}>{conversation.contact_name || "Sin nombre"}</p>

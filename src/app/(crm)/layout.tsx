@@ -75,14 +75,15 @@ async function MainNav() {
   await connection();
   const profile = await getCurrentProfile();
   const supabase = await createClient();
-  const [unread, { count: stockCount }] = await Promise.all([
+  const [unread, { count: stockCount }, { count: sourceCount }] = await Promise.all([
     countUnreadNotifications({ userClient: supabase, userId: profile.id }),
     supabase.from("catalog_items").select("id", { count: "exact", head: true }),
+    supabase.from("catalog_sources").select("id", { count: "exact", head: true }),
   ]);
 
   return (
     <nav className="flex flex-col gap-4" aria-label="Principal">
-      {sectionsFor(profile.role, Boolean(stockCount)).map((group) => (
+      {sectionsFor(profile.role, Boolean(stockCount || sourceCount)).map((group) => (
         <div key={group.title} className="flex flex-col gap-0.5">
           <p className="eyebrow mb-1 px-3 !text-[0.65rem]">{group.title}</p>
           {group.sections.map((section) => (

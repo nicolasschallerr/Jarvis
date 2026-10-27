@@ -43,8 +43,9 @@
   --warning-soft: #fbeedb;
   --danger: #b3261e;
   --danger-soft: #fbe4e1;
-  --info: #0a7f8c;
-  --info-soft: #dcebf0;
+  /* Azul propio: antes era igual al acento y "Nuevo" no se distinguía de "En curso" (ADR-048). */
+  --info: #2a62c9;
+  --info-soft: #e2ebfa;
 }
 
 :root[data-theme="dark"] {
@@ -68,8 +69,8 @@
   --warning-soft: #33260f;
   --danger: #f28b7f;
   --danger-soft: #3a1714;
-  --info: #7fcfd8;
-  --info-soft: #0b2a33;
+  --info: #8fb2ff;
+  --info-soft: #11213d;
 }
 
 @theme inline {

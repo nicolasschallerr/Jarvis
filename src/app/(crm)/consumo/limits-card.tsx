@@ -8,10 +8,13 @@ const usd = new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD",
 
 const LEVEL_TONE: Record<UsageLevel, Tone> = { ok: "success", warning: "warning", exceeded: "danger" };
 const LEVEL_LABEL: Record<UsageLevel, string> = { ok: "Dentro del límite", warning: "Cerca del límite", exceeded: "Límite superado" };
-const BAR: Record<UsageLevel, string> = { ok: "bg-success", warning: "bg-warning", exceeded: "bg-danger" };
-
-function MeterRow({ label, meter, format }: { label: string; meter: Meter; format: (value: number) => string }) {
+// Medidor lineal: el relleno es un degradado verde → ámbar (en el % de aviso) → rojo (en el 100%) pintado a lo ancho de
+// toda la pista y recortado hasta lo consumido. Así la punta toma el color que corresponde al porcentaje, y la marca
+// muestra dónde salta el aviso.
+function MeterRow({ label, meter, alertPercent, format }: { label: string; meter: Meter; alertPercent: number; format: (value: number) => string }) {
   const width = Math.min(100, Math.round(meter.percent));
+  const alertAt = Math.min(100, Math.max(0, alertPercent));
+  const gradient = `linear-gradient(90deg, var(--success) 0%, var(--success) ${Math.max(0, alertAt - 25)}%, var(--warning) ${alertAt}%, var(--danger) 100%)`;
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
@@ -21,14 +24,17 @@ function MeterRow({ label, meter, format }: { label: string; meter: Meter; forma
         </span>
       </div>
       <div
-        className="h-2.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
+        className="relative h-2.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
         role="progressbar"
         aria-label={`${label}: ${Math.floor(meter.percent)}% del límite`}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.min(100, Math.floor(meter.percent))}
       >
-        <div className={`h-full rounded-full ${BAR[meter.level]}`} style={{ width: `${width}%` }} />
+        {width > 0 ? (
+          <div className="grow-x h-full rounded-full" style={{ width: `${width}%`, backgroundImage: gradient, backgroundSize: `${(100 / width) * 100}% 100%` }} />
+        ) : null}
+        {alertAt > 0 && alertAt < 100 ? <span className="absolute inset-y-0 w-px bg-surface/80" style={{ left: `${alertAt}%` }} aria-hidden="true" /> : null}
       </div>
     </div>
   );
@@ -54,8 +60,8 @@ export function LimitsCard({ limits, used, canEdit }: { limits: Limits; used: { 
 
       {hasLimits ? (
         <div className="flex flex-col gap-4">
-          {status.credits ? <MeterRow label="Créditos" meter={status.credits} format={(value) => number.format(value)} /> : null}
-          {status.cost ? <MeterRow label="Costo estimado de IA" meter={status.cost} format={(value) => usd.format(value)} /> : null}
+          {status.credits ? <MeterRow label="Créditos" meter={status.credits} alertPercent={limits.alertPercent} format={(value) => number.format(value)} /> : null}
+          {status.cost ? <MeterRow label="Costo estimado de IA" meter={status.cost} alertPercent={limits.alertPercent} format={(value) => usd.format(value)} /> : null}
           <p className="text-xs text-muted">Se avisa a los superadministradores al llegar al {limits.alertPercent}% y al superar el límite.</p>
         </div>
       ) : (

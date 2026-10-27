@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 
 import { Badge, type Tone } from "@/components/ui/badge";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { EmptyState, NoAccess } from "@/components/ui/empty-state";
 import { InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
@@ -52,9 +53,7 @@ export default async function PlantillasPage() {
       />
 
       {error ? (
-        <p role="alert" className="p-6 text-sm text-danger">
-          No se pudieron cargar las plantillas. Probá recargar.
-        </p>
+        <ErrorBanner>No se pudieron cargar las plantillas. Probá recargar.</ErrorBanner>
       ) : (templates ?? []).length === 0 ? (
         <EmptyState
           icon={<InboxIcon className="size-6" />}

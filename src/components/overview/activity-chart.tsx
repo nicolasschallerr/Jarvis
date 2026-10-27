@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 export type ActivityPoint = { day: string; inbound: number; outbound: number };
 
-const SERIES = [
+// Una serie del gráfico: qué campo del punto dibuja, cómo se llama y de qué color va (un color CSS, ej. "var(--accent)").
+export type ChartSeries<P extends { day: string }> = { key: Exclude<keyof P, "day"> & string; name: string; color: string };
+
+// Por defecto, los mensajes del Panorama: recibidos y enviados.
+const MESSAGE_SERIES: ChartSeries<ActivityPoint>[] = [
   { key: "inbound", name: "Recibidos", color: "var(--agent-sinapsis)" },
   { key: "outbound", name: "Enviados", color: "var(--accent)" },
-] as const;
+];
 
 const W = 600;
 const H = 180;
@@ -17,18 +21,24 @@ const dayLabel = new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "nume
 const shortDay = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
 const asDate = (day: string) => new Date(`${day}T00:00:00Z`);
 
-// Mensajes por día: dos líneas con su área, que se dibujan al aparecer. Al pasar el mouse (o el dedo) una línea vertical
-// marca el día y una ficha muestra los dos números. La tabla de abajo (oculta a la vista) da los mismos datos a los
-// lectores de pantalla.
-export function ActivityChart({ points }: { points: ActivityPoint[] }) {
+// Datos por día: una línea con su área por serie, que se dibujan al aparecer. Al pasar el mouse (o el dedo) una línea
+// vertical marca el día y una ficha muestra los números. La tabla de abajo (oculta a la vista) da los mismos datos, con
+// todas las series, a los lectores de pantalla. Sin `series` dibuja los mensajes recibidos y enviados (el Panorama).
+export function ActivityChart<P extends { day: string }>({ points, series, caption = "Mensajes por día" }: { points: P[]; series?: ChartSeries<P>[]; caption?: string }) {
   const [hover, setHover] = useState<number | null>(null);
-  const max = Math.max(1, ...points.flatMap((point) => [point.inbound, point.outbound]));
+  // Ids únicos por gráfico: con dos en la misma página, los degradados no se pisan.
+  const uid = useId();
+  const lines = (series ?? MESSAGE_SERIES) as unknown as ChartSeries<P>[];
+  const value = (point: P, key: string) => Number((point as Record<string, unknown>)[key]) || 0;
+
+  const max = Math.max(1, ...points.flatMap((point) => lines.map((item) => value(point, item.key))));
   const step = points.length > 1 ? W / (points.length - 1) : W;
   const x = (index: number) => index * step;
-  const y = (value: number) => PAD.top + (H - PAD.top - PAD.bottom) * (1 - value / max);
+  const y = (amount: number) => PAD.top + (H - PAD.top - PAD.bottom) * (1 - amount / max);
 
-  const line = (key: "inbound" | "outbound") => points.map((point, index) => `${index === 0 ? "M" : "L"}${x(index)},${y(point[key])}`).join(" ");
-  const area = (key: "inbound" | "outbound") => `${line(key)} L${x(points.length - 1)},${H} L0,${H} Z`;
+  const line = (key: string) => points.map((point, index) => `${index === 0 ? "M" : "L"}${x(index)},${y(value(point, key))}`).join(" ");
+  const area = (key: string) => `${line(key)} L${x(points.length - 1)},${H} L0,${H} Z`;
+  const gradientId = (key: string) => `area-${uid.replace(/:/g, "")}-${key}`;
 
   function pick(event: React.PointerEvent<HTMLDivElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -40,11 +50,11 @@ export function ActivityChart({ points }: { points: ActivityPoint[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <ul className="flex gap-4 text-xs text-muted">
-        {SERIES.map((series) => (
-          <li key={series.key} className="flex items-center gap-1.5">
-            <span className="h-0.5 w-3 rounded-full" style={{ background: series.color }} aria-hidden="true" />
-            {series.name}
+      <ul className="flex flex-wrap gap-4 text-xs text-muted">
+        {lines.map((item) => (
+          <li key={item.key} className="flex items-center gap-1.5">
+            <span className="h-0.5 w-3 rounded-full" style={{ background: item.color }} aria-hidden="true" />
+            {item.name}
           </li>
         ))}
       </ul>
@@ -52,10 +62,10 @@ export function ActivityChart({ points }: { points: ActivityPoint[] }) {
       <div className="relative h-44 touch-none" onPointerMove={pick} onPointerLeave={() => setHover(null)} aria-hidden="true">
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible">
           <defs>
-            {SERIES.map((series) => (
-              <linearGradient key={series.key} id={`area-${series.key}`} x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor={series.color} stopOpacity="0.22" />
-                <stop offset="100%" stopColor={series.color} stopOpacity="0" />
+            {lines.map((item) => (
+              <linearGradient key={item.key} id={gradientId(item.key)} x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor={item.color} stopOpacity="0.22" />
+                <stop offset="100%" stopColor={item.color} stopOpacity="0" />
               </linearGradient>
             ))}
           </defs>
@@ -63,15 +73,15 @@ export function ActivityChart({ points }: { points: ActivityPoint[] }) {
             <line key={ratio} x1="0" x2={W} y1={PAD.top + (H - PAD.top) * ratio} y2={PAD.top + (H - PAD.top) * ratio} className="stroke-line" strokeDasharray="3 5" vectorEffect="non-scaling-stroke" />
           ))}
           <line x1="0" x2={W} y1={H} y2={H} className="stroke-line" vectorEffect="non-scaling-stroke" />
-          {SERIES.map((series) => (
-            <path key={`a-${series.key}`} d={area(series.key)} fill={`url(#area-${series.key})`} className="fade-in" />
+          {lines.map((item) => (
+            <path key={`a-${item.key}`} d={area(item.key)} fill={`url(#${gradientId(item.key)})`} className="fade-in" />
           ))}
-          {SERIES.map((series) => (
+          {lines.map((item) => (
             <path
-              key={`l-${series.key}`}
-              d={line(series.key)}
+              key={`l-${item.key}`}
+              d={line(item.key)}
               fill="none"
-              stroke={series.color}
+              stroke={item.color}
               strokeWidth="2"
               strokeLinejoin="round"
               strokeLinecap="round"
@@ -85,11 +95,11 @@ export function ActivityChart({ points }: { points: ActivityPoint[] }) {
 
         {/* Los puntos van en HTML para que sean redondos aunque el gráfico se estire. */}
         {current && hover !== null
-          ? SERIES.map((series) => (
+          ? lines.map((item) => (
               <span
-                key={series.key}
+                key={item.key}
                 className="absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface"
-                style={{ left: `${(x(hover) / W) * 100}%`, top: `${(y(current[series.key]) / H) * 100}%`, background: series.color }}
+                style={{ left: `${(x(hover) / W) * 100}%`, top: `${(y(value(current, item.key)) / H) * 100}%`, background: item.color }}
               />
             ))
           : null}
@@ -100,13 +110,13 @@ export function ActivityChart({ points }: { points: ActivityPoint[] }) {
             style={{ left: `${(x(hover) / W) * 100}%`, transform: `translateX(${hover > points.length / 2 ? "calc(-100% - 12px)" : "12px"})` }}
           >
             <p className="mb-1 font-semibold first-letter:uppercase">{dayLabel.format(asDate(current.day))}</p>
-            {SERIES.map((series) => (
-              <p key={series.key} className="flex items-center justify-between gap-4">
+            {lines.map((item) => (
+              <p key={item.key} className="flex items-center justify-between gap-4">
                 <span className="flex items-center gap-1.5 text-muted">
-                  <span className="size-2 rounded-full" style={{ background: series.color }} />
-                  {series.name}
+                  <span className="size-2 rounded-full" style={{ background: item.color }} />
+                  {item.name}
                 </span>
-                <span className="font-mono font-semibold">{current[series.key]}</span>
+                <span className="font-mono font-semibold">{value(current, item.key)}</span>
               </p>
             ))}
           </div>
@@ -119,20 +129,24 @@ export function ActivityChart({ points }: { points: ActivityPoint[] }) {
       </div>
 
       <table className="sr-only">
-        <caption>Mensajes por día</caption>
+        <caption>{caption}</caption>
         <thead>
           <tr>
             <th scope="col">Día</th>
-            <th scope="col">Recibidos</th>
-            <th scope="col">Enviados</th>
+            {lines.map((item) => (
+              <th key={item.key} scope="col">
+                {item.name}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {points.map((point) => (
             <tr key={point.day}>
               <th scope="row">{dayLabel.format(asDate(point.day))}</th>
-              <td>{point.inbound}</td>
-              <td>{point.outbound}</td>
+              {lines.map((item) => (
+                <td key={item.key}>{value(point, item.key)}</td>
+              ))}
             </tr>
           ))}
         </tbody>

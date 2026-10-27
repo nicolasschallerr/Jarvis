@@ -2,7 +2,6 @@ import type { NextRequest } from "next/server";
 
 import { deliverAreaAnswers } from "@/lib/agent/area-replies";
 import { anthropicClientFromEnv } from "@/lib/ai/anthropic-client";
-import { runCatalogSyncs } from "@/lib/catalog/sources";
 import { runFollowups } from "@/lib/followups/run";
 import { processPendingMessages } from "@/lib/inbound/process";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -57,14 +56,8 @@ async function handle(request: NextRequest) {
           return null;
         })
       : null;
-    // Stock: vuelve a leer las planillas de Google que ya cumplieron su intervalo (ADR-045).
-    const catalogSyncs = hasTime()
-      ? await runCatalogSyncs(admin).catch((error: unknown) => {
-          console.error("worker stock:", error instanceof Error ? error.message : error);
-          return null;
-        })
-      : null;
-    return Response.json({ ...result, areaReplies, followups, usageAlerts, broadcasts, catalogSyncs });
+    // El stock tiene su propio trabajador (/api/worker/catalog, ADR-047): leer un sitio puede tardar minutos.
+    return Response.json({ ...result, areaReplies, followups, usageAlerts, broadcasts });
   } catch (error) {
     console.error("worker mensajes:", error instanceof Error ? error.message : error);
     return new Response("Error", { status: 500 });

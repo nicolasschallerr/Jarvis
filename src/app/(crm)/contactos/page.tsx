@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { Avatar } from "@/components/ui/avatar";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ContactsIcon, SearchIcon } from "@/components/ui/icons";
@@ -61,9 +62,7 @@ export default async function ContactosPage({ searchParams }: PageProps<"/contac
       />
 
       {failed ? (
-        <p role="alert" className="m-4 rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger sm:m-6">
-          No se pudieron cargar los contactos. Probá recargar la página.
-        </p>
+        <ErrorBanner>No se pudieron cargar los contactos. Probá recargar la página.</ErrorBanner>
       ) : items.length === 0 ? (
         <EmptyState
           icon={<ContactsIcon className="size-5" />}

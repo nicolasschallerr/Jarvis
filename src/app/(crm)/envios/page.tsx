@@ -3,6 +3,7 @@ import { connection } from "next/server";
 
 import { Badge, type Tone } from "@/components/ui/badge";
 import { EmptyState, NoAccess } from "@/components/ui/empty-state";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { SendIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { BROADCAST_STATUS_LABELS } from "@/lib/broadcasts/rules";
@@ -48,9 +49,7 @@ export default async function EnviosPage() {
       />
 
       {error ? (
-        <p role="alert" className="p-6 text-sm text-danger">
-          No se pudieron cargar los envíos. Probá recargar la página.
-        </p>
+        <ErrorBanner>No se pudieron cargar los envíos. Probá recargar la página.</ErrorBanner>
       ) : (broadcasts ?? []).length === 0 ? (
         <EmptyState
           icon={<SendIcon className="size-6" />}
@@ -63,19 +62,36 @@ export default async function EnviosPage() {
           }
         />
       ) : (
-        <ul className="divide-y divide-line">
+        <ul className="flex flex-col gap-3 p-4 sm:p-6">
           {(broadcasts ?? []).map((broadcast) => {
             const row = statsById.get(broadcast.id);
             const sent = Number(row?.sent ?? 0);
             const failed = Number(row?.failed ?? 0);
             const queued = Number(row?.queued ?? 0);
             const total = sent + failed + queued;
+            const sending = broadcast.status === "sending";
+            // Barra apilada: enviados, sin enviar y en cola, cada tramo proporcional a su cantidad (solo los que tienen algo).
+            const segments = [
+              { count: sent, color: "bg-success" },
+              { count: failed, color: "bg-danger" },
+              { count: queued, color: "bg-zinc-300 dark:bg-zinc-700" },
+            ].filter((segment) => segment.count > 0);
             return (
               <li key={broadcast.id}>
-                <Link href={`/envios/${broadcast.id}`} className="flex flex-col gap-2 px-4 py-3.5 transition hover:bg-zinc-100/80 sm:px-6 dark:hover:bg-zinc-900">
+                <Link
+                  href={`/envios/${broadcast.id}`}
+                  className="card spotlight flex flex-col gap-2 p-4 transition duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-md"
+                >
                   <div className="flex flex-wrap items-center gap-2">
+                    {sending ? (
+                      // En vivo: el envío está saliendo ahora (la página se refresca sola).
+                      <span className="relative inline-flex size-2.5 shrink-0" aria-hidden="true">
+                        <span className="live-ping absolute inset-0 rounded-full bg-accent" />
+                        <span className="relative size-2.5 rounded-full bg-accent" />
+                      </span>
+                    ) : null}
                     <p className="font-medium">{broadcast.name}</p>
-                    <Badge tone={TONES[broadcast.status] ?? "neutral"} dot>
+                    <Badge tone={TONES[broadcast.status] ?? "neutral"} dot={!sending}>
                       {BROADCAST_STATUS_LABELS[broadcast.status] ?? broadcast.status}
                     </Badge>
                     <span className="ml-auto text-xs text-muted">
@@ -84,11 +100,18 @@ export default async function EnviosPage() {
                   </div>
                   <p className="text-sm text-muted">
                     Plantilla {broadcast.message_templates?.name ?? "—"}
-                    {total > 0 ? ` · ${number.format(sent)} enviados de ${number.format(total)}${failed > 0 ? ` · ${number.format(failed)} sin enviar` : ""}` : ""}
+                    {total > 0
+                      ? ` · ${number.format(sent)} enviados de ${number.format(total)}${failed > 0 ? ` · ${number.format(failed)} sin enviar` : ""}${queued > 0 ? ` · ${number.format(queued)} en cola` : ""}`
+                      : ""}
                   </p>
                   {total > 0 ? (
-                    <div className="h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800" aria-hidden="true">
-                      <div className="h-full rounded-full bg-success" style={{ width: `${Math.round((sent / total) * 100)}%` }} />
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-2 flex-1 gap-0.5 overflow-hidden rounded-full" aria-hidden="true">
+                        {segments.map((segment) => (
+                          <div key={segment.color} className={`grow-x h-full basis-0 ${segment.color}`} style={{ flexGrow: segment.count }} />
+                        ))}
+                      </div>
+                      <span className="w-10 shrink-0 text-right font-mono text-xs text-muted">{Math.round((sent / total) * 100)}%</span>
                     </div>
                   ) : null}
                 </Link>

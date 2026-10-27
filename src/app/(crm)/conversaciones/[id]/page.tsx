@@ -5,6 +5,7 @@ import { Suspense } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { DeliveryStatus } from "@/components/conversations/delivery-status";
 import { ArrowLeftIcon, BotIcon } from "@/components/ui/icons";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { channelLabel, dayHeading, dayKeyOf, timeOnly, typeLabel } from "@/lib/crm/format";
@@ -27,6 +28,8 @@ import { OpenSidePanelButton } from "./side-panel";
 const MESSAGE_PAGE = 100;
 const MESSAGE_MAX = 2000;
 const SIGNED_URL_SECONDS = 3600;
+// Mensajes seguidos del mismo autor con menos de esta distancia se agrupan en un solo bloque (sin repetir la firma).
+const GROUP_GAP_MS = 5 * 60 * 1000;
 
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -185,7 +188,7 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
           </div>
         </header>
 
-        <ol className="flex flex-1 flex-col gap-2 overflow-y-auto px-4 py-4 sm:px-6" aria-label="Mensajes">
+        <ol className="flex flex-1 flex-col overflow-y-auto px-4 py-4 sm:px-6" aria-label="Mensajes">
           {hasOlder ? (
             <li className="flex justify-center pb-2">
               <Link href={`/conversaciones/${id}?mensajes=${limit + MESSAGE_PAGE}`} scroll={false} className="btn-secondary !py-1 text-xs">
@@ -198,6 +201,16 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
             const when = whenOf(message);
             const previous = messages[index - 1];
             const newDay = !previous || dayKeyOf(whenOf(previous)) !== dayKeyOf(when);
+            // Mismo autor (el mismo lado y, si es del equipo, la misma persona), mismo día y pocos minutos después: va
+            // pegado al anterior. Los avisos del sistema y lo que siguió a un envío fallido nunca se agrupan.
+            const sameAuthorAsPrev =
+              !!previous &&
+              !newDay &&
+              message.sender !== "system" &&
+              previous.sender === message.sender &&
+              previous.sender_profile_id === message.sender_profile_id &&
+              previous.status !== "failed" &&
+              new Date(when).getTime() - new Date(whenOf(previous)).getTime() < GROUP_GAP_MS;
 
             return (
               <MessageItem
@@ -205,6 +218,7 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
                 message={message}
                 when={when}
                 dayLabel={newDay ? dayHeading(when, now) : null}
+                grouped={sameAuthorAsPrev}
                 media={mediaByMessage.get(message.id)}
                 operatorName={message.sender_profile_id ? operatorNames.get(message.sender_profile_id) : undefined}
                 agentName={agentName}
@@ -248,10 +262,12 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
 
 // Una burbuja. Cada autor tiene su estilo: el contacto a la izquierda; el agente y el equipo a la derecha (el agente
 // en tono suave con su marca, una persona del equipo en el color fuerte); los avisos del sistema, al centro.
+// `grouped`: sigue a otro mensaje del mismo autor, así que va pegado y sin firma.
 function MessageItem({
   message,
   when,
   dayLabel,
+  grouped,
   media,
   operatorName,
   agentName,
@@ -259,15 +275,15 @@ function MessageItem({
   message: MessageRow;
   when: string;
   dayLabel: string | null;
+  grouped: boolean;
   media: MediaItem | undefined;
   operatorName: string | undefined;
   agentName: string;
 }) {
+  // El día queda pegado arriba mientras se recorre: al subir por una charla larga siempre se sabe de cuándo es.
   const separator = dayLabel ? (
-    <li className="my-2 flex items-center gap-3 text-xs font-medium text-muted" aria-label={dayLabel}>
-      <span className="h-px flex-1 bg-line" aria-hidden="true" />
-      {dayLabel}
-      <span className="h-px flex-1 bg-line" aria-hidden="true" />
+    <li className="sticky top-2 z-10 my-3 flex justify-center">
+      <span className="badge border border-line bg-surface/90 text-muted shadow-sm backdrop-blur">{dayLabel}</span>
     </li>
   ) : null;
 
@@ -275,7 +291,7 @@ function MessageItem({
     return (
       <>
         {separator}
-        <li className="mx-auto max-w-[85%] rounded-full bg-zinc-200/60 px-3 py-1 text-center text-xs text-muted dark:bg-zinc-800">
+        <li className="mx-auto mt-3 max-w-[85%] rounded-full bg-zinc-200/60 px-3 py-1 text-center text-xs text-muted dark:bg-zinc-800">
           {message.body} · {timeOnly(when)}
         </li>
       </>
@@ -285,20 +301,24 @@ function MessageItem({
   const fromContact = message.sender === "contact";
   const fromAgent = message.sender === "agent";
   const failed = message.status === "failed";
+  const outbound = message.direction === "outbound";
 
+  // La "cola" es la esquina chica del lado del autor. En un grupo también se achica la esquina de arriba de ese lado,
+  // así las burbujas seguidas se leen como un solo bloque.
+  const tail = fromContact ? `rounded-bl-sm ${grouped ? "rounded-tl-sm" : ""}` : `rounded-br-sm ${grouped ? "rounded-tr-sm" : ""}`;
   const bubble = fromContact
-    ? "rounded-bl-sm border border-line bg-surface"
+    ? `${tail} border border-line bg-surface`
     : fromAgent
-      ? "rounded-br-sm bg-accent-soft"
-      : "rounded-br-sm bg-accent text-accent-foreground";
+      ? `${tail} bg-accent-soft`
+      : `${tail} bg-accent text-accent-foreground`;
   const meta = fromContact || fromAgent ? "text-muted" : "text-accent-foreground/80";
 
   return (
     <>
       {separator}
-      <li className={`flex ${fromContact ? "justify-start" : "justify-end"}`}>
+      <li className={`flex ${grouped ? "mt-0.5" : "mt-3"} ${fromContact ? "justify-start" : "justify-end"}`}>
         <div className={`flex max-w-[85%] flex-col gap-1 rounded-2xl px-3.5 py-2 text-sm shadow-xs sm:max-w-[70%] ${bubble} ${failed ? "ring-2 ring-danger" : ""}`}>
-          {fromAgent ? (
+          {grouped ? null : fromAgent ? (
             <p className="flex items-center gap-1 text-xs font-semibold text-accent">
               <BotIcon className="size-3.5" />
               {agentName}
@@ -316,10 +336,14 @@ function MessageItem({
               Transcripción: {message.transcription}
             </p>
           ) : null}
-          <p className={`self-end text-[11px] ${meta}`}>{timeOnly(when)}</p>
+          <p className={`flex items-center gap-1 self-end text-[11px] ${meta}`}>
+            {timeOnly(when)}
+            {/* Sobre la burbuja en color fuerte, "leído" va en el texto pleno (el tono info se perdería en el fondo). */}
+            {outbound && !failed ? <DeliveryStatus status={message.status} readClass={fromContact || fromAgent ? "text-info" : "text-accent-foreground"} /> : null}
+          </p>
         </div>
       </li>
-      {failed ? <li className="-mt-1 self-end text-xs font-medium text-danger">No se pudo enviar este mensaje.</li> : null}
+      {failed ? <li className="mt-1 self-end text-xs font-medium text-danger">No se pudo enviar este mensaje.</li> : null}
     </>
   );
 }

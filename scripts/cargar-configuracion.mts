@@ -6,7 +6,8 @@ import { createClient } from "@supabase/supabase-js";
 
 import { syncAttentionConfig } from "../src/lib/client-config/attention";
 import { readAttentionFiles } from "../src/lib/client-config/read-dir";
-import { parseClientConfig, syncAgents, syncSectorsAndUnits } from "../src/lib/client-config/load";
+import { configuredSources, parseClientConfig, syncAgents, syncSectorsAndUnits } from "../src/lib/client-config/load";
+import { syncSourcesFromConfig } from "../src/lib/catalog/sources";
 import type { Database } from "../src/lib/supabase/database.types";
 
 // Valida clientes/<carpeta>/sectores-y-reglas.yaml y carga sectores y unidades en la organización.
@@ -74,6 +75,16 @@ console.log("Unidades:", summary.units);
 
 const agents = await syncAgents(admin, organization.id, parsed.config);
 console.log("Agentes:", agents);
+
+// Fuentes de stock (ADR-047): el CRM las lee solo. Las claves de las bases van en variables CATALOGO_… del servidor.
+const sources = configuredSources(parsed.config);
+const sourcesSummary = await syncSourcesFromConfig(admin, organization.id, sources);
+console.log("Fuentes de stock:", sourcesSummary);
+for (const source of sources) {
+  if (source.config.keyEnv && !process.env[source.config.keyEnv]) {
+    console.warn(`Aviso: la fuente "${source.name}" usa ${source.config.keyEnv}, que no está en este entorno. Cargala en Vercel y en el .env antes de sincronizar.`);
+  }
+}
 
 // Prompt y conocimiento del agente de atención (agente-prompt.md y conocimiento/<unidad>.md).
 const files = readAttentionFiles(directory);

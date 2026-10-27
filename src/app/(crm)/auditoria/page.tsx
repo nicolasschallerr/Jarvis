@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { Avatar } from "@/components/ui/avatar";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { EmptyState, NoAccess } from "@/components/ui/empty-state";
 import { LockIcon } from "@/components/ui/icons";
 import { LinkTabs } from "@/components/ui/link-tabs";
@@ -62,9 +63,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps<"/audito
       </PageHeader>
 
       {failed ? (
-        <p role="alert" className="p-6 text-sm text-danger">
-          No se pudo cargar el registro. Probá recargar la página.
-        </p>
+        <ErrorBanner>No se pudo cargar el registro. Probá recargar la página.</ErrorBanner>
       ) : items.length === 0 ? (
         <EmptyState icon={<LockIcon className="size-5" />} title="Todavía no hay movimientos de este tipo" description="Cuando alguien cambie algo, queda registrado acá." />
       ) : (

@@ -135,11 +135,29 @@ agentes:
     frase: "Los números cuentan una historia."
 
 catalogo:
-  # Stock que consulta el agente (ADR-043): si está activo, el agente busca en él antes de responder sobre
-  # disponibilidad, precios o características. Los ítems se cargan aparte, desde un catalogo.json con el formato común:
-  #   npx tsx --env-file=.env.local scripts/cargar-catalogo.mts --org-slug <slug> --archivo <carpeta>/catalogo.json
+  # Stock que consulta el agente (ADR-043). Si está activo, el agente busca en él antes de responder sobre
+  # disponibilidad, precios o características. Encenderlo o apagarlo después se hace desde Agentes → Stock (ADR-046).
   activo: false
   nombre: productos              # cómo se llama lo que hay en el catálogo, en plural (ej. propiedades)
+  # De dónde lo lee el CRM solo (ADR-047). El cliente no conecta nada: lo configura Orbita AI acá.
+  # Después de cargar la configuración, para leerlas ya: scripts/sincronizar-stock.mts --org-slug <slug>
+  fuentes: []
+  # Ejemplos:
+  #   - tipo: supabase              # la base Supabase del cliente, de solo lectura
+  #     nombre: Base de la tienda
+  #     url: https://<proyecto>.supabase.co
+  #     tabla: products
+  #     clave_env: CATALOGO_MITIENDA_KEY   # la CLAVE va en Vercel y en el .env con ese nombre, NUNCA en este archivo
+  #     columnas: { stock: cantidad_disponible }   # opcional: solo si una columna tiene un nombre que no se reconoce
+  #     cada_horas: 1
+  #   - tipo: web                   # Shopify, WooCommerce o cualquier tienda con mapa del sitio y datos de producto
+  #     nombre: Tienda online
+  #     url: https://mitienda.com.ar
+  #     cada_horas: 6
+  #   - tipo: planilla              # Google Sheets compartida "cualquiera con el enlace puede ver"
+  #     nombre: Lista de precios
+  #     url: https://docs.google.com/spreadsheets/d/<id>/edit
+  #     cada_horas: 6
 
 ia:
   # Modelo del agente de atención (opcional; por defecto el perfil intermedio de Jarvis).

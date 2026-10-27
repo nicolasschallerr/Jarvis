@@ -3,6 +3,8 @@ import { parse } from "yaml";
 
 import type { Database } from "@/lib/supabase/database.types";
 
+import type { ConfiguredSource } from "@/lib/catalog/sources";
+
 import { clientConfigSchema, type ClientConfig } from "./schema";
 
 export type ParseResult = { ok: true; config: ClientConfig } | { ok: false; errors: string[] };
@@ -145,4 +147,20 @@ export async function syncAgents(
   if (error) throw new Error(`No se pudieron guardar los agentes: ${error.message}`);
 
   return { synced: agents.length };
+}
+
+// Las fuentes de stock del archivo, en el formato que guarda la base (ADR-047). El tipo "planilla" se guarda como
+// "sheet". La configuración de cada fuente solo tiene direcciones y el NOMBRE de la variable con la clave.
+export function configuredSources(config: ClientConfig): ConfiguredSource[] {
+  return (config.catalogo?.fuentes ?? []).map((source) => {
+    if (source.tipo === "supabase") {
+      return {
+        name: source.nombre,
+        kind: "supabase",
+        config: { url: source.url.replace(/\/$/, ""), table: source.tabla, keyEnv: source.clave_env, ...(source.columnas ? { columns: source.columnas } : {}) },
+        syncEveryHours: source.cada_horas,
+      };
+    }
+    return { name: source.nombre, kind: source.tipo === "web" ? "web" : "sheet", config: { url: source.url }, syncEveryHours: source.cada_horas };
+  });
 }

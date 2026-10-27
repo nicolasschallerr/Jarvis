@@ -115,7 +115,11 @@ export type SpreadsheetResult = { ok: true; items: CatalogItem[]; skipped: numbe
 export const MAX_SPREADSHEET_ITEMS = 5000;
 
 export function parseSpreadsheet(text: string): SpreadsheetResult {
-  const rows = parseCsv(text);
+  return parseTable(parseCsv(text));
+}
+
+// Una tabla cualquiera (la primera fila son los encabezados) pasa a ítems. La usan la planilla y la base del cliente.
+export function parseTable(rows: string[][]): SpreadsheetResult {
   if (rows.length < 2) return { ok: false, errors: ["La planilla está vacía: tiene que tener una fila de encabezados y al menos un producto."] };
 
   const [header = [], ...body] = rows;

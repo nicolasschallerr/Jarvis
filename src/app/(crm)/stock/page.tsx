@@ -2,12 +2,13 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { Badge } from "@/components/ui/badge";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { SearchIcon, StockIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { normalize, type CatalogItem } from "@/lib/catalog/search";
 import { rowToItem } from "@/lib/catalog/source";
-import { getCurrentProfile } from "@/lib/auth/profile";
 import { dateTime } from "@/lib/crm/format";
 import { createClient } from "@/lib/supabase/server";
 
@@ -59,27 +60,22 @@ export default async function StockPage({ searchParams }: PageProps<"/stock">) {
   const limit = Math.min(Math.max(Number(first(params.ver)) || PAGE_SIZE, PAGE_SIZE), 500);
 
   const supabase = await createClient();
-  const [{ data: rows, error }, { data: agent }, { data: sourceRows }, profile] = await Promise.all([
+  const [{ data: rows, error }, { data: agent }, { data: sourceRows }] = await Promise.all([
     supabase.from("catalog_items").select("*").order("synced_at", { ascending: false }).limit(5000),
     supabase.from("agents").select("name").eq("kind", "attention").maybeSingle(),
-    supabase.from("catalog_sources").select("*").order("created_at"),
-    getCurrentProfile(),
+    supabase.from("catalog_sources").select("id, kind, name, sync_every_hours, last_synced_at, last_status, last_message, item_count").order("created_at"),
   ]);
 
-  const sources: SourceView[] = (sourceRows ?? []).map((source) => {
-    const config = source.config as { url?: unknown; fileName?: unknown } | null;
-    return {
-      id: source.id,
-      kind: source.kind,
-      name: source.name,
-      detail: typeof config?.fileName === "string" ? config.fileName : null,
-      syncEveryHours: source.sync_every_hours,
-      lastSyncedAt: source.last_synced_at,
-      lastStatus: source.last_status,
-      lastMessage: source.last_message,
-      itemCount: source.item_count,
-    };
-  });
+  const sources: SourceView[] = (sourceRows ?? []).map((source) => ({
+    id: source.id,
+    kind: source.kind,
+    name: source.name,
+    syncEveryHours: source.sync_every_hours,
+    lastSyncedAt: source.last_synced_at,
+    lastStatus: source.last_status,
+    lastMessage: source.last_message,
+    itemCount: source.item_count,
+  }));
 
   const all = (rows ?? []).map(rowToItem);
   const lastSync = rows?.reduce<string | null>((latest, row) => (!latest || row.synced_at > latest ? row.synced_at : latest), null) ?? null;
@@ -90,6 +86,8 @@ export default async function StockPage({ searchParams }: PageProps<"/stock">) {
     .filter((item) => matchesText(item, text))
     .sort((a, b) => (Number(b.externalId) - Number(a.externalId) || 0) || a.title.localeCompare(b.title, "es"));
   const gone = all.length - available.length;
+  const soldOut = available.filter((item) => item.stockQuantity === 0).length;
+  const low = available.filter((item) => typeof item.stockQuantity === "number" && item.stockQuantity > 0 && item.stockQuantity <= 3).length;
 
   return (
     <main className="flex flex-1 flex-col">
@@ -100,25 +98,42 @@ export default async function StockPage({ searchParams }: PageProps<"/stock">) {
           <form action="/stock" className="relative w-full sm:w-80" role="search">
             {operation ? <input type="hidden" name="op" value={operation} /> : null}
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
-            <input type="search" name="q" defaultValue={text} placeholder="Dirección, zona, tipo o número de ficha" aria-label="Buscar en el stock" className="field w-full !pl-9" />
+            <input type="search" name="q" defaultValue={text} placeholder="Nombre, marca, SKU o categoría" aria-label="Buscar en el stock" className="field w-full !pl-9" />
           </form>
         }
       />
 
-      <SourcesPanel sources={sources} canEdit={profile.role === "superadmin"} />
+      <SourcesPanel sources={sources} />
 
       {error ? (
-        <p role="alert" className="m-4 rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger sm:m-6">
-          No se pudo cargar el stock. Probá recargar la página.
-        </p>
+        <ErrorBanner>No se pudo cargar el stock. Probá recargar la página.</ErrorBanner>
       ) : all.length === 0 ? (
         <EmptyState
           icon={<StockIcon className="size-5" />}
-          title="Todavía no hay stock cargado"
-          description="Conectá una fuente arriba y el agente va a usar ese stock para responder; lo vas a ver acá."
+          title={sources.length ? "Leyendo el stock por primera vez" : "Todavía no hay stock conectado"}
+          description={
+            sources.length
+              ? "La conexión ya está hecha: en unos minutos vas a ver acá los productos que el agente usa para responder."
+              : "El equipo de Orbita AI conecta la base de datos o la web de tu negocio y el stock aparece acá solo, siempre actualizado."
+          }
         />
       ) : (
         <>
+          <dl className="grid grid-cols-2 gap-3 px-4 pt-4 sm:grid-cols-4 sm:px-6">
+            {[
+              { label: "Con stock", value: available.length - soldOut, tone: "text-success" },
+              { label: "Pocas unidades", value: low, tone: "text-warning" },
+              { label: "Agotados", value: soldOut, tone: "text-danger" },
+              { label: "Ya no publicados", value: gone, tone: "text-muted" },
+            ].map((stat, index) => (
+              <div key={stat.label} className="card rise-in flex flex-col gap-0.5 p-3.5" style={{ animationDelay: `${index * 60}ms` }}>
+                <dt className="text-xs text-muted">{stat.label}</dt>
+                <dd className={`font-display text-2xl font-semibold ${stat.tone}`}>
+                  <AnimatedNumber value={stat.value} />
+                </dd>
+              </div>
+            ))}
+          </dl>
           <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3 sm:px-6">
             <Link href={stockHref({ q: text })} className={pill(!operation && !showGone)}>
               Disponibles · {available.length}
@@ -140,12 +155,12 @@ export default async function StockPage({ searchParams }: PageProps<"/stock">) {
           ) : (
             <ul className="grid gap-4 p-4 sm:grid-cols-2 sm:p-6 xl:grid-cols-3 2xl:grid-cols-4">
               {filtered.slice(0, limit).map((item) => (
-                <li key={item.externalId} className="overflow-hidden rounded-xl border border-line bg-surface">
+                <li key={item.externalId} className="card spotlight group overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
                   <div className="relative aspect-[4/3] bg-zinc-200/60 dark:bg-zinc-800">
                     {item.photos[0] ? (
                       // Fotos de la web del cliente: se muestran tal cual, sin pasar por el optimizador de imágenes.
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.photos[0]} alt="" loading="lazy" className="size-full object-cover" />
+                      <img src={item.photos[0]} alt="" loading="lazy" className="size-full object-cover transition duration-500 group-hover:scale-[1.03]" />
                     ) : null}
                     <span className="absolute top-2 left-2 flex gap-1.5">
                       {item.operation ? <Badge tone={item.operation === "alquiler" ? "info" : "accent"}>{item.operation}</Badge> : null}

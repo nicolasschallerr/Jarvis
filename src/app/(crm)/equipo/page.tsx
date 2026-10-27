@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { EmptyState, NoAccess } from "@/components/ui/empty-state";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { TeamIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentProfile } from "@/lib/auth/profile";
@@ -77,9 +78,7 @@ export default async function EquipoPage() {
       />
 
       {error ? (
-        <p role="alert" className="p-6 text-sm text-danger">
-          No se pudieron cargar los sectores. Probá recargar.
-        </p>
+        <ErrorBanner>No se pudieron cargar los sectores. Probá recargar.</ErrorBanner>
       ) : views.length === 0 ? (
         <EmptyState
           icon={<TeamIcon className="size-6" />}

@@ -3,8 +3,10 @@ import Link from "next/link";
 
 import { Board, type BoardCase } from "@/components/kanban/board";
 import { Avatar } from "@/components/ui/avatar";
-import { PriorityBadge, StatusBadge } from "@/components/ui/badge";
+import { PriorityBadge, PRIORITY_DOTS, StatusBadge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorBanner } from "@/components/ui/error-banner";
+import { AutoSubmitSelect, FilterChips } from "@/components/ui/filter-chips";
 import { CaseIcon } from "@/components/ui/icons";
 import { LinkTabs, SegmentedLinks } from "@/components/ui/link-tabs";
 import { PageHeader } from "@/components/ui/page-header";
@@ -39,6 +41,9 @@ function first(value: string | string[] | undefined): string | undefined {
 }
 
 type Mode = "tablero" | "lista";
+
+// Hasta cuántos sectores se muestran como píldoras; con más, ocuparían varias filas y conviene un selector.
+const SECTOR_CHIPS_MAX = 6;
 
 // Cuántos casos resueltos recientes muestra la última columna del tablero.
 const BOARD_RESOLVED_LIMIT = 15;
@@ -94,6 +99,7 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
   else failed = true;
 
   const now = new Date();
+  const sectorList = sectors ?? [];
 
   const boardCases: BoardCase[] = cases.map((item) => ({
     id: item.id,
@@ -140,64 +146,65 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
               active: candidate === view,
             }))}
           />
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <form method="get" action="/casos" className="flex items-center gap-2">
-              <input type="hidden" name="vista" value={view} />
-              <input type="hidden" name="modo" value={mode} />
-              {view === "sector" && sectorId ? <input type="hidden" name="sector" value={sectorId} /> : null}
-              {includeResolved ? <input type="hidden" name="resueltos" value="1" /> : null}
-              <select name="prioridad" defaultValue={priority ?? ""} aria-label="Prioridad" className="field !w-auto !py-1.5 text-sm">
-                <option value="">Todas las prioridades</option>
-                {CASE_PRIORITIES.map((option) => (
-                  <option key={option} value={option}>
-                    {PRIORITY_LABELS[option]}
-                  </option>
-                ))}
-              </select>
-              <button type="submit" className="btn-secondary !py-1.5 text-sm">
-                Filtrar
-              </button>
-            </form>
-            {board ? null : (
-              <Link href={href({ ...filters, resolved: !includeResolved })} className="text-sm text-muted underline-offset-2 hover:text-foreground hover:underline">
-                {includeResolved ? "Ocultar resueltos" : "Incluir resueltos"}
-              </Link>
-            )}
-          </div>
         </div>
 
-        {view === "sector" ? (
-          <form method="get" action="/casos" className="flex items-center gap-2">
-            <input type="hidden" name="vista" value="sector" />
-            <input type="hidden" name="modo" value={mode} />
-            {includeResolved ? <input type="hidden" name="resueltos" value="1" /> : null}
-            {priority ? <input type="hidden" name="prioridad" value={priority} /> : null}
-            <select name="sector" defaultValue={sectorId ?? ""} aria-label="Sector" className="field !w-auto !py-1.5">
-              <option value="" disabled>
-                Elegí un sector...
-              </option>
-              {(sectors ?? []).map((sector) => (
-                <option key={sector.id} value={sector.id}>
-                  {sector.name}
-                </option>
-              ))}
-            </select>
-            <button type="submit" className="btn-primary !py-1.5">
-              Ver
-            </button>
-          </form>
-        ) : null}
+        {/* Todos los filtros en una sola fila de píldoras. Son enlaces que arman la misma URL que antes (`prioridad`,
+            `resueltos`, `sector`), así los enlaces guardados siguen andando. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <FilterChips
+            label="Prioridad"
+            items={[
+              { href: href({ ...filters, priority: null }), label: "Todas", active: priority === null },
+              ...CASE_PRIORITIES.map((option) => ({
+                href: href({ ...filters, priority: option }),
+                label: PRIORITY_LABELS[option] ?? option,
+                active: option === priority,
+                dot: PRIORITY_DOTS[option],
+              })),
+            ]}
+          />
+          {/* El tablero ya trae los resueltos recientes en su última columna: el interruptor solo tiene sentido en la lista. */}
+          {board ? null : (
+            <FilterChips
+              label="Casos resueltos"
+              items={[{ href: href({ ...filters, resolved: !includeResolved }), label: "Incluir resueltos", active: includeResolved, dot: "bg-success" }]}
+            />
+          )}
+          {view === "sector" ? (
+            sectorList.length > SECTOR_CHIPS_MAX ? (
+              <AutoSubmitSelect
+                action="/casos"
+                label="Sector"
+                name="sector"
+                value={sectorId ?? ""}
+                placeholder="Elegí un sector..."
+                options={sectorList.map((sector) => ({ value: sector.id, label: sector.name }))}
+                hidden={{ vista: "sector", modo: mode, ...(includeResolved ? { resueltos: "1" } : {}), ...(priority ? { prioridad: priority } : {}) }}
+              />
+            ) : (
+              <FilterChips
+                label="Sector"
+                items={sectorList.map((sector) => ({ href: href({ ...filters, sector: sector.id }), label: sector.name, active: sector.id === sectorId }))}
+              />
+            )
+          ) : null}
+        </div>
       </PageHeader>
 
       {failed ? (
-        <p role="alert" className="p-6 text-sm text-danger">
-          No se pudieron cargar los casos. Probá recargar la página.
-        </p>
+        <ErrorBanner>No se pudieron cargar los casos. Probá recargar la página.</ErrorBanner>
       ) : view === "sector" && !sectorId ? (
         <EmptyState icon={<CaseIcon className="size-6" />} title="Elegí un sector" description="Vas a ver los casos abiertos de ese sector." />
+      ) : board && boardCases.length === 0 ? (
+        // Sin ningún caso, cinco columnas vacías no dicen nada: mejor explicar por qué está vacío.
+        <EmptyState
+          icon={<CaseIcon className="size-6" />}
+          title="No hay casos en esta vista"
+          description={view === "mine" ? "Cuando te asignen un caso, aparece acá." : "Probá con otra vista o quitá los filtros."}
+        />
       ) : board ? (
         <div className="py-4">
-          <Board cases={boardCases} canEdit={profile.role !== "viewer"} />
+          <Board cases={boardCases} canEdit={profile.role !== "viewer"} now={now.toISOString()} />
         </div>
       ) : cases.length === 0 ? (
         <EmptyState
@@ -213,17 +220,17 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
                 <>
                   <Avatar name={item.contacts?.display_name} size="sm" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{item.title}</p>
+                    <p className="truncate font-medium">{item.title ?? "Caso sin título"}</p>
                     <p className="truncate text-sm text-muted">
                       {item.contacts?.display_name || "Sin nombre"} · {item.sectors?.name ?? "Sin sector"} ·{" "}
                       {item.assignee?.full_name ? `Asignado a ${item.assignee.full_name}` : "Sin asignar"}
                     </p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <StatusBadge status={item.status} />
                       <PriorityBadge priority={item.priority} />
                     </div>
                   </div>
-                  <time className="shrink-0 text-xs text-muted" dateTime={item.updated_at}>
+                  <time className="shrink-0 font-mono text-[11px] text-muted" dateTime={item.updated_at}>
                     {shortDate(item.updated_at, now)}
                   </time>
                 </>
@@ -232,11 +239,11 @@ export default async function CasosPage({ searchParams }: PageProps<"/casos">) {
               return (
                 <li key={item.id}>
                   {item.conversation_id ? (
-                    <Link href={`/conversaciones/${item.conversation_id}`} className="flex items-start gap-3 px-4 py-3 transition hover:bg-zinc-100 sm:px-6 dark:hover:bg-zinc-900">
+                    <Link href={`/conversaciones/${item.conversation_id}`} className="flex items-start gap-3 px-4 py-3 transition hover:bg-zinc-100/80 sm:px-6 dark:hover:bg-zinc-900">
                       {content}
                     </Link>
                   ) : (
-                    <div className="flex items-start gap-3 px-4 py-3 sm:px-6">{content}</div>
+                    <div className="flex items-start gap-3 px-4 py-3 transition hover:bg-zinc-100/80 sm:px-6 dark:hover:bg-zinc-900">{content}</div>
                   )}
                 </li>
               );

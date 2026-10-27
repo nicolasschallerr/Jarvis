@@ -102,6 +102,8 @@ export async function syncCatalog(
   // La fuente de la que vienen los ítems (ADR-045). Con fuente, la baja lógica alcanza solo a los ítems de esa fuente;
   // sin fuente (el script de carga por archivo), a todos los de la organización, como antes.
   sourceId: string | null = null,
+  // false cuando la lectura de la fuente quedó incompleta (ADR-047): se guarda lo leído y no se da de baja lo demás.
+  deactivateMissing = true,
 ): Promise<CatalogSyncSummary> {
   const syncedAt = now.toISOString();
   const rows = items.map((item) => ({
@@ -137,6 +139,8 @@ export async function syncCatalog(
       .upsert(rows.slice(start, start + 200), { onConflict: "organization_id,external_id" });
     if (error) throw new Error(`No se pudo guardar el catálogo: ${error.message}`);
   }
+
+  if (!deactivateMissing) return { upserted: rows.length, deactivated: 0 };
 
   // Lo que estaba disponible y no vino en esta carga queda dado de baja.
   let goneQuery = admin.from("catalog_items").update({ is_available: false }).eq("organization_id", organizationId).eq("is_available", true).lt("synced_at", syncedAt);

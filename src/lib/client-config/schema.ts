@@ -111,11 +111,42 @@ const iaSchema = z.object({
   precio_salida_usd_por_millon: z.number().nonnegative().optional(),
 });
 
+// Fuentes de stock que el CRM lee solo (ADR-047). La clave de una base nunca va acá: se nombra la variable de entorno
+// (CATALOGO_…) que la tiene en el servidor.
+const fuenteSchema = z.discriminatedUnion("tipo", [
+  z.object({
+    tipo: z.literal("supabase"),
+    nombre: z.string().trim().min(1).max(80),
+    url: z.url().refine((value) => /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(value), "tiene que ser https://<proyecto>.supabase.co"),
+    tabla: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,62}$/, "nombre de tabla inválido"),
+    clave_env: z.string().regex(/^CATALOGO_[A-Z0-9_]{2,60}$/, "tiene que ser el nombre de una variable que empiece con CATALOGO_"),
+    columnas: z.record(z.string(), z.string()).optional(),
+    cada_horas: z.number().int().min(1).max(168).default(1),
+  }),
+  z.object({
+    tipo: z.literal("web"),
+    nombre: z.string().trim().min(1).max(80),
+    url: z.url().refine((value) => value.startsWith("https://"), "tiene que empezar con https://"),
+    cada_horas: z.number().int().min(1).max(168).default(6),
+  }),
+  z.object({
+    tipo: z.literal("planilla"),
+    nombre: z.string().trim().min(1).max(80),
+    url: z.url().refine((value) => value.startsWith("https://docs.google.com/spreadsheets/"), "tiene que ser un enlace de Google Sheets"),
+    cada_horas: z.number().int().min(1).max(168).default(6),
+  }),
+]);
+
 // Catálogo de stock que consulta el agente (ADR-043). "nombre" es cómo se llama lo que hay en él, en plural
-// (ej. "propiedades", "vehículos"). Los ítems se cargan aparte, con scripts/cargar-catalogo.mts.
+// (ej. "propiedades", "vehículos"). "fuentes" dice de dónde lo lee el CRM solo (ADR-047).
 const catalogoSchema = z.object({
   activo: z.boolean().default(false),
   nombre: z.string().trim().min(1).max(40).default("productos"),
+  fuentes: z
+    .array(fuenteSchema)
+    .max(10)
+    .refine((list) => new Set(list.map((source) => source.nombre)).size === list.length, "hay dos fuentes con el mismo nombre")
+    .default([]),
 });
 
 export const clientConfigSchema = z

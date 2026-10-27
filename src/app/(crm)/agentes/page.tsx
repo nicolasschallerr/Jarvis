@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { toAgentKind, type AgentView } from "@/components/agents/agent-card";
 import { EmptyState, NoAccess } from "@/components/ui/empty-state";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { BotIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { getCurrentProfile } from "@/lib/auth/profile";
@@ -37,9 +38,7 @@ export default async function AgentesPage() {
       <PageHeader title="Agentes" description="Cómo se llaman, qué hacen y si están trabajando." />
 
       {error ? (
-        <p role="alert" className="p-6 text-sm text-danger">
-          No se pudieron cargar los agentes. Probá recargar.
-        </p>
+        <ErrorBanner>No se pudieron cargar los agentes. Probá recargar.</ErrorBanner>
       ) : agents.length === 0 ? (
         <EmptyState
           icon={<BotIcon className="size-6" />}
@@ -63,7 +62,7 @@ export default async function AgentesPage() {
                   <p className="text-sm text-muted">
                     {products ?? 0} productos disponibles en {sources ?? 0} {sources === 1 ? "fuente" : "fuentes"}.{" "}
                     <Link href="/stock" className="font-medium text-accent hover:underline">
-                      Administrar el stock
+                      Ver el stock
                     </Link>
                   </p>
                 ) : null}

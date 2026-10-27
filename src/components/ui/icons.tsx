@@ -179,3 +179,18 @@ export const ArrowRightIcon = (props: IconProps) => (
     <path d="M5 12h14M13 6l6 6-6 6" />
   </Svg>
 );
+
+// Doble tilde de "entregado" / "leído": la segunda tilde corrida a la derecha, como en los canales de chat.
+export const DoubleCheckIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="m2 12.5 4.5 4.5L16 7" />
+    <path d="m11.5 16 1 1L22 7" />
+  </Svg>
+);
+
+export const ClockIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
+  </Svg>
+);
