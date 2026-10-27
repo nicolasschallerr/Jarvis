@@ -67,21 +67,23 @@ function CaseCard({ item, now, canEdit, onMove }: { item: BoardCase; now: Date; 
   return (
     <li
       ref={setNodeRef}
-      className={`card flex flex-col gap-1.5 p-3 transition ${isDragging ? "opacity-40" : "hover:-translate-y-0.5 hover:shadow-md"}`}
+      {...(canEdit ? listeners : {})}
+      className={`card flex flex-col gap-1.5 p-3 transition ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${isDragging ? "opacity-40" : "hover:-translate-y-0.5 hover:shadow-md"}`}
     >
       <CardBody item={item} now={now} />
 
       {canEdit ? (
         <div className="mt-1 flex items-center gap-2">
-          {/* Manija: solo desde acá se arrastra, así los enlaces, el selector y el desplazamiento táctil de las
-              columnas no se pisan con el arrastre. También se mueve con el teclado (espacio y flechas). */}
+          {/* La tarjeta entera se agarra con el mouse (después de mover 6 px, así un clic en el enlace sigue siendo
+              clic) o con el dedo (manteniendo apretado un momento, así el desplazamiento de las columnas no se pisa).
+              La manija es el punto de entrada del teclado (espacio y flechas): dnd-kit solo acepta el teclado
+              desde el activador. */}
           <button
             type="button"
             ref={setActivatorNodeRef}
-            {...listeners}
             {...attributes}
             aria-label={`Mover el caso ${item.title}`}
-            className="btn-secondary cursor-grab touch-none !px-2 !py-1 text-xs active:cursor-grabbing"
+            className="btn-secondary cursor-grab !px-2 !py-1 text-xs active:cursor-grabbing"
           >
             <svg viewBox="0 0 16 16" className="size-4" fill="currentColor" aria-hidden="true">
               <circle cx="5" cy="3" r="1.3" />
@@ -241,7 +243,7 @@ export function Board({ cases, canEdit }: { cases: BoardCase[]; canEdit: boolean
           announcements,
           screenReaderInstructions: {
             draggable:
-              "Para mover un caso, apretá espacio o Enter en la manija, usá las flechas para elegir la columna y volvé a apretar espacio para soltarlo. Escape cancela.",
+              "Para mover un caso con el teclado, apretá espacio o Enter en la manija, usá las flechas para elegir la columna y volvé a apretar espacio para soltarlo. Escape cancela.",
           },
         }}
       >
