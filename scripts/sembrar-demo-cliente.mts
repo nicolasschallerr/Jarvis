@@ -1,0 +1,334 @@
+import { randomBytes } from "node:crypto";
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { parseArgs } from "node:util";
+
+import { createClient } from "@supabase/supabase-js";
+import { parse as parseYaml } from "yaml";
+import { z } from "zod";
+
+import { respondToMessage } from "../src/lib/agent/attention";
+import { createAnthropicClient } from "../src/lib/ai/anthropic-client";
+import { parseCatalogFile, syncCatalog } from "../src/lib/catalog/import";
+import { syncAttentionConfig } from "../src/lib/client-config/attention";
+import { parseClientConfig, syncAgents, syncSectorsAndUnits } from "../src/lib/client-config/load";
+import { readAttentionFiles } from "../src/lib/client-config/read-dir";
+import type { Database } from "../src/lib/supabase/database.types";
+
+// Arma una organización de DEMOSTRACIÓN para un cliente o prospecto, a partir de su carpeta: configuración, catálogo
+// (si tiene) y un guion de conversaciones (demo/escenarios.yaml). Cada mensaje del guion lo contesta el agente REAL
+// con Claude (la misma función que en producción), así la demo muestra respuestas, herramientas, derivaciones y
+// costos verdaderos. Solo el último paso, el envío a Meta, se simula: los canales de la demo no son números reales.
+//
+// Uso (desde la carpeta del repo), SOLO en desarrollo:
+//   npx tsx --env-file=.env.local scripts/sembrar-demo-cliente.mts --dir "../Orbita AI - Privado/clientes/<slug>"
+//
+// Crea (o BORRA y vuelve a crear) la organización "<slug>-demo". Nunca toca otra: solo borra slugs que terminan en
+// "-demo". Cuesta dinero (Claude real, una llamada o más por mensaje del guion).
+// El usuario administrador se toma de JARVIS_DEMO_<SLUG>_EMAIL / _PASSWORD; si no están, se generan y se agregan a
+// .env.local (que no se sube al repo). Nunca se imprimen.
+
+const { values } = parseArgs({ options: { dir: { type: "string" } } });
+
+function fail(message: string): never {
+  console.error(`Error: ${message}`);
+  process.exit(1);
+}
+
+const dir = values.dir ?? fail('Falta --dir (la carpeta del cliente, ej. "../Orbita AI - Privado/clientes/<slug>").');
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!url || !serviceRoleKey) fail("Faltan NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY (usá --env-file=.env.local).");
+if (!process.env.ANTHROPIC_API_KEY) fail("Falta ANTHROPIC_API_KEY: la demo usa Claude real.");
+
+// ---------- Guion de la demo ----------
+const roleSchema = z.enum(["superadmin", "operator", "viewer"]);
+const statusSchema = z.enum(["new", "in_progress", "waiting_contact", "waiting_area", "resolved"]);
+const channelSchema = z.enum(["whatsapp", "instagram"]);
+
+const scriptSchema = z.object({
+  nombre_organizacion: z.string().min(1),
+  administrador: z.object({ nombre: z.string().min(1) }),
+  equipo: z
+    .array(z.object({ nombre: z.string().min(1), rol: roleSchema.default("operator"), sectores: z.array(z.string()).default([]), lider: z.boolean().default(false) }))
+    .default([]),
+  // Conversaciones que contesta Claude en vivo. "despues": lo que hace el equipo cuando el agente terminó.
+  conversaciones: z
+    .array(
+      z.object({
+        canal: channelSchema,
+        contacto: z.string().min(1),
+        identificador: z.string().min(1),
+        hace_minutos: z.number().int().positive(),
+        mensajes: z.array(z.string().min(1)).min(1),
+        despues: z
+          .object({
+            asignar_a: z.string().optional(),
+            estado: statusSchema.optional(),
+            nota: z.string().optional(),
+            respuesta_operador: z.string().optional(),
+            resolucion: z.string().optional(),
+          })
+          .optional(),
+      }),
+    )
+    .default([]),
+  // Historia de los últimos días, sin Claude (texto ya escrito), para que el CRM y el Agente Analítico tengan datos.
+  historial: z
+    .array(
+      z.object({
+        canal: channelSchema,
+        contacto: z.string().min(1),
+        identificador: z.string().min(1),
+        dias_atras: z.number().positive(),
+        titulo: z.string().min(1),
+        sector: z.string().min(1),
+        unidad: z.string().optional(),
+        estado: statusSchema.default("resolved"),
+        prioridad: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
+        horas_para_resolver: z.number().positive().default(4),
+        mensaje: z.string().min(1),
+        respuesta: z.string().min(1),
+        resumen: z.string().optional(),
+        resolucion: z.string().optional(),
+        asignar_a: z.string().optional(),
+      }),
+    )
+    .default([]),
+});
+
+const configText = existsSync(join(dir, "sectores-y-reglas.yaml")) ? readFileSync(join(dir, "sectores-y-reglas.yaml"), "utf8") : fail(`No encuentro ${join(dir, "sectores-y-reglas.yaml")}.`);
+const parsedConfig = parseClientConfig(configText);
+if (!parsedConfig.ok) fail(`sectores-y-reglas.yaml tiene errores:\n  - ${parsedConfig.errors.join("\n  - ")}`);
+const config = parsedConfig.config;
+
+const scriptFile = join(dir, "demo", "escenarios.yaml");
+if (!existsSync(scriptFile)) fail(`No encuentro ${scriptFile}.`);
+const parsedScript = scriptSchema.safeParse(parseYaml(readFileSync(scriptFile, "utf8")));
+if (!parsedScript.success) fail(`demo/escenarios.yaml tiene errores:\n  - ${parsedScript.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("\n  - ")}`);
+const demo = parsedScript.data;
+
+const files = readAttentionFiles(dir) ?? fail(`Falta ${join(dir, "agente-prompt.md")}.`);
+
+let catalogItems = null;
+if (config.catalogo?.activo) {
+  const catalogFile = join(dir, "catalogo.json");
+  if (!existsSync(catalogFile)) fail(`El catálogo está activo pero no encuentro ${catalogFile}.`);
+  const parsedCatalog = parseCatalogFile(readFileSync(catalogFile, "utf8"));
+  if (!parsedCatalog.ok) fail(`catalogo.json tiene errores:\n  - ${parsedCatalog.errors.join("\n  - ")}`);
+  catalogItems = parsedCatalog.items;
+}
+
+const sectorIds = new Set(config.sectores.map((sector) => sector.id));
+for (const person of demo.equipo) for (const sector of person.sectores) if (!sectorIds.has(sector)) fail(`"${person.nombre}" está en el sector "${sector}", que no existe.`);
+for (const item of demo.historial) if (!sectorIds.has(item.sector)) fail(`El historial "${item.titulo}" usa el sector "${item.sector}", que no existe.`);
+
+const slug = `${config.organizacion.slug}-demo`;
+const envKey = `JARVIS_DEMO_${config.organizacion.slug.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`;
+
+// ---------- Base ----------
+const admin = createClient<Database>(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+
+let adminEmail = process.env[`${envKey}_EMAIL`];
+let adminPassword = process.env[`${envKey}_PASSWORD`];
+if (!adminEmail || !adminPassword) {
+  adminEmail = `demo-${config.organizacion.slug}-admin@jarvis.test`;
+  adminPassword = randomBytes(18).toString("base64url");
+  appendFileSync(
+    ".env.local",
+    `\n# Usuario de la demo de ${config.organizacion.nombre} (scripts/sembrar-demo-cliente.mts). Solo para desarrollo.\n${envKey}_EMAIL=${adminEmail}\n${envKey}_PASSWORD=${adminPassword}\n`,
+  );
+  console.log(`Credenciales de la demo generadas y guardadas en .env.local (${envKey}_EMAIL / ${envKey}_PASSWORD).`);
+}
+
+// 1. Borrar la demo anterior (solo slugs "-demo"): primero los usuarios, porque sus perfiles impiden borrar la organización.
+const { data: previous } = await admin.from("organizations").select("id, slug").eq("slug", slug).maybeSingle();
+if (previous) {
+  if (!previous.slug.endsWith("-demo")) fail("Por seguridad, solo se borran organizaciones de demostración.");
+  const { data: profiles } = await admin.from("profiles").select("id").eq("organization_id", previous.id);
+  for (const profile of profiles ?? []) await admin.auth.admin.deleteUser(profile.id);
+  const { error } = await admin.from("organizations").delete().eq("id", previous.id);
+  if (error) fail(`No se pudo borrar la demo anterior: ${error.message}`);
+  console.log("Demo anterior borrada.");
+}
+const userPrefix = `demo-${config.organizacion.slug}-`;
+const { data: existingUsers } = await admin.auth.admin.listUsers({ perPage: 1000 });
+for (const user of existingUsers?.users ?? []) {
+  if (user.email?.startsWith(userPrefix) && user.email.endsWith("@jarvis.test")) await admin.auth.admin.deleteUser(user.id);
+}
+
+// 2. Organización, configuración, agente encendido y catálogo.
+const { data: org, error: orgError } = await admin.from("organizations").insert({ slug, name: demo.nombre_organizacion }).select("id").single();
+if (orgError || !org) fail(`No se pudo crear la organización: ${orgError?.message}`);
+const orgId = org.id;
+
+await syncSectorsAndUnits(admin, orgId, config);
+await syncAgents(admin, orgId, config);
+await syncAttentionConfig(admin, orgId, config, files);
+const { error: enableError } = await admin.from("agents").update({ is_enabled: true }).eq("organization_id", orgId);
+if (enableError) fail(`No se pudieron encender los agentes: ${enableError.message}`);
+if (catalogItems) {
+  const summary = await syncCatalog(admin, orgId, catalogItems);
+  console.log(`Catálogo: ${summary.upserted} ítems.`);
+}
+
+const { data: sectorRows } = await admin.from("sectors").select("id, slug").eq("organization_id", orgId);
+const sectorId = (id: string) => sectorRows?.find((row) => row.slug === id)?.id ?? fail(`Falta el sector ${id}`);
+const { data: unitRows } = await admin.from("business_units").select("id, slug").eq("organization_id", orgId);
+const unitId = (id: string | undefined) => (id ? (unitRows?.find((row) => row.slug === id)?.id ?? null) : null);
+
+// 3. Equipo.
+async function createPerson(email: string, fullName: string, role: z.infer<typeof roleSchema>, password?: string) {
+  const { data, error } = await admin.auth.admin.createUser({ email, password: password ?? randomBytes(24).toString("base64url"), email_confirm: true });
+  if (error || !data.user) fail(`No se pudo crear ${email}: ${error?.message}`);
+  const { error: profileError } = await admin.from("profiles").insert({ id: data.user.id, organization_id: orgId, full_name: fullName, role });
+  if (profileError) fail(`No se pudo crear el perfil de ${email}: ${profileError.message}`);
+  return data.user.id;
+}
+const people = new Map<string, string>();
+people.set(demo.administrador.nombre, await createPerson(adminEmail, demo.administrador.nombre, "superadmin", adminPassword));
+for (const [index, person] of demo.equipo.entries()) {
+  const id = await createPerson(`${userPrefix}${index + 1}@jarvis.test`, person.nombre, person.rol);
+  people.set(person.nombre, id);
+  if (person.sectores.length > 0) {
+    await admin.from("sector_members").insert(person.sectores.map((sector) => ({ organization_id: orgId, sector_id: sectorId(sector), profile_id: id, is_lead: person.lider })));
+  }
+}
+const personId = (name: string | undefined) => (name ? (people.get(name) ?? fail(`"${name}" no está en el equipo de la demo.`)) : null);
+
+// 4. Canales de la demo. El token es una variable que existe solo mientras corre este script, y el envío se simula:
+// nada sale a Meta.
+const CHANNEL_TOKENS = { whatsapp: "WHATSAPP_ACCESS_TOKEN_DEMO", instagram: "INSTAGRAM_ACCESS_TOKEN_DEMO" } as const;
+for (const name of Object.values(CHANNEL_TOKENS)) process.env[name] = "demo-sin-envio-real";
+const { data: channels, error: channelError } = await admin
+  .from("channels")
+  .insert([
+    { organization_id: orgId, type: "whatsapp", name: "WhatsApp (demo)", external_id: `demo-wa-${orgId.slice(0, 8)}`, secret_ref: CHANNEL_TOKENS.whatsapp },
+    { organization_id: orgId, type: "instagram", name: "Instagram (demo)", external_id: `demo-ig-${orgId.slice(0, 8)}`, secret_ref: CHANNEL_TOKENS.instagram },
+  ])
+  .select("id, type");
+if (channelError || !channels) fail(`No se pudieron crear los canales: ${channelError?.message}`);
+const channelId = (type: "whatsapp" | "instagram") => channels.find((row) => row.type === type)?.id ?? fail(`Falta el canal ${type}`);
+
+let sent = 0;
+// Responde como Meta a un envío (WhatsApp devuelve messages[0].id; Instagram, message_id).
+async function fakeMeta(): Promise<Response> {
+  sent += 1;
+  const id = `demo-out-${orgId.slice(0, 8)}-${sent}`;
+  return new Response(JSON.stringify({ messages: [{ id }], message_id: id, recipient_id: "demo" }), { status: 200, headers: { "content-type": "application/json" } });
+}
+
+// 5. Mensajes.
+const nowMs = Date.now();
+const minutesAgo = (minutes: number) => new Date(nowMs - minutes * 60_000);
+let sequence = 0;
+
+async function inbound(params: { channel: "whatsapp" | "instagram"; identifier: string; name: string; text: string; at: Date }) {
+  sequence += 1;
+  const externalId = `demo-in-${orgId.slice(0, 8)}-${sequence}`;
+  const { error } = await admin.rpc("ingest_inbound_message", {
+    p_organization_id: orgId,
+    p_channel_id: channelId(params.channel),
+    p_channel_type: params.channel,
+    p_identifier: params.identifier,
+    p_contact_name: params.name,
+    p_external_id: externalId,
+    p_type: "text",
+    p_body: params.text,
+    p_provider_timestamp: params.at.toISOString(),
+    p_raw: {},
+  });
+  if (error) fail(`No se pudo crear un mensaje: ${error.message}`);
+  const { data } = await admin.from("messages").select("id, conversation_id").eq("organization_id", orgId).eq("external_id", externalId).single();
+  if (!data) fail("No se encontró el mensaje recién creado.");
+  return { messageId: data.id, conversationId: data.conversation_id };
+}
+
+const client = createAnthropicClient();
+
+console.log(`Conversaciones en vivo con Claude: ${demo.conversaciones.length}.`);
+for (const conversation of demo.conversaciones) {
+  let conversationId = "";
+  let at = conversation.hace_minutos;
+  for (const text of conversation.mensajes) {
+    const created = await inbound({ channel: conversation.canal, identifier: conversation.identificador, name: conversation.contacto, text, at: minutesAgo(at) });
+    conversationId = created.conversationId;
+    const result = await respondToMessage(admin, client, { conversationId, messageId: created.messageId, now: minutesAgo(at - 1), fetchImpl: fakeMeta });
+    console.log(`  ${conversation.contacto}: ${result.status}${result.status === "replied" ? "" : ` (${result.reason})`}`);
+    at -= 3;
+  }
+
+  const after = conversation.despues;
+  if (!after) continue;
+  const { data: openCase } = await admin.from("cases").select("id, contact_id").eq("conversation_id", conversationId).order("opened_at", { ascending: false }).limit(1).maybeSingle();
+  if (after.respuesta_operador) {
+    const by = personId(after.asignar_a);
+    await admin.from("conversations").update({ ai_enabled: false }).eq("id", conversationId);
+    await admin.from("messages").insert({
+      organization_id: orgId,
+      conversation_id: conversationId,
+      direction: "outbound",
+      sender: "operator",
+      sender_profile_id: by,
+      type: "text",
+      body: after.respuesta_operador,
+      status: "sent",
+      external_id: `demo-op-${orgId.slice(0, 8)}-${sequence}`,
+      provider_timestamp: minutesAgo(Math.max(at - 5, 1)).toISOString(),
+    });
+  }
+  if (openCase) {
+    const update: Database["public"]["Tables"]["cases"]["Update"] = {};
+    if (after.asignar_a) update.assigned_to = personId(after.asignar_a);
+    if (after.estado) update.status = after.estado;
+    if (after.resolucion) update.resolution = after.resolucion;
+    if (after.estado === "resolved") update.resolved_at = minutesAgo(Math.max(at - 10, 1)).toISOString();
+    if (Object.keys(update).length > 0) await admin.from("cases").update(update).eq("id", openCase.id);
+    if (after.nota) {
+      await admin.from("internal_notes").insert({ organization_id: orgId, conversation_id: conversationId, case_id: openCase.id, author_id: personId(after.asignar_a) ?? people.get(demo.administrador.nombre) ?? null, body: after.nota });
+    }
+  }
+}
+
+// 6. Historial (sin Claude).
+for (const item of demo.historial) {
+  const openedAt = new Date(nowMs - item.dias_atras * 86_400_000);
+  const created = await inbound({ channel: item.canal, identifier: item.identificador, name: item.contacto, text: item.mensaje, at: openedAt });
+  sequence += 1;
+  await admin.from("messages").insert({
+    organization_id: orgId,
+    conversation_id: created.conversationId,
+    direction: "outbound",
+    sender: "agent",
+    type: "text",
+    body: item.respuesta,
+    status: "sent",
+    external_id: `demo-hist-${orgId.slice(0, 8)}-${sequence}`,
+    provider_timestamp: new Date(openedAt.getTime() + 60_000).toISOString(),
+  });
+  await admin.from("conversations").update({ last_message_at: new Date(openedAt.getTime() + 60_000).toISOString() }).eq("id", created.conversationId);
+  const { data: conv } = await admin.from("conversations").select("contact_id").eq("id", created.conversationId).single();
+  const resolved = item.estado === "resolved";
+  const { error } = await admin.from("cases").insert({
+    organization_id: orgId,
+    contact_id: conv?.contact_id ?? fail("Falta el contacto"),
+    conversation_id: created.conversationId,
+    title: item.titulo,
+    sector_id: sectorId(item.sector),
+    unit_id: unitId(item.unidad),
+    status: item.estado,
+    priority: item.prioridad,
+    summary: item.resumen ?? null,
+    resolution: item.resolucion ?? null,
+    assigned_to: personId(item.asignar_a),
+    opened_at: openedAt.toISOString(),
+    resolved_at: resolved ? new Date(openedAt.getTime() + item.horas_para_resolver * 3_600_000).toISOString() : null,
+  });
+  if (error) fail(`No se pudo crear el caso "${item.titulo}": ${error.message}`);
+}
+console.log(`Historial: ${demo.historial.length} casos de los últimos días.`);
+
+const { data: calls } = await admin.from("ai_calls").select("input_tokens, output_tokens").eq("organization_id", orgId);
+const tokens = (calls ?? []).reduce((sum, call) => ({ input: sum.input + (call.input_tokens ?? 0), output: sum.output + (call.output_tokens ?? 0) }), { input: 0, output: 0 });
+console.log(`Demo lista: ${demo.nombre_organizacion} (${slug}). Claude: ${calls?.length ?? 0} llamadas, ${tokens.input} tokens de entrada y ${tokens.output} de salida.`);
+console.log(`Entrá con el usuario de ${envKey}_EMAIL.`);
