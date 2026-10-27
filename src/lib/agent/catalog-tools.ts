@@ -17,6 +17,7 @@ const searchSchema = z.object({
   moneda: z.enum(["USD", "ARS"]).optional(),
   palabras_clave: z.array(z.string().trim().min(2).max(40)).max(5).optional(),
   cantidad: z.number().int().min(1).max(8).default(5),
+  solo_con_stock: z.boolean().optional(),
 });
 
 const detailSchema = z.object({ id: z.string().trim().min(1).max(100) });
@@ -47,6 +48,10 @@ export function createCatalogTools(source: CatalogSource, options: { label: stri
             description: 'Características que tiene que tener, una palabra por elemento (ej. ["pileta"], ["cochera"]).',
           },
           cantidad: { type: "integer", description: "Cuántos resultados devolver (por defecto 5, máximo 8)." },
+          solo_con_stock: {
+            type: "boolean",
+            description: "true para dejar afuera lo agotado. Sin esto, lo agotado aparece marcado como AGOTADO: decíselo a la persona, no lo ofrezcas como disponible.",
+          },
         },
       },
       async run(input) {
@@ -65,6 +70,7 @@ export function createCatalogTools(source: CatalogSource, options: { label: stri
             maxPrice: filters.precio_maximo,
             currency: filters.moneda,
             keywords: filters.palabras_clave,
+            inStockOnly: filters.solo_con_stock,
           },
           filters.cantidad,
         );

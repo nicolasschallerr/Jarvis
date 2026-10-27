@@ -30,6 +30,9 @@ const itemSchema = z.object({
   descripcion: z.string().max(10000).nullish().transform((value) => value?.trim() || null),
   detalles: z.record(z.string(), z.string()).default({}),
   fotos: z.array(z.url()).max(100).default([]),
+  sku: nullableText,
+  marca: nullableText,
+  stock: z.number().int().nonnegative().nullish().transform((value) => value ?? null),
 });
 
 export const catalogFileSchema = z.object({
@@ -79,6 +82,9 @@ export function parseCatalogFile(text: string): CatalogFileResult {
       description: item.descripcion,
       details: item.detalles,
       photos: item.fotos,
+      sku: item.sku,
+      brand: item.marca,
+      stockQuantity: item.stock,
       isAvailable: true,
     })),
   };
@@ -93,6 +99,9 @@ export async function syncCatalog(
   organizationId: string,
   items: CatalogItem[],
   now: Date = new Date(),
+  // La fuente de la que vienen los ítems (ADR-045). Con fuente, la baja lógica alcanza solo a los ítems de esa fuente;
+  // sin fuente (el script de carga por archivo), a todos los de la organización, como antes.
+  sourceId: string | null = null,
 ): Promise<CatalogSyncSummary> {
   const syncedAt = now.toISOString();
   const rows = items.map((item) => ({
@@ -113,6 +122,10 @@ export async function syncCatalog(
     description: item.description,
     details: item.details as Json,
     photos: item.photos,
+    sku: item.sku ?? null,
+    brand: item.brand ?? null,
+    stock_quantity: item.stockQuantity ?? null,
+    source_id: sourceId,
     is_available: true,
     synced_at: syncedAt,
   }));
@@ -126,13 +139,9 @@ export async function syncCatalog(
   }
 
   // Lo que estaba disponible y no vino en esta carga queda dado de baja.
-  const { data: gone, error: goneError } = await admin
-    .from("catalog_items")
-    .update({ is_available: false })
-    .eq("organization_id", organizationId)
-    .eq("is_available", true)
-    .lt("synced_at", syncedAt)
-    .select("id");
+  let goneQuery = admin.from("catalog_items").update({ is_available: false }).eq("organization_id", organizationId).eq("is_available", true).lt("synced_at", syncedAt);
+  if (sourceId) goneQuery = goneQuery.eq("source_id", sourceId);
+  const { data: gone, error: goneError } = await goneQuery.select("id");
   if (goneError) throw new Error(`No se pudieron dar de baja los ítems que ya no están: ${goneError.message}`);
 
   return { upserted: rows.length, deactivated: gone?.length ?? 0 };

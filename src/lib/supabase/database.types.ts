@@ -854,6 +854,10 @@ export type Database = {
           photos: string[]
           price: number | null
           price_text: string | null
+          brand: string | null
+          sku: string | null
+          source_id: string | null
+          stock_quantity: number | null
           synced_at: string
           title: string
           updated_at: string
@@ -864,6 +868,7 @@ export type Database = {
           area_m2?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
+          brand?: string | null
           category?: string | null
           created_at?: string
           currency?: string | null
@@ -878,6 +883,9 @@ export type Database = {
           photos?: string[]
           price?: number | null
           price_text?: string | null
+          sku?: string | null
+          source_id?: string | null
+          stock_quantity?: number | null
           synced_at?: string
           title: string
           updated_at?: string
@@ -888,6 +896,7 @@ export type Database = {
           area_m2?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
+          brand?: string | null
           category?: string | null
           created_at?: string
           currency?: string | null
@@ -902,6 +911,9 @@ export type Database = {
           photos?: string[]
           price?: number | null
           price_text?: string | null
+          sku?: string | null
+          source_id?: string | null
+          stock_quantity?: number | null
           synced_at?: string
           title?: string
           updated_at?: string
@@ -911,6 +923,66 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "catalog_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_items_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_sources: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          item_count: number
+          kind: string
+          last_message: string | null
+          last_status: string | null
+          last_synced_at: string | null
+          name: string
+          organization_id: string
+          sync_every_hours: number | null
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          id?: string
+          item_count?: number
+          kind: string
+          last_message?: string | null
+          last_status?: string | null
+          last_synced_at?: string | null
+          name: string
+          organization_id: string
+          sync_every_hours?: number | null
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          item_count?: number
+          kind?: string
+          last_message?: string | null
+          last_status?: string | null
+          last_synced_at?: string | null
+          name?: string
+          organization_id?: string
+          sync_every_hours?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_sources_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"

@@ -19,6 +19,11 @@ export type CatalogItem = {
   details: Record<string, string>;
   photos: string[];
   isAvailable: boolean;
+  // Propios de una tienda (ADR-045). Opcionales: un catálogo inmobiliario no los usa. stockQuantity null = la
+  // fuente no informa unidades; 0 = agotado.
+  sku?: string | null;
+  brand?: string | null;
+  stockQuantity?: number | null;
 };
 
 export type CatalogFilters = {
@@ -30,6 +35,8 @@ export type CatalogFilters = {
   currency?: string;
   // Palabras que tienen que aparecer en el título, la descripción o los detalles (ej. "pileta", "cochera").
   keywords?: string[];
+  // Deja afuera lo agotado (stock en 0). Sin esto, lo agotado aparece y se describe como agotado.
+  inStockOnly?: boolean;
 };
 
 export type CatalogSearchResult = { total: number; items: CatalogItem[] };
@@ -63,7 +70,7 @@ function matchesLoosely(value: string | null, wanted: string): boolean {
 }
 
 function searchableText(item: CatalogItem): string {
-  return normalize([item.title, item.description, item.zone, item.locality, ...Object.entries(item.details).flat()].join(" "));
+  return normalize([item.title, item.description, item.zone, item.locality, item.sku, item.brand, ...Object.entries(item.details).flat()].join(" "));
 }
 
 export function searchCatalog(items: CatalogItem[], filters: CatalogFilters, limit = 5): CatalogSearchResult {
@@ -71,6 +78,7 @@ export function searchCatalog(items: CatalogItem[], filters: CatalogFilters, lim
 
   const matches = items.filter((item) => {
     if (!item.isAvailable) return false;
+    if (filters.inStockOnly && item.stockQuantity === 0) return false;
     if (filters.operation && normalize(item.operation) !== normalize(filters.operation)) return false;
     if (filters.category && !matchesLoosely(item.category, filters.category)) return false;
     if (filters.zone && !matchesLoosely(item.zone, filters.zone) && !matchesLoosely(item.locality, filters.zone)) return false;
@@ -101,10 +109,19 @@ export function describeItem(item: CatalogItem): string {
     item.bathrooms ? `${item.bathrooms} baño${item.bathrooms > 1 ? "s" : ""}` : null,
   ].filter(Boolean);
   const where = [item.zone, item.locality].filter(Boolean).join(", ");
+  const stock =
+    item.stockQuantity === undefined || item.stockQuantity === null
+      ? null
+      : item.stockQuantity === 0
+        ? "AGOTADO"
+        : `${item.stockQuantity} unidad${item.stockQuantity === 1 ? "" : "es"} en stock`;
   return [
     `[id ${item.externalId}] ${[item.category, item.operation ? `en ${item.operation}` : null].filter(Boolean).join(" ")}: ${item.title}`,
+    item.brand ? `(marca ${item.brand})` : null,
+    item.sku ? `(SKU ${item.sku})` : null,
     where ? `(${where})` : null,
     `· ${item.priceText || "precio a consultar"}`,
+    stock ? `· ${stock}` : null,
     facts.length ? `· ${facts.join(", ")}` : null,
     item.url ? `· ficha: ${item.url}` : null,
   ]

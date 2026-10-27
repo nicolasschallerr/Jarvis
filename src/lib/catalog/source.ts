@@ -41,6 +41,9 @@ export function rowToItem(row: Row): CatalogItem {
     details,
     photos: row.photos,
     isAvailable: row.is_available,
+    sku: row.sku,
+    brand: row.brand,
+    stockQuantity: row.stock_quantity,
   };
 }
 

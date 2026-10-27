@@ -7,8 +7,11 @@ import { SearchIcon, StockIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { normalize, type CatalogItem } from "@/lib/catalog/search";
 import { rowToItem } from "@/lib/catalog/source";
+import { getCurrentProfile } from "@/lib/auth/profile";
 import { dateTime } from "@/lib/crm/format";
 import { createClient } from "@/lib/supabase/server";
+
+import { SourcesPanel, type SourceView } from "./sources-panel";
 
 export const metadata = { title: "Stock" };
 
@@ -56,10 +59,27 @@ export default async function StockPage({ searchParams }: PageProps<"/stock">) {
   const limit = Math.min(Math.max(Number(first(params.ver)) || PAGE_SIZE, PAGE_SIZE), 500);
 
   const supabase = await createClient();
-  const [{ data: rows, error }, { data: agent }] = await Promise.all([
+  const [{ data: rows, error }, { data: agent }, { data: sourceRows }, profile] = await Promise.all([
     supabase.from("catalog_items").select("*").order("synced_at", { ascending: false }).limit(5000),
     supabase.from("agents").select("name").eq("kind", "attention").maybeSingle(),
+    supabase.from("catalog_sources").select("*").order("created_at"),
+    getCurrentProfile(),
   ]);
+
+  const sources: SourceView[] = (sourceRows ?? []).map((source) => {
+    const config = source.config as { url?: unknown; fileName?: unknown } | null;
+    return {
+      id: source.id,
+      kind: source.kind,
+      name: source.name,
+      detail: typeof config?.fileName === "string" ? config.fileName : null,
+      syncEveryHours: source.sync_every_hours,
+      lastSyncedAt: source.last_synced_at,
+      lastStatus: source.last_status,
+      lastMessage: source.last_message,
+      itemCount: source.item_count,
+    };
+  });
 
   const all = (rows ?? []).map(rowToItem);
   const lastSync = rows?.reduce<string | null>((latest, row) => (!latest || row.synced_at > latest ? row.synced_at : latest), null) ?? null;
@@ -68,7 +88,7 @@ export default async function StockPage({ searchParams }: PageProps<"/stock">) {
   const filtered = (showGone ? all.filter((item) => !item.isAvailable) : available)
     .filter((item) => !operation || item.operation === operation)
     .filter((item) => matchesText(item, text))
-    .sort((a, b) => Number(b.externalId) - Number(a.externalId) || a.title.localeCompare(b.title, "es"));
+    .sort((a, b) => (Number(b.externalId) - Number(a.externalId) || 0) || a.title.localeCompare(b.title, "es"));
   const gone = all.length - available.length;
 
   return (
@@ -85,6 +105,8 @@ export default async function StockPage({ searchParams }: PageProps<"/stock">) {
         }
       />
 
+      <SourcesPanel sources={sources} canEdit={profile.role === "superadmin"} />
+
       {error ? (
         <p role="alert" className="m-4 rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger sm:m-6">
           No se pudo cargar el stock. Probá recargar la página.
@@ -93,7 +115,7 @@ export default async function StockPage({ searchParams }: PageProps<"/stock">) {
         <EmptyState
           icon={<StockIcon className="size-5" />}
           title="Todavía no hay stock cargado"
-          description="Cuando se cargue el catálogo del cliente, el agente lo va a usar para responder y lo vas a ver acá."
+          description="Conectá una fuente arriba y el agente va a usar ese stock para responder; lo vas a ver acá."
         />
       ) : (
         <>
@@ -134,8 +156,15 @@ export default async function StockPage({ searchParams }: PageProps<"/stock">) {
                     <p className="text-lg font-semibold">{item.priceText || "Precio a consultar"}</p>
                     <p className="truncate font-medium">{item.title}</p>
                     <p className="truncate text-sm text-muted">
-                      {[item.category, item.zone === "Otra" ? item.locality : item.zone].filter(Boolean).join(" · ")}
+                      {[item.brand, item.category, item.zone === "Otra" ? item.locality : item.zone].filter(Boolean).join(" · ")}
                     </p>
+                    {item.stockQuantity !== null && item.stockQuantity !== undefined ? (
+                      <p className="text-sm">
+                        <Badge tone={item.stockQuantity === 0 ? "danger" : item.stockQuantity <= 3 ? "warning" : "success"}>
+                          {item.stockQuantity === 0 ? "Agotado" : `${item.stockQuantity} en stock`}
+                        </Badge>
+                      </p>
+                    ) : null}
                     <p className="text-sm text-muted">
                       {[
                         item.areaM2 ? `${item.areaM2.toLocaleString("es-AR")} m²` : null,
@@ -146,7 +175,7 @@ export default async function StockPage({ searchParams }: PageProps<"/stock">) {
                         .join(" · ") || " "}
                     </p>
                     <div className="mt-2 flex items-center justify-between text-xs text-muted">
-                      <span>Ficha #{item.externalId}</span>
+                      <span>{item.sku ? `SKU ${item.sku}` : `Ficha #${item.externalId}`}</span>
                       {item.url ? (
                         <a href={item.url} target="_blank" rel="noopener noreferrer" className="font-medium text-accent hover:underline">
                           Ver en la web
