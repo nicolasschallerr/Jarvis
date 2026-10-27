@@ -71,6 +71,7 @@ export function buildAttentionSettings(config: ClientConfig, knowledge: Record<s
     pricing: hasPricing
       ? { inputPerMTok: ia?.precio_entrada_usd_por_millon ?? 0, outputPerMTok: ia?.precio_salida_usd_por_millon ?? 0 }
       : null,
+    catalog: { enabled: config.catalogo?.activo ?? false, label: config.catalogo?.nombre ?? "productos" },
   };
 }
 

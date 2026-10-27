@@ -134,6 +134,13 @@ agentes:
     nombre: Mateo
     frase: "Los números cuentan una historia."
 
+catalogo:
+  # Stock que consulta el agente (ADR-043): si está activo, el agente busca en él antes de responder sobre
+  # disponibilidad, precios o características. Los ítems se cargan aparte, desde un catalogo.json con el formato común:
+  #   npx tsx --env-file=.env.local scripts/cargar-catalogo.mts --org-slug <slug> --archivo <carpeta>/catalogo.json
+  activo: false
+  nombre: productos              # cómo se llama lo que hay en el catálogo, en plural (ej. propiedades)
+
 ia:
   # Modelo del agente de atención (opcional; por defecto el perfil intermedio de Jarvis).
   modelo_atencion: claude-sonnet-5-5

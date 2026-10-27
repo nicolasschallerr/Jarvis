@@ -1,8 +1,10 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
 import { createAnthropicClient } from "../src/lib/ai/anthropic-client";
+import { parseCatalogFile } from "../src/lib/catalog/import";
+import type { CatalogItem } from "../src/lib/catalog/search";
 import { buildAttentionSettings, DEFAULT_ATTENTION_MODEL } from "../src/lib/client-config/attention";
 import { parseClientConfig } from "../src/lib/client-config/load";
 import { readAttentionFiles } from "../src/lib/client-config/read-dir";
@@ -75,8 +77,20 @@ const client = createAnthropicClient();
 const agentModel = config.config.ia?.modelo_atencion ?? DEFAULT_ATTENTION_MODEL;
 console.log(`Agente: ${agentModel} · Juez: ${DEFAULT_JUDGE_MODEL}. Corriendo...`);
 
+// Si el cliente tiene catálogo de stock, se usa el catalogo.json de su carpeta (en memoria: no se lee la base).
+let catalog: CatalogItem[] | undefined;
+if (config.config.catalogo?.activo) {
+  const catalogFile = join(directory ?? "", "catalogo.json");
+  if (!existsSync(catalogFile)) fail(`El catálogo está activo pero no encuentro ${catalogFile}.`);
+  const parsedCatalog = parseCatalogFile(readFileSync(catalogFile, "utf8"));
+  if (!parsedCatalog.ok) fail(`catalogo.json tiene errores:\n  - ${parsedCatalog.errors.join("\n  - ")}`);
+  catalog = parsedCatalog.items;
+  console.log(`Catálogo: ${catalog.length} ítems.`);
+}
+
 const summary = await runEvals(
   {
+    catalog,
     agentClient: client,
     judgeClient: client,
     agentModel,

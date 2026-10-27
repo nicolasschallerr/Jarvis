@@ -105,6 +105,8 @@ npm test                                             pruebas contra jarvis-dev (
 npx tsx --env-file=.env.local scripts/trabajador.mts --estado|--pausar|--reanudar   trabajador de mensajes (si una corrida se corta y queda pausado)
 npx tsx --env-file=.env.produccion scripts/crear-superadmin.mts --org-slug <slug> --org-name "<nombre>" --email <email> --name "<nombre>"   (en producción)
 npx tsx --env-file=.env.produccion scripts/cargar-configuracion.mts --org-slug <slug> --dir "../Orbita AI - Privado/clientes/<slug>"
+npx tsx --env-file=.env.local scripts/cargar-catalogo.mts --org-slug <slug> --archivo "../Orbita AI - Privado/clientes/<slug>/catalogo.json"   stock que consulta el agente (ADR-043)
+npx tsx --env-file=.env.local scripts/sembrar-demo-cliente.mts --dir "../Orbita AI - Privado/clientes/<slug>"   demo comercial "<slug>-demo" con Claude real (solo desarrollo)
 npx tsx --env-file=.env.local scripts/test-claude.mts  prueba de la API key de Anthropic
 npx tsx --env-file=.env.local scripts/correr-evals.mts --dir "../Orbita AI - Privado/clientes/<slug>"  evals con Claude real (cuesta dinero)
 npx supabase migration new <nombre>                  crear una migración

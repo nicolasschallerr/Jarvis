@@ -111,6 +111,13 @@ const iaSchema = z.object({
   precio_salida_usd_por_millon: z.number().nonnegative().optional(),
 });
 
+// Catálogo de stock que consulta el agente (ADR-043). "nombre" es cómo se llama lo que hay en él, en plural
+// (ej. "propiedades", "vehículos"). Los ítems se cargan aparte, con scripts/cargar-catalogo.mts.
+const catalogoSchema = z.object({
+  activo: z.boolean().default(false),
+  nombre: z.string().trim().min(1).max(40).default("productos"),
+});
+
 export const clientConfigSchema = z
   .object({
     organizacion: z
@@ -127,6 +134,7 @@ export const clientConfigSchema = z
     sectores: z.array(sectorSchema).min(1, "tiene que haber al menos un sector"),
     derivacion: z.object({ sector_por_defecto: slug }).loose().optional(),
     agentes: z.array(agenteSchema).optional(),
+    catalogo: catalogoSchema.optional(),
   })
   .loose()
   .superRefine((config, ctx) => {

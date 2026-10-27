@@ -71,6 +71,13 @@ Los scripts leen la carpeta del cliente con `--dir`, por ejemplo
 8. **Cargar la configuración** en esa organización (con `--validar-solo` primero, para revisar sin tocar la base):
    `npx tsx --env-file=.env.produccion scripts/cargar-configuracion.mts --org-slug <slug> --dir "../Orbita AI - Privado/clientes/<slug>"`
    Para probar antes en desarrollo, el mismo comando con `--env-file=.env.local`.
+   **Si tiene stock** (por ejemplo, una inmobiliaria): activar `catalogo` en `sectores-y-reglas.yaml`, escribir en su
+   carpeta privada un lector de su web o sistema que genere `catalogo.json` con el formato común
+   (`src/lib/catalog/import.ts`) y cargarlo con `scripts/cargar-catalogo.mts` (ADR-043).
+
+   **Para una demo comercial** (prospecto): con un guion en `demo/escenarios.yaml`, en desarrollo,
+   `npx tsx --env-file=.env.local scripts/sembrar-demo-cliente.mts --dir "../Orbita AI - Privado/clientes/<slug>"`
+   arma la organización `<slug>-demo` y Claude responde de verdad cada mensaje del guion (cuesta dinero).
 9. **Conectar sus canales** con `scripts/crear-canal.mts` (ver `docs/guia-conectar-meta.md`) y **encender el agente** desde Agentes.
 10. **Seguir el playbook** de implementación: [`docs/playbook-implementacion.md`](../docs/playbook-implementacion.md).
 

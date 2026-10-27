@@ -51,6 +51,9 @@ export const attentionSettingsSchema = z.object({
     .default({ active: false, hours: [], text: null }),
   // Precios en USD por millón de tokens, solo si el cliente los configura: nunca se asumen.
   pricing: z.object({ inputPerMTok: z.number(), outputPerMTok: z.number() }).nullable().default(null),
+  // Catálogo de stock (ADR-043): si está activo, el agente tiene las herramientas para buscarlo. `label` es cómo
+  // se llama lo que hay en el catálogo (ej. "propiedades").
+  catalog: z.object({ enabled: z.boolean(), label: z.string() }).default({ enabled: false, label: "productos" }),
 });
 
 export type AttentionSettings = z.infer<typeof attentionSettingsSchema>;
@@ -157,8 +160,24 @@ export function buildSystemPrompt(prompt: string, settings: AttentionSettings, n
     "## Adjuntos\n\nSi el asociado manda una imagen o un PDF, lo ves: es parte de su consulta (por ejemplo, un comprobante o un formulario). Leelo y usá lo que muestre, sin pedir de nuevo lo que ya está ahí. Los audios te llegan transcriptos con la marca [Audio transcripto]; una transcripción puede tener errores, y si algo importante no se entiende, confirmalo. Si un adjunto no se pudo leer, pedile con amabilidad que lo escriba. No repitas ni guardes datos sensibles de un adjunto que no necesites para la gestión.",
   );
 
+  if (settings.catalog.enabled) {
+    const label = settings.catalog.label;
+    sections.push(
+      [
+        `## Stock: catálogo de ${label}`,
+        "",
+        `Tenés el catálogo actualizado de ${label} disponibles. Cuando pregunten qué hay, si sigue disponible, precios, ambientes o características, buscá primero con \`buscar_en_catalogo\` (y \`ver_ficha_del_catalogo\` para uno en particular) y respondé solo con lo que devuelven.`,
+        "- Nunca inventes ni completes un dato que no esté en el catálogo (expensas, apto crédito, mascotas, fechas de visita): decí que lo confirma el equipo y, si hace falta, usá `consultar_al_area`.",
+        "- Mostrá como máximo 3 opciones por mensaje, cada una en una línea: qué es, dónde, precio tal como está publicado y 1 o 2 datos clave. Agregá el enlace a la ficha si lo hay. Si hay más, decí cuántas y ofrecé ver más.",
+        "- Si no hay nada con lo que pide, decilo claro y ofrecé aflojar un filtro o que el equipo le avise cuando ingrese algo así.",
+        "- Los precios en dólares y en pesos no se comparan entre sí. Si da un tope sin moneda, en venta suele ser en dólares y en alquiler en pesos: si no está claro, preguntá.",
+        "- Cuando la persona quiere visitar, reservar u ofertar por uno concreto, juntá los datos que pide la unidad y derivá con un resumen que incluya el id y el título del ítem.",
+      ].join("\n"),
+    );
+  }
+
   sections.push(
-    "## Cómo usar las herramientas\n\nGuardá los datos con `guardar_datos_del_caso` apenas el asociado los dé. Cuando tengas todo lo que pide la unidad, usá `derivar_a_sector`. Si falta un dato que solo sabe el área, usá `consultar_al_area`. Después de usar una herramienta, escribile al asociado un mensaje breve que diga qué pasó y qué sigue. Respondé siempre con el texto que se le envía al asociado, sin explicar tu razonamiento.",
+    `## Cómo usar las herramientas\n\nGuardá los datos con \`guardar_datos_del_caso\` apenas el asociado los dé. Cuando tengas todo lo que pide la unidad, usá \`derivar_a_sector\`. Si falta un dato que solo sabe el área, usá \`consultar_al_area\`.${settings.catalog.enabled ? " Para todo lo que sea stock disponible, usá `buscar_en_catalogo` y `ver_ficha_del_catalogo`." : ""} Después de usar una herramienta, escribile al asociado un mensaje breve que diga qué pasó y qué sigue. Respondé siempre con el texto que se le envía al asociado, sin explicar tu razonamiento.`,
   );
 
   const handoffNotices = [

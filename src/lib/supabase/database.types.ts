@@ -835,6 +835,89 @@ export type Database = {
           },
         ]
       }
+      catalog_items: {
+        Row: {
+          area_m2: number | null
+          bathrooms: number | null
+          bedrooms: number | null
+          category: string | null
+          created_at: string
+          currency: string | null
+          description: string | null
+          details: Json
+          external_id: string
+          id: string
+          is_available: boolean
+          locality: string | null
+          operation: string | null
+          organization_id: string
+          photos: string[]
+          price: number | null
+          price_text: string | null
+          synced_at: string
+          title: string
+          updated_at: string
+          url: string | null
+          zone: string | null
+        }
+        Insert: {
+          area_m2?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          category?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          details?: Json
+          external_id: string
+          id?: string
+          is_available?: boolean
+          locality?: string | null
+          operation?: string | null
+          organization_id: string
+          photos?: string[]
+          price?: number | null
+          price_text?: string | null
+          synced_at?: string
+          title: string
+          updated_at?: string
+          url?: string | null
+          zone?: string | null
+        }
+        Update: {
+          area_m2?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          category?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          details?: Json
+          external_id?: string
+          id?: string
+          is_available?: boolean
+          locality?: string | null
+          operation?: string | null
+          organization_id?: string
+          photos?: string[]
+          price?: number | null
+          price_text?: string | null
+          synced_at?: string
+          title?: string
+          updated_at?: string
+          url?: string | null
+          zone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channels: {
         Row: {
           config: Json

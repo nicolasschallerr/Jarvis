@@ -1,7 +1,10 @@
+import { createCatalogTools } from "@/lib/agent/catalog-tools";
 import { buildSystemPrompt, composeReply, type AttentionSettings } from "@/lib/agent/context";
 import { runAgentLoop } from "@/lib/agent/loop";
 import { createAttentionTools } from "@/lib/agent/tools";
 import type { ChatMessage, ModelClient } from "@/lib/ai/types";
+import type { CatalogItem } from "@/lib/catalog/search";
+import { createMemoryCatalog } from "@/lib/catalog/source";
 
 import { judge, type CriterionResult } from "./judge";
 import { createMemoryBackend, type RecordedAction } from "./memory-backend";
@@ -58,6 +61,7 @@ function transcriptOf(messages: string[], replies: string[], actions: RecordedAc
     if (action.kind === "save_data") lines.push(`- Guardó datos (${action.unit || "sin unidad"}): ${JSON.stringify(action.data)}`);
     else if (action.kind === "save_contact") lines.push(`- Guardó datos del asociado: ${Object.keys(action.data).join(", ")}`);
     else if (action.kind === "handoff") lines.push(`- Derivó al sector ${action.sector}. Resumen: ${action.summary}`);
+    else if (action.kind === "catalog") lines.push(`- Consultó el catálogo (${action.tool} ${JSON.stringify(action.input)}). Devolvió:\n${action.output.slice(0, 1500)}`);
     else lines.push(`- Consultó al sector ${action.sector}: ${action.question}`);
   }
   return lines.join("\n");
@@ -75,6 +79,8 @@ export type EvalRunParams = {
   prompt: string;
   settings: AttentionSettings;
   now?: Date;
+  // Ítems del catálogo de stock, si el cliente lo tiene activo (se leen del catalogo.json de su carpeta).
+  catalog?: CatalogItem[];
 };
 
 // Corre un caso: le escribe al agente los mensajes del asociado de a uno (con el historial armado como en
@@ -105,12 +111,25 @@ export async function runEvalCase(params: EvalRunParams, evalCase: EvalCase): Pr
   };
 
   try {
-    const tools = createAttentionTools(createMemoryBackend(actions, params.channel), {
-      unitSlugs: params.settings.units.map((unit) => unit.id),
-      sectorSlugs: params.settings.sectors.map((sector) => sector.id),
-      fields: params.settings.fields,
-      maxFieldRetries: params.settings.maxFieldRetries,
-    });
+    const catalogTools = params.settings.catalog.enabled
+      ? createCatalogTools(createMemoryCatalog(params.catalog ?? []), params.settings.catalog).map((tool) => ({
+          ...tool,
+          async run(input: unknown) {
+            const outcome = await tool.run(input);
+            actions.push({ kind: "catalog", tool: tool.name, input, output: outcome.output });
+            return outcome;
+          },
+        }))
+      : [];
+    const tools = [
+      ...createAttentionTools(createMemoryBackend(actions, params.channel), {
+        unitSlugs: params.settings.units.map((unit) => unit.id),
+        sectorSlugs: params.settings.sectors.map((sector) => sector.id),
+        fields: params.settings.fields,
+        maxFieldRetries: params.settings.maxFieldRetries,
+      }),
+      ...catalogTools,
+    ];
     const system = buildSystemPrompt(params.prompt, params.settings, params.now ?? new Date(), params.channel?.type);
     const history: ChatMessage[] = [];
 

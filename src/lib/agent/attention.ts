@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ModelClient } from "@/lib/ai/types";
+import { createSupabaseCatalog } from "@/lib/catalog/source";
 import { checkSendable, sendTextMessage } from "@/lib/outbound/send";
 import type { Database } from "@/lib/supabase/database.types";
 
+import { createCatalogTools } from "./catalog-tools";
 import { buildHistory, buildSystemPrompt, composeReply, isMenuCommand, sinceLastMenu } from "./context";
 import { loadAttentionAgent, loadHistoryRows, loadInlineMedia } from "./load";
 import { runAgentLoop } from "./loop";
@@ -130,12 +132,15 @@ async function respondOnce(context: TurnContext): Promise<AttentionResult | "new
   const history = buildHistory(visible, await loadInlineMedia(admin, visible));
   if (history.length === 0) return skipped("sin_mensajes_para_responder");
 
-  const tools = createAttentionTools(createSupabaseBackend(admin, conversationId), {
-    unitSlugs: settings.units.map((unit) => unit.id),
-    sectorSlugs: settings.sectors.map((sector) => sector.id),
-    fields: settings.fields,
-    maxFieldRetries: settings.maxFieldRetries,
-  });
+  const tools = [
+    ...createAttentionTools(createSupabaseBackend(admin, conversationId), {
+      unitSlugs: settings.units.map((unit) => unit.id),
+      sectorSlugs: settings.sectors.map((sector) => sector.id),
+      fields: settings.fields,
+      maxFieldRetries: settings.maxFieldRetries,
+    }),
+    ...(settings.catalog.enabled ? createCatalogTools(createSupabaseCatalog(admin, context.organizationId), settings.catalog) : []),
+  ];
 
   const record = {
     organizationId: context.organizationId,

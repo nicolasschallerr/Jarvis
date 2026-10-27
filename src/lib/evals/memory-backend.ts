@@ -6,7 +6,10 @@ export type RecordedAction =
   | { kind: "save_data"; unit: string; data: Record<string, string | number | boolean> }
   | { kind: "save_contact"; data: { name?: string; document?: string; locality?: string } }
   | { kind: "handoff"; sector: string; summary: string }
-  | { kind: "ask_area"; sector: string; question: string };
+  | { kind: "ask_area"; sector: string; question: string }
+  // Consultas al catálogo de stock (ADR-043): se anotan con lo que devolvieron, para que el juez pueda ver si
+  // el agente respondió con datos reales o inventó.
+  | { kind: "catalog"; tool: string; input: unknown; output: string };
 
 // Backend en memoria: se comporta como la base (los datos se suman, los reintentos se cuentan y se
 // borran al validar) para que los evals ejerciten el guardián de datos y los límites de reintentos igual
