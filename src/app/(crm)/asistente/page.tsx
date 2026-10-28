@@ -1,11 +1,12 @@
 import { connection } from "next/server";
 
+import { AgentChat, type Suggestion } from "@/components/assistant/agent-chat";
 import { NoAccess } from "@/components/ui/empty-state";
 import { ASSISTANT_NAME } from "@/lib/assistant/ask";
 import { getCurrentProfile } from "@/lib/auth/profile";
 import { createClient } from "@/lib/supabase/server";
 
-import { AssistantChat, type Suggestion } from "./assistant-chat";
+import { askAssistantAction } from "./actions";
 
 export const metadata = { title: "Asistente" };
 
@@ -53,7 +54,8 @@ export default async function AsistentePage() {
   return (
     <main className="flex min-h-0 flex-1 flex-col">
       <h1 className="sr-only">{agent?.name ?? ASSISTANT_NAME}</h1>
-      <AssistantChat
+      <AgentChat
+        action={askAssistantAction}
         agentName={agent?.name ?? ASSISTANT_NAME}
         firstName={profile.fullName.trim().split(/\s+/)[0] ?? ""}
         organizationName={profile.organizationName}

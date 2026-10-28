@@ -4,9 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { AssistantOrb } from "@/components/assistant/assistant-orb";
 import { CaseIcon, ChatIcon, CoinIcon, ContactsIcon, GaugeIcon, StockIcon } from "@/components/ui/icons";
-import type { AnalystTurn } from "@/lib/analytics/ask";
-
-import { askAssistantAction } from "./actions";
+import type { AnalystAnswer, AnalystTurn } from "@/lib/analytics/ask";
 
 type Entry = { id: number; role: "user" | "assistant"; text: string; tools?: string[]; isError?: boolean };
 
@@ -51,18 +49,33 @@ function TypedAnswer({ text, onDone }: { text: string; onDone: () => void }) {
   return <span className={done ? undefined : "answer-caret"}>{withBold(text.slice(0, shown))}</span>;
 }
 
-export function AssistantChat({
+// Color de cada agente: el orbe, las burbujas y el botón toman el suyo (se reemplaza la variable del Asistente).
+const TINT_VAR = { assistant: "var(--agent-assistant)", analytic: "var(--agent-sinapsis)", finance: "var(--agent-finance)" } as const;
+
+// Chat de un agente que responde preguntas sobre los datos (Asistente, analítico): bienvenida con el orbe, sugerencias
+// por tema, respuestas que se escriben de a palabras y caja flotante. Lo que cambia entre agentes llega por props.
+export function AgentChat({
+  action,
   agentName,
   firstName,
   organizationName,
   suggestions,
   toolLabels,
+  tint = "assistant",
+  heading,
+  intro,
+  footnote,
 }: {
+  action: (history: AnalystTurn[], question: string) => Promise<AnalystAnswer>;
   agentName: string;
   firstName: string;
   organizationName: string;
   suggestions: Suggestion[];
   toolLabels: Record<string, string>;
+  tint?: keyof typeof TINT_VAR;
+  heading?: string;
+  intro?: string;
+  footnote?: string;
 }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [typing, setTyping] = useState<number | null>(null);
@@ -101,7 +114,7 @@ export function AssistantChat({
     setQuestion("");
 
     startTransition(async () => {
-      const result = await askAssistantAction(history, clean);
+      const result = await action(history, clean);
       const id = nextId.current++;
       setEntries((current) => [
         ...current,
@@ -115,7 +128,10 @@ export function AssistantChat({
   const empty = entries.length === 0;
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div
+      className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
+      style={{ ["--agent-assistant" as string]: TINT_VAR[tint], ["--color-agent-assistant" as string]: TINT_VAR[tint] }}
+    >
       {/* Luces de la marca que se mueven despacio detrás de todo. */}
       <div className="pointer-events-none absolute inset-0 -z-0" aria-hidden="true">
         <div
@@ -142,10 +158,10 @@ export function AssistantChat({
                   {agentName} · {organizationName}
                 </p>
                 <h2 className="gradient-text font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-                  ¿En qué te ayudo{firstName ? `, ${firstName}` : ""}?
+                  {heading ?? `¿En qué te ayudo${firstName ? `, ${firstName}` : ""}?`}
                 </h2>
                 <p className="mx-auto max-w-lg text-sm text-muted sm:text-base">
-                  Preguntame lo que quieras sobre la organización. Busco el dato real en el CRM y te lo explico. No modifico nada.
+                  {intro ?? "Preguntame lo que quieras sobre la organización. Busco el dato real en el CRM y te lo explico. No modifico nada."}
                 </p>
               </div>
             </div>
@@ -176,7 +192,7 @@ export function AssistantChat({
             </ul>
           </section>
         ) : (
-          <ol className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-6" aria-live="polite" aria-label="Conversación con el Asistente">
+          <ol className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-6" aria-live="polite" aria-label={`Conversación con ${agentName}`}>
             {entries.map((entry) =>
               entry.role === "user" ? (
                 <li key={entry.id} className="rise-in flex justify-end">
@@ -274,7 +290,7 @@ export function AssistantChat({
           </button>
         </form>
         <p className="mx-auto mt-2 max-w-3xl text-center text-[11px] text-muted">
-          {agentName} solo lee: responde con los datos de {organizationName} que podés ver vos.
+          {footnote ?? `${agentName} solo lee: responde con los datos de ${organizationName} que podés ver vos.`}
         </p>
       </div>
     </div>

@@ -4,13 +4,16 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  pointerWithin,
+  rectIntersection,
   TouchSensor,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
   type Announcements,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -38,6 +41,20 @@ export type BoardCase = {
 };
 
 const isStatus = (value: unknown): value is CaseStatus => CASE_STATUSES.includes(value as CaseStatus);
+
+// Destinos de la bandeja del celular: "bandeja:<estado>". Al soltar se traducen al estado.
+const TRAY = "bandeja:";
+const statusOf = (id: unknown): CaseStatus | null => {
+  const value = typeof id === "string" && id.startsWith(TRAY) ? id.slice(TRAY.length) : id;
+  return isStatus(value) ? value : null;
+};
+
+// Con el dedo cuenta dónde está el dedo (no el borde de la tarjeta que se arrastra): así soltar en la bandeja o en una
+// columna angosta es preciso. Si el dedo no está sobre nada, se usa la superposición de la tarjeta.
+const collisions: CollisionDetection = (args) => {
+  const byPointer = pointerWithin(args);
+  return byPointer.length > 0 ? byPointer : rectIntersection(args);
+};
 
 // Solo las prioridades alta y urgente llevan placa: la normal y la baja son el caso común y su placa era ruido.
 const showsPriority = (priority: string) => priority === "urgent" || priority === "high";
@@ -96,7 +113,10 @@ function CaseCard({ item, now, canEdit, onMove }: { item: BoardCase; now: Date; 
     <li
       ref={setNodeRef}
       {...(canEdit ? listeners : {})}
-      className={`group ${cardClass(item)} transition ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${isDragging ? "opacity-40" : "hover:-translate-y-0.5 hover:shadow-md"}`}
+      // touch-action manipulation: el dedo sigue desplazando el tablero; el arrastre empieza solo después de mantenerlo.
+      // Sin "callout": en el iPhone mantener apretado un enlace abría la vista previa en vez de levantar la tarjeta.
+      style={{ touchAction: "manipulation", WebkitTouchCallout: "none" }}
+      className={`group ${cardClass(item)} select-none transition ${canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${isDragging ? "scale-[0.98] opacity-40" : "hover:-translate-y-0.5 hover:shadow-md"}`}
     >
       <CardBody item={item} now={now} />
 
@@ -154,7 +174,9 @@ function Column({ status, items, now, canEdit, onMove }: { status: CaseStatus; i
     <section
       ref={setNodeRef}
       aria-label={`${STATUS_LABELS[status]}: ${items.length} casos`}
-      className={`flex w-72 shrink-0 snap-start flex-col gap-3 rounded-xl border-t-2 p-3 transition ${accent?.border ?? "border-t-line"} ${
+      id={`columna-${status}`}
+      // En el celular cada columna ocupa casi todo el ancho y asoma la siguiente; desde sm vuelven a 18 rem.
+      className={`flex w-[84vw] max-w-80 shrink-0 snap-center flex-col gap-3 rounded-xl border-t-2 p-3 transition sm:w-72 sm:snap-start ${accent?.border ?? "border-t-line"} ${
         isOver ? "bg-accent-soft/40 ring-2 ring-accent" : "bg-zinc-100/70 dark:bg-zinc-900/60"
       }`}
     >
@@ -179,6 +201,24 @@ function Column({ status, items, now, canEdit, onMove }: { status: CaseStatus; i
   );
 }
 
+// Un destino de la bandeja que aparece abajo en el celular mientras se arrastra un caso.
+function TrayTarget({ status, count }: { status: CaseStatus; count: number }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `${TRAY}${status}` });
+  const accent = STATUS_ACCENTS[status];
+  return (
+    <li
+      ref={setNodeRef}
+      className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl border px-1 py-2 text-center transition duration-150 ${
+        isOver ? "scale-105 border-accent bg-accent-soft shadow-md" : "border-line bg-surface"
+      }`}
+    >
+      <span className={`size-2 rounded-full ${accent?.dot ?? "bg-zinc-400"}`} aria-hidden="true" />
+      <span className="w-full truncate text-[11px] font-medium leading-tight">{STATUS_LABELS[status]}</span>
+      <span className="text-[10px] text-muted tabular-nums">{count}</span>
+    </li>
+  );
+}
+
 // `now` llega del servidor como texto ISO: si el cliente calculara su propia hora, las fechas relativas ("hace 5 min")
 // podrían no coincidir con el HTML del servidor y React avisaría un desajuste de hidratación.
 export function Board({ cases, canEdit, now: nowIso }: { cases: BoardCase[]; canEdit: boolean; now: string }) {
@@ -194,15 +234,20 @@ export function Board({ cases, canEdit, now: nowIso }: { cases: BoardCase[]; can
   const [pending, startTransition] = useTransition();
   const now = new Date(nowIso);
 
-  // Mouse con una pequeña distancia (para que un clic no cuente como arrastre), tacto con una pausa y teclado.
+  // Mouse y dedo por separado. El sensor de "puntero" también escuchaba al dedo y arrancaba un arrastre a los 6 px, así
+  // que en el celular desplazar el tablero levantaba tarjetas sin querer. Ahora: mouse después de moverse 6 px (un clic
+  // sigue siendo clic); dedo después de mantenerlo apretado un momento sin moverse (deslizar sigue desplazando).
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 6 } }),
     useSensor(KeyboardSensor),
   );
 
   const titleOf = (id: unknown) => optimistic.find((item) => item.id === id)?.title ?? "el caso";
-  const labelOf = (id: unknown) => (isStatus(id) ? STATUS_LABELS[id] : "una columna");
+  const labelOf = (id: unknown) => {
+    const status = statusOf(id);
+    return status ? STATUS_LABELS[status] : "una columna";
+  };
 
   const commit = (id: string, status: CaseStatus, text: string) => {
     setError(null);
@@ -225,10 +270,15 @@ export function Board({ cases, canEdit, now: nowIso }: { cases: BoardCase[]; can
     commit(id, status, "");
   };
 
-  const onDragStart = (event: DragStartEvent) => setActiveId(String(event.active.id));
+  const onDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id));
+    // Con el dedo, una vibración corta confirma que la tarjeta se levantó (si el teléfono lo permite).
+    if (event.activatorEvent.type.startsWith("touch")) navigator.vibrate?.(12);
+  };
   const onDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
-    if (event.over && isStatus(event.over.id)) move(String(event.active.id), event.over.id);
+    const status = event.over ? statusOf(event.over.id) : null;
+    if (status) move(String(event.active.id), status);
   };
 
   const announcements: Announcements = {
@@ -270,8 +320,25 @@ export function Board({ cases, canEdit, now: nowIso }: { cases: BoardCase[]; can
         </form>
       ) : null}
 
+      {/* Celular: saltar a una columna sin tener que deslizar el tablero entero. */}
+      <nav aria-label="Columnas del tablero" className="flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:hidden">
+        {CASE_STATUSES.map((status) => (
+          <button
+            key={status}
+            type="button"
+            onClick={() => document.getElementById(`columna-${status}`)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" })}
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-medium"
+          >
+            <span className={`size-2 rounded-full ${STATUS_ACCENTS[status]?.dot ?? "bg-zinc-400"}`} aria-hidden="true" />
+            {STATUS_LABELS[status]}
+            <span className="text-muted tabular-nums">{optimistic.filter((item) => item.status === status).length}</span>
+          </button>
+        ))}
+      </nav>
+
       <DndContext
         sensors={sensors}
+        collisionDetection={collisions}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
         onDragCancel={() => setActiveId(null)}
@@ -291,11 +358,23 @@ export function Board({ cases, canEdit, now: nowIso }: { cases: BoardCase[]; can
 
         <DragOverlay>
           {activeItem ? (
-            <div className={`${cardClass(activeItem)} w-72 cursor-grabbing shadow-xl`}>
+            <div className={`${cardClass(activeItem)} w-64 rotate-2 cursor-grabbing shadow-2xl ring-2 ring-accent/40 sm:w-72`}>
               <CardBody item={activeItem} now={now} />
             </div>
           ) : null}
         </DragOverlay>
+
+        {/* Celular: mientras se arrastra, una bandeja fija abajo con los cinco estados para soltar ahí. */}
+        {activeItem ? (
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgb(0_0_0/0.08)] backdrop-blur sm:hidden">
+            <p className="mb-2 text-center text-xs text-muted">Soltalo en el estado nuevo</p>
+            <ul className="flex gap-1.5">
+              {CASE_STATUSES.map((status) => (
+                <TrayTarget key={status} status={status} count={optimistic.filter((item) => item.status === status).length} />
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </DndContext>
     </div>
   );

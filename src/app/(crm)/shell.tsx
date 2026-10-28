@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Logo } from "@/components/ui/logo";
 import { MotionProvider } from "@/components/ui/motion-provider";
@@ -10,6 +10,7 @@ import { MotionProvider } from "@/components/ui/motion-provider";
 // servidor) y es un solo elemento: solo cambia su posición según el ancho.
 export function Shell({ sidebar, children }: { sidebar: React.ReactNode; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const swipeFrom = useRef<number | null>(null);
 
   // Esc cierra el cajón.
   useEffect(() => {
@@ -41,7 +42,7 @@ export function Shell({ sidebar, children }: { sidebar: React.ReactNode; childre
         >
           Saltar al contenido
         </a>
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line px-4 md:hidden">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-background/80 px-4 backdrop-blur md:hidden">
           <button
             type="button"
             onClick={() => setOpen(true)}
@@ -57,25 +58,46 @@ export function Shell({ sidebar, children }: { sidebar: React.ReactNode; childre
           <Logo />
         </header>
 
-        {open ? (
-          <button
-            type="button"
-            aria-label="Cerrar el menú"
-            onClick={() => setOpen(false)}
-            className="fixed inset-0 z-40 bg-black/40 md:hidden"
-          />
-        ) : null}
+        {/* Fondo del cajón: aparece con un fundido y desenfoca lo de atrás. Siempre está, pero solo se toca abierto. */}
+        <button
+          type="button"
+          aria-label="Cerrar el menú"
+          tabIndex={open ? 0 : -1}
+          onClick={() => setOpen(false)}
+          className={`fixed inset-0 z-40 bg-zinc-950/45 backdrop-blur-[3px] transition-opacity duration-300 md:hidden ${open ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        />
 
         <aside
           id="menu-principal"
+          data-open={open}
           // Un clic en un enlace o en cerrar sesión cierra el cajón.
           onClick={(event) => {
             if ((event.target as HTMLElement).closest("a, button[type=submit]")) setOpen(false);
           }}
-          className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85%] flex-col justify-between border-r border-line bg-background p-4 shadow-xl transition-[transform,visibility] duration-200 md:visible md:static md:z-auto md:w-64 md:max-w-none md:translate-none md:bg-surface/60 md:shadow-none ${
+          // Deslizar el dedo hacia la izquierda cierra el cajón.
+          onTouchStart={(event) => {
+            swipeFrom.current = event.touches[0]?.clientX ?? null;
+          }}
+          onTouchEnd={(event) => {
+            const from = swipeFrom.current;
+            const to = event.changedTouches[0]?.clientX;
+            swipeFrom.current = null;
+            if (open && from !== null && to !== undefined && from - to > 60) setOpen(false);
+          }}
+          className={`fixed inset-y-0 left-0 z-50 flex w-[19rem] max-w-[86%] flex-col justify-between rounded-r-3xl border-r border-line bg-background p-4 pt-5 shadow-2xl transition-[transform,visibility] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] md:visible md:static md:z-auto md:w-64 md:max-w-none md:translate-none md:rounded-none md:bg-surface/60 md:pt-4 md:shadow-none ${
             open ? "visible translate-x-0" : "invisible -translate-x-full"
           }`}
         >
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Cerrar el menú"
+            className="absolute top-4 right-4 grid size-9 place-items-center rounded-full text-muted transition hover:bg-zinc-100 hover:text-foreground md:hidden dark:hover:bg-zinc-800"
+          >
+            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
           {sidebar}
         </aside>
 
