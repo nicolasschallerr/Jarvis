@@ -27,8 +27,13 @@ import type { Database } from "../src/lib/supabase/database.types";
 // "-demo". Cuesta dinero (Claude real, una llamada o más por mensaje del guion).
 // El usuario administrador se toma de JARVIS_DEMO_<SLUG>_EMAIL / _PASSWORD; si no están, se generan y se agregan a
 // .env.local (que no se sube al repo). Nunca se imprimen.
+//
+// --usuarios "correo:rol,correo:rol": cuentas que YA existen y pasan a esta demo (por ejemplo el dueño y un mentor),
+// con ese rol (superadmin, operator o viewer). Si hay un superadmin entre ellas, hace de administrador del guion y no se
+// crea el usuario administrador de la demo. Al volver a armar la demo esas cuentas se conservan: nunca se borran.
+// Si el guion trae "finanzas", se cargan los movimientos de los últimos meses para el agente financiero (ADR-049).
 
-const { values } = parseArgs({ options: { dir: { type: "string" } } });
+const { values } = parseArgs({ options: { dir: { type: "string" }, usuarios: { type: "string" } } });
 
 function fail(message: string): never {
   console.error(`Error: ${message}`);
@@ -36,6 +41,17 @@ function fail(message: string): never {
 }
 
 const dir = values.dir ?? fail('Falta --dir (la carpeta del cliente, ej. "../Orbita AI - Privado/clientes/<slug>").');
+const ROLES = ["superadmin", "operator", "viewer"] as const;
+const existingAccounts = (values.usuarios ?? "")
+  .split(",")
+  .map((entry) => entry.trim())
+  .filter(Boolean)
+  .map((entry) => {
+    const [email = "", role = "viewer"] = entry.split(":").map((part) => part.trim());
+    if (!email.includes("@")) fail(`--usuarios: "${entry}" no es un correo.`);
+    if (!(ROLES as readonly string[]).includes(role)) fail(`--usuarios: el rol de ${email} tiene que ser superadmin, operator o viewer.`);
+    return { email: email.toLowerCase(), role: role as (typeof ROLES)[number] };
+  });
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !serviceRoleKey) fail("Faltan NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY (usá --env-file=.env.local).");
@@ -73,6 +89,40 @@ const scriptSchema = z.object({
       }),
     )
     .default([]),
+  // Movimientos de los últimos meses para el agente financiero (ADR-049): categorías que se repiten cada mes con una
+  // variación y partidas pendientes (por cobrar o por pagar, vencidas o no).
+  finanzas: z
+    .object({
+      meses: z.number().int().min(1).max(12).default(6),
+      categorias: z
+        .array(
+          z.object({
+            nombre: z.string().min(1).max(80),
+            tipo: z.enum(["ingreso", "egreso"]),
+            // Total del mes, repartido en movimientos_por_mes. Con monto_fijo, cada movimiento es de ese monto exacto
+            // (ej. préstamos de $ 2.000.000) y lo que varía es la cantidad.
+            mensual: z.number().positive().optional(),
+            monto_fijo: z.number().positive().optional(),
+            movimientos_por_mes: z.number().int().min(1).max(40).default(4),
+            contraparte: z.string().max(120).optional(),
+          })
+          .refine((category) => category.mensual !== undefined || category.monto_fijo !== undefined, "falta mensual o monto_fijo"),
+        )
+        .min(1),
+      pendientes: z
+        .array(
+          z.object({
+            descripcion: z.string().min(1).max(200),
+            contraparte: z.string().max(120).optional(),
+            tipo: z.enum(["ingreso", "egreso"]),
+            categoria: z.string().max(80).optional(),
+            monto: z.number().positive(),
+            vence_en_dias: z.number().int(),
+          }),
+        )
+        .default([]),
+    })
+    .optional(),
   // Historia de los últimos días, sin Claude (texto ya escrito), para que el CRM y el Agente Analítico tengan datos.
   historial: z
     .array(
@@ -129,9 +179,10 @@ const envKey = `JARVIS_DEMO_${config.organizacion.slug.toUpperCase().replace(/[^
 // ---------- Base ----------
 const admin = createClient<Database>(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
+const ownerAccount = existingAccounts.find((account) => account.role === "superadmin");
 let adminEmail = process.env[`${envKey}_EMAIL`];
 let adminPassword = process.env[`${envKey}_PASSWORD`];
-if (!adminEmail || !adminPassword) {
+if (!ownerAccount && (!adminEmail || !adminPassword)) {
   adminEmail = `demo-${config.organizacion.slug}-admin@jarvis.test`;
   adminPassword = randomBytes(18).toString("base64url");
   appendFileSync(
@@ -141,26 +192,59 @@ if (!adminEmail || !adminPassword) {
   console.log(`Credenciales de la demo generadas y guardadas en .env.local (${envKey}_EMAIL / ${envKey}_PASSWORD).`);
 }
 
-// 1. Borrar la demo anterior (solo slugs "-demo"): primero los usuarios, porque sus perfiles impiden borrar la organización.
+// 0. Las cuentas de --usuarios tienen que existir de antemano: este script nunca crea ni borra cuentas de personas.
+const userPrefix = `demo-${config.organizacion.slug}-`;
+const isDemoUser = (email: string | undefined) => !!email && email.startsWith(userPrefix) && email.endsWith("@jarvis.test");
+const { data: existingUsers } = await admin.auth.admin.listUsers({ perPage: 1000 });
+const accountIds = new Map<string, string>();
+for (const account of existingAccounts) {
+  const user = existingUsers?.users.find((candidate) => candidate.email?.toLowerCase() === account.email);
+  if (!user) fail(`--usuarios: no existe ninguna cuenta con el correo ${account.email}.`);
+  if (isDemoUser(user.email)) fail(`--usuarios: ${account.email} es un usuario generado por la demo.`);
+  accountIds.set(account.email, user.id);
+}
+
+// 1. Borrar la demo anterior (solo slugs "-demo"). Los usuarios generados se borran (sus perfiles impiden borrar la
+// organización); las cuentas de personas que estaban en la demo NO: se apartan y pasan a la demo nueva.
 const { data: previous } = await admin.from("organizations").select("id, slug").eq("slug", slug).maybeSingle();
+let keptProfiles: string[] = [];
 if (previous) {
   if (!previous.slug.endsWith("-demo")) fail("Por seguridad, solo se borran organizaciones de demostración.");
   const { data: profiles } = await admin.from("profiles").select("id").eq("organization_id", previous.id);
-  for (const profile of profiles ?? []) await admin.auth.admin.deleteUser(profile.id);
-  const { error } = await admin.from("organizations").delete().eq("id", previous.id);
-  if (error) fail(`No se pudo borrar la demo anterior: ${error.message}`);
-  console.log("Demo anterior borrada.");
+  const emails = new Map((existingUsers?.users ?? []).map((user) => [user.id, user.email]));
+  for (const profile of profiles ?? []) {
+    const email = emails.get(profile.id);
+    if (isDemoUser(email) || (!!adminEmail && email === adminEmail)) await admin.auth.admin.deleteUser(profile.id);
+    else keptProfiles.push(profile.id);
+  }
+  // Se libera el nombre: la vieja queda aparte hasta que sus personas pasen a la nueva, y recién ahí se borra.
+  const { error } = await admin.from("organizations").update({ slug: `${slug}-anterior-${Date.now()}` }).eq("id", previous.id);
+  if (error) fail(`No se pudo apartar la demo anterior: ${error.message}`);
 }
-const userPrefix = `demo-${config.organizacion.slug}-`;
-const { data: existingUsers } = await admin.auth.admin.listUsers({ perPage: 1000 });
 for (const user of existingUsers?.users ?? []) {
-  if (user.email?.startsWith(userPrefix) && user.email.endsWith("@jarvis.test")) await admin.auth.admin.deleteUser(user.id);
+  if (isDemoUser(user.email)) await admin.auth.admin.deleteUser(user.id);
 }
 
 // 2. Organización, configuración, agente encendido y catálogo.
 const { data: org, error: orgError } = await admin.from("organizations").insert({ slug, name: demo.nombre_organizacion }).select("id").single();
 if (orgError || !org) fail(`No se pudo crear la organización: ${orgError?.message}`);
 const orgId = org.id;
+
+// Las personas que estaban en la demo anterior (y las de --usuarios) pasan a esta; recién ahí se borra la anterior.
+keptProfiles = [...new Set([...keptProfiles, ...accountIds.values()])];
+if (keptProfiles.length > 0) {
+  const { error } = await admin.from("profiles").update({ organization_id: orgId }).in("id", keptProfiles);
+  if (error) fail(`No se pudieron pasar las cuentas a la demo nueva: ${error.message}`);
+}
+for (const account of existingAccounts) {
+  const { error } = await admin.from("profiles").update({ role: account.role }).eq("id", accountIds.get(account.email) ?? "");
+  if (error) fail(`No se pudo asignar el rol de ${account.email}: ${error.message}`);
+}
+if (previous) {
+  const { error } = await admin.from("organizations").delete().eq("id", previous.id);
+  if (error) fail(`No se pudo borrar la demo anterior: ${error.message}`);
+  console.log(`Demo anterior borrada${keptProfiles.length ? ` (se conservaron ${keptProfiles.length} cuentas)` : ""}.`);
+}
 
 await syncSectorsAndUnits(admin, orgId, config);
 await syncAgents(admin, orgId, config);
@@ -186,7 +270,12 @@ async function createPerson(email: string, fullName: string, role: z.infer<typeo
   return data.user.id;
 }
 const people = new Map<string, string>();
-people.set(demo.administrador.nombre, await createPerson(adminEmail, demo.administrador.nombre, "superadmin", adminPassword));
+people.set(
+  demo.administrador.nombre,
+  ownerAccount
+    ? (accountIds.get(ownerAccount.email) ?? fail("Falta la cuenta del administrador."))
+    : await createPerson(adminEmail as string, demo.administrador.nombre, "superadmin", adminPassword),
+);
 for (const [index, person] of demo.equipo.entries()) {
   const id = await createPerson(`${userPrefix}${index + 1}@jarvis.test`, person.nombre, person.rol);
   people.set(person.nombre, id);
@@ -328,7 +417,63 @@ for (const item of demo.historial) {
 }
 console.log(`Historial: ${demo.historial.length} casos de los últimos días.`);
 
+// 7. Finanzas (sin Claude): movimientos cobrados y pagados de cada mes y las partidas pendientes.
+if (demo.finanzas) {
+  const finance = demo.finanzas;
+  // Variación fija por posición (sin azar): la demo da lo mismo cada vez que se arma.
+  const wobble = (seed: number) => {
+    const x = Math.sin(seed * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  const isoDay = (date: Date) => date.toISOString().slice(0, 10);
+  const today = new Date(nowMs);
+  const rows: Database["public"]["Tables"]["finance_movements"]["Insert"][] = [];
+  finance.categorias.forEach((category, categoryIndex) => {
+    for (let offset = finance.meses - 1; offset >= 0; offset -= 1) {
+      const first = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - offset, 1));
+      const daysInMonth = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+      // El mes en curso va hasta hoy: solo lleva la parte proporcional.
+      const lastDay = offset === 0 ? today.getUTCDate() : daysInMonth;
+      const share = lastDay / daysInMonth;
+      const variation = 0.85 + wobble(categoryIndex * 31 + offset) * 0.3;
+      const count = Math.max(1, Math.round(category.movimientos_por_mes * share * (category.monto_fijo ? variation : 1)));
+      const amount = category.monto_fijo ?? Math.round(((category.mensual ?? 0) * share * variation) / count);
+      for (let index = 0; index < count; index += 1) {
+        const day = 1 + Math.floor(wobble(categoryIndex * 97 + offset * 13 + index) * lastDay);
+        rows.push({
+          organization_id: orgId,
+          kind: category.tipo === "ingreso" ? "income" : "expense",
+          category: category.nombre,
+          // Número de operación propio de cada movimiento ("1/2" se confundía con cuotas de una misma operación).
+          description: `${category.nombre} · N.º ${String(1000 + categoryIndex * 400 + (finance.meses - 1 - offset) * 40 + index + 1)}`,
+          counterparty: category.contraparte ?? null,
+          amount,
+          occurred_on: isoDay(new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(day, lastDay)))),
+          status: "paid",
+        });
+      }
+    }
+  });
+  for (const item of finance.pendientes) {
+    const due = new Date(nowMs + item.vence_en_dias * 86_400_000);
+    rows.push({
+      organization_id: orgId,
+      kind: item.tipo === "ingreso" ? "income" : "expense",
+      category: item.categoria ?? (item.tipo === "ingreso" ? "Cuentas por cobrar" : "Cuentas por pagar"),
+      description: item.descripcion,
+      counterparty: item.contraparte ?? null,
+      amount: item.monto,
+      occurred_on: isoDay(new Date(due.getTime() - 30 * 86_400_000)),
+      due_on: isoDay(due),
+      status: "pending",
+    });
+  }
+  const { error } = await admin.from("finance_movements").insert(rows);
+  if (error) fail(`No se pudieron cargar las finanzas: ${error.message}`);
+  console.log(`Finanzas: ${rows.length} movimientos.`);
+}
+
 const { data: calls } = await admin.from("ai_calls").select("input_tokens, output_tokens").eq("organization_id", orgId);
 const tokens = (calls ?? []).reduce((sum, call) => ({ input: sum.input + (call.input_tokens ?? 0), output: sum.output + (call.output_tokens ?? 0) }), { input: 0, output: 0 });
 console.log(`Demo lista: ${demo.nombre_organizacion} (${slug}). Claude: ${calls?.length ?? 0} llamadas, ${tokens.input} tokens de entrada y ${tokens.output} de salida.`);
-console.log(`Entrá con el usuario de ${envKey}_EMAIL.`);
+console.log(ownerAccount ? `Entrá con tu cuenta (${ownerAccount.email}).` : `Entrá con el usuario de ${envKey}_EMAIL.`);

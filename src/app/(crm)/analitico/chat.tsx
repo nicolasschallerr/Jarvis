@@ -2,9 +2,17 @@
 
 import { useRef, useState, useTransition } from "react";
 
-import type { AnalystTurn } from "@/lib/analytics/ask";
+import type { AnalystAnswer, AnalystTurn } from "@/lib/analytics/ask";
 
 import { askAnalystAction } from "./actions";
+
+// Los agentes responden con **negritas** de Markdown: se muestran como negrita y el resto queda como texto (los saltos
+// de línea y las listas con guion ya se ven bien con whitespace-pre-wrap). No se interpreta nada más: es texto seguro.
+function withBold(text: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) =>
+    part.startsWith("**") && part.endsWith("**") && part.length > 4 ? <strong key={index}>{part.slice(2, -2)}</strong> : part,
+  );
+}
 
 type Entry = { role: "user" | "assistant"; text: string; tools?: string[]; isError?: boolean };
 
@@ -23,7 +31,21 @@ const EXAMPLES = [
   "¿Qué sector tarda más en responder las consultas del agente?",
 ];
 
-export function AnalystChat({ agentName }: { agentName: string }) {
+// El mismo chat sirve para el agente analítico y para el financiero (/finanzas): cambian la acción, los ejemplos y los
+// nombres de las herramientas.
+export function AnalystChat({
+  agentName,
+  action = askAnalystAction,
+  examples = EXAMPLES,
+  toolLabels = TOOL_LABELS,
+  intro,
+}: {
+  agentName: string;
+  action?: (history: AnalystTurn[], question: string) => Promise<AnalystAnswer>;
+  examples?: string[];
+  toolLabels?: Record<string, string>;
+  intro?: string;
+}) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [question, setQuestion] = useState("");
   const [pending, startTransition] = useTransition();
@@ -39,7 +61,7 @@ export function AnalystChat({ agentName }: { agentName: string }) {
     setQuestion("");
 
     startTransition(async () => {
-      const result = await askAnalystAction(history, clean);
+      const result = await action(history, clean);
       setEntries((current) => [
         ...current,
         result.ok ? { role: "assistant", text: result.answer, tools: result.toolsUsed } : { role: "assistant", text: result.error, isError: true },
@@ -54,10 +76,10 @@ export function AnalystChat({ agentName }: { agentName: string }) {
         {entries.length === 0 ? (
           <div className="flex flex-col gap-3 text-sm">
             <p className="text-muted">
-              Preguntale a {agentName} por los números de tu operación. Responde con datos reales y no modifica nada.
+              {intro ?? `Preguntale a ${agentName} por los números de tu operación. Responde con datos reales y no modifica nada.`}
             </p>
             <ul className="flex flex-wrap gap-2">
-              {EXAMPLES.map((example) => (
+              {examples.map((example) => (
                 <li key={example}>
                   <button type="button" onClick={() => ask(example)} className="btn-secondary !px-3 !py-1.5 text-left text-xs">
                     {example}
@@ -78,10 +100,10 @@ export function AnalystChat({ agentName }: { agentName: string }) {
                       : "bg-zinc-100 dark:bg-zinc-800"
                 }`}
               >
-                {entry.text}
+                {entry.role === "assistant" && !entry.isError ? withBold(entry.text) : entry.text}
               </p>
               {entry.tools && entry.tools.length > 0 ? (
-                <p className="text-xs text-muted">Consultó: {entry.tools.map((tool) => TOOL_LABELS[tool] ?? tool).join(", ")}</p>
+                <p className="text-xs text-muted">Consultó: {entry.tools.map((tool) => toolLabels[tool] ?? tool).join(", ")}</p>
               ) : null}
             </div>
           ))

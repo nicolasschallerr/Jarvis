@@ -33,6 +33,7 @@
   --agent-jarvis: #0a7f8c;
   --agent-sinapsis: #b8741a; /* ámbar: distingue al agente analítico */
   --agent-stock: #6d4fc2; /* violeta: distingue al agente de stock (el verde queda para estados de éxito) */
+  --agent-finance: #b0386a; /* frambuesa: distingue al agente financiero */
   --glow: rgb(34 184 201 / 0.18);
   /* Tokens semánticos: un solo lugar para el significado de cada color (ADR-028). */
   --muted: #5e6e78; /* texto secundario, contraste ≥ 5:1 sobre Bruma */
@@ -60,6 +61,7 @@
   --agent-jarvis: #22b8c9;
   --agent-sinapsis: #e8a948;
   --agent-stock: #a58bf0;
+  --agent-finance: #f08cb4;
   --glow: rgb(34 184 201 / 0.22);
   --muted: #9fb3bc;
   --line: #1a2a36;
@@ -84,6 +86,7 @@
   --color-agent-jarvis: var(--agent-jarvis);
   --color-agent-sinapsis: var(--agent-sinapsis);
   --color-agent-stock: var(--agent-stock);
+  --color-agent-finance: var(--agent-finance);
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-success: var(--success);
@@ -341,6 +344,18 @@ body {
 .grow-x {
   transform-origin: left;
   animation: grow-x 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Columnas que crecen desde abajo (Finanzas). */
+@keyframes grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+.grow-y {
+  transform-origin: bottom;
+  animation: grow-y 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
 /* Órbitas decorativas (inicio de sesión y página pública): anillos que giran a distinta velocidad. */

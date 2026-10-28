@@ -1380,6 +1380,56 @@ export type Database = {
           },
         ]
       }
+      finance_movements: {
+        Row: {
+          amount: number
+          category: string
+          counterparty: string | null
+          created_at: string
+          description: string
+          due_on: string | null
+          id: string
+          kind: string
+          occurred_on: string
+          organization_id: string
+          status: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          counterparty?: string | null
+          created_at?: string
+          description: string
+          due_on?: string | null
+          id?: string
+          kind: string
+          occurred_on: string
+          organization_id: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          counterparty?: string | null
+          created_at?: string
+          description?: string
+          due_on?: string | null
+          id?: string
+          kind?: string
+          occurred_on?: string
+          organization_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_movements_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       followups: {
         Row: {
           case_id: string
@@ -2360,6 +2410,8 @@ export type Database = {
         | "analytic"
         | "evaluator"
         | "stock"
+        | "finance"
+        | "assistant"
       app_role: "superadmin" | "operator" | "viewer"
       area_query_status: "pending" | "answered" | "cancelled" | "expired"
       broadcast_status: "draft" | "scheduled" | "sending" | "done" | "cancelled"
@@ -2537,6 +2589,8 @@ export const Constants = {
         "analytic",
         "evaluator",
         "stock",
+        "finance",
+        "assistant",
       ],
       app_role: ["superadmin", "operator", "viewer"],
       area_query_status: ["pending", "answered", "cancelled", "expired"],

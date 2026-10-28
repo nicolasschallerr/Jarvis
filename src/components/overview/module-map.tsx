@@ -15,6 +15,7 @@ const TINTS = {
   success: { icon: "bg-success-soft text-success", wash: "from-success-soft/80", mark: "text-success" },
   sinapsis: { icon: "bg-agent-sinapsis/15 text-agent-sinapsis", wash: "from-agent-sinapsis/10", mark: "text-agent-sinapsis" },
   stock: { icon: "bg-agent-stock/15 text-agent-stock", wash: "from-agent-stock/10", mark: "text-agent-stock" },
+  finance: { icon: "bg-agent-finance/15 text-agent-finance", wash: "from-agent-finance/10", mark: "text-agent-finance" },
 } satisfies Record<string, Tint>;
 
 const TINT_OF: Record<string, Tint> = {
@@ -23,7 +24,9 @@ const TINT_OF: Record<string, Tint> = {
   "/avisos": TINTS.warning,
   "/contactos": TINTS.success,
   "/stock": TINTS.stock,
+  "/asistente": TINTS.accent,
   "/analitico": TINTS.sinapsis,
+  "/finanzas": TINTS.finance,
   "/reportes": TINTS.info,
   "/consumo": TINTS.success,
 };

@@ -123,7 +123,7 @@ export async function syncSectorsAndUnits(
   return summary;
 }
 
-const AGENT_KIND = { atencion: "attention", analitico: "analytic" } as const;
+const AGENT_KIND = { atencion: "attention", analitico: "analytic", stock: "stock", financiero: "finance" } as const;
 
 // Carga los agentes del cliente (nombre y frase). Es idempotente y NO toca el estado ni si el agente
 // está encendido: eso lo manejan el superadmin y el servidor, no el archivo de configuración.

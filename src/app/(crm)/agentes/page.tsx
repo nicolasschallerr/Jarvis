@@ -60,9 +60,17 @@ export default async function AgentesPage() {
               <AgentForm key={agent.id} id={agent.id} agent={view}>
                 {kind === "stock" ? (
                   <p className="text-sm text-muted">
-                    {products ?? 0} productos disponibles en {sources ?? 0} {sources === 1 ? "fuente" : "fuentes"}.{" "}
+                    {products ?? 0} productos disponibles
+                    {sources ? ` en ${sources} ${sources === 1 ? "fuente" : "fuentes"}` : ""}.{" "}
                     <Link href="/stock" className="font-medium text-accent hover:underline">
                       Ver el stock
+                    </Link>
+                  </p>
+                ) : kind === "finance" ? (
+                  <p className="text-sm text-muted">
+                    Lee los movimientos de la empresa y responde sobre ingresos, gastos y cobranzas.{" "}
+                    <Link href="/finanzas" className="font-medium text-accent hover:underline">
+                      Ver Finanzas
                     </Link>
                   </p>
                 ) : null}

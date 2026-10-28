@@ -12,6 +12,7 @@ const ENABLE_LABEL = {
   attention: "Encendido (atiende las conversaciones)",
   analytic: "Encendido (responde las preguntas del equipo)",
   stock: "Encendido (el agente de atención consulta el stock para responder)",
+  finance: "Encendido (responde sobre los números de la empresa)",
 } as const;
 
 export function AgentForm({ id, agent, children }: { id: string; agent: AgentView; children?: React.ReactNode }) {

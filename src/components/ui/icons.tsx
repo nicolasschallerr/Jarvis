@@ -51,6 +51,20 @@ export const ContactsIcon = (props: IconProps) => (
   </Svg>
 );
 
+export const AssistantIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M12 3.5c.4 3.9 1.9 5.4 5.8 5.8-3.9.4-5.4 1.9-5.8 5.8-.4-3.9-1.9-5.4-5.8-5.8 3.9-.4 5.4-1.9 5.8-5.8Z" />
+    <path d="M18.5 15c.2 1.7.8 2.3 2.5 2.5-1.7.2-2.3.8-2.5 2.5-.2-1.7-.8-2.3-2.5-2.5 1.7-.2 2.3-.8 2.5-2.5Z" />
+  </Svg>
+);
+
+export const CoinIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M14.8 9.2c-.5-.8-1.5-1.3-2.8-1.3-1.6 0-2.8.8-2.8 2s1.1 1.7 2.8 2.1c1.7.4 2.9 1 2.9 2.2s-1.3 2-2.9 2c-1.4 0-2.5-.6-3-1.4M12 6.5v1.4M12 16.2v1.3" />
+  </Svg>
+);
+
 export const StockIcon = (props: IconProps) => (
   <Svg {...props}>
     <path d="M3 10.5 12 4l9 6.5" />

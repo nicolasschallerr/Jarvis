@@ -1,28 +1,31 @@
-export type AgentKind = "attention" | "analytic" | "stock";
+export type AgentKind = "attention" | "analytic" | "stock" | "finance";
 export type AgentStatus = "paused" | "working" | "waiting_approval";
 
 const ROLES: Record<AgentKind, string> = {
   attention: "Agente de atención",
   analytic: "Agente analítico",
   stock: "Agente de stock",
+  finance: "Agente financiero",
 };
 
 // Los agentes que se muestran en el CRM. La base tiene otros tipos de agente internos (resumen, clasificador...) que no
 // son compañeros de equipo visibles: para esos devuelve null.
 export function toAgentKind(kind: string): AgentKind | null {
-  return kind === "attention" || kind === "analytic" || kind === "stock" ? kind : null;
+  return kind === "attention" || kind === "analytic" || kind === "stock" || kind === "finance" ? kind : null;
 }
 
 export const AGENT_COLOR: Record<AgentKind, string> = {
   attention: "var(--agent-jarvis)",
   analytic: "var(--agent-sinapsis)",
   stock: "var(--agent-stock)",
+  finance: "var(--agent-finance)",
 };
 
 const AGENT_BAR: Record<AgentKind, string> = {
   attention: "bg-agent-jarvis",
   analytic: "bg-agent-sinapsis",
   stock: "bg-agent-stock",
+  finance: "bg-agent-finance",
 };
 
 export type AgentView = {

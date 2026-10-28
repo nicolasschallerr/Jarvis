@@ -27,9 +27,10 @@ const unidadSchema = z.object({
 });
 
 // Cómo se llaman y qué frase tienen los agentes de este cliente. "atencion" es el que conversa con los
-// afiliados y "analitico" el que responde preguntas sobre los datos.
+// afiliados, "analitico" el que responde preguntas sobre los datos, "stock" el que consulta el catálogo y
+// "financiero" el que responde sobre los números de la empresa (ADR-049).
 const agenteSchema = z.object({
-  tipo: z.enum(["atencion", "analitico"]),
+  tipo: z.enum(["atencion", "analitico", "stock", "financiero"]),
   nombre: z.string().trim().min(1, "falta el nombre").max(40, "el nombre no puede superar los 40 caracteres"),
   frase: z.string().trim().max(140, "la frase no puede superar los 140 caracteres").optional(),
 });
