@@ -49,8 +49,10 @@ function TypedAnswer({ text, onDone }: { text: string; onDone: () => void }) {
   return <span className={done ? undefined : "answer-caret"}>{withBold(text.slice(0, shown))}</span>;
 }
 
-// Color de cada agente: el orbe, las burbujas y el botón toman el suyo (se reemplaza la variable del Asistente).
-const TINT_VAR = { assistant: "var(--agent-assistant)", analytic: "var(--agent-sinapsis)", finance: "var(--agent-finance)" } as const;
+// Color de cada agente: el orbe, las burbujas y el botón usan la variable del Asistente, y para otro agente se la
+// reemplaza por la suya. El Asistente NO se reemplaza: definir --agent-assistant como var(--agent-assistant) es una
+// referencia a sí misma, que CSS invalida (y desaparecían el degradé del título y el núcleo del orbe).
+const TINT_VAR = { assistant: null, analytic: "var(--agent-sinapsis)", finance: "var(--agent-finance)" } as const;
 
 // Chat de un agente que responde preguntas sobre los datos (Asistente, analítico): bienvenida con el orbe, sugerencias
 // por tema, respuestas que se escriben de a palabras y caja flotante. Lo que cambia entre agentes llega por props.
@@ -130,7 +132,7 @@ export function AgentChat({
   return (
     <div
       className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
-      style={{ ["--agent-assistant" as string]: TINT_VAR[tint], ["--color-agent-assistant" as string]: TINT_VAR[tint] }}
+      style={TINT_VAR[tint] ? { ["--agent-assistant" as string]: TINT_VAR[tint], ["--color-agent-assistant" as string]: TINT_VAR[tint] } : undefined}
     >
       {/* Luces de la marca que se mueven despacio detrás de todo. */}
       <div className="pointer-events-none absolute inset-0 -z-0" aria-hidden="true">
