@@ -174,7 +174,8 @@ describe("envío de la respuesta del área", () => {
 
   it("si el agente está apagado, no la manda", async () => {
     const { queryId } = await seedAnsweredQuery();
-    await admin.from("agents").update({ is_enabled: false }).eq("organization_id", organizationId);
+    // Todos menos el Asistente, que no se puede apagar (ADR-050): la base rechazaría el cambio entero.
+    await admin.from("agents").update({ is_enabled: false }).eq("organization_id", organizationId).neq("kind", "assistant");
 
     const client = createScriptedClient([]);
     await deliverAreaAnswers(admin, client, { fetchImpl: fakeTelegram(), limit: 50 });
