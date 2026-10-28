@@ -3,10 +3,10 @@ export type AgentStatus = "paused" | "working" | "waiting_approval";
 
 const ROLES: Record<AgentKind, string> = {
   attention: "Agente de atención",
-  analytic: "Agente analítico",
+  analytic: "Agente analítico · métricas de la atención",
   stock: "Agente de stock",
   finance: "Agente financiero",
-  assistant: "Asistente de la empresa · siempre encendido",
+  assistant: "Asistente IA · responde sobre toda la empresa",
 };
 
 // Los agentes que se muestran en el CRM. La base tiene otros tipos de agente internos (resumen, clasificador...) que no

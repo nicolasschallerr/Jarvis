@@ -71,7 +71,9 @@ export default async function AnaliticoPage() {
           suggestions={SUGGESTIONS}
           toolLabels={TOOL_LABELS}
           heading={`¿Qué querés saber de la operación${firstName ? `, ${firstName}` : ""}?`}
-          intro={`Soy ${agent.name}, el agente analítico. Te respondo con números reales de la atención: casos, tiempos, conversaciones, áreas y consumo de la IA.`}
+          intro={`Soy ${agent.name}, el agente analítico: me especializo en las métricas de la atención. Te doy números precisos de volumen, tiempos y rendimiento por sector y por persona.`}
+          scope={["Volumen de casos", "Tiempos de resolución", "Conversaciones por canal", "Consultas a las áreas", "Consumo de IA"]}
+          crossLink={{ href: "/asistente", text: "¿Querés preguntar sobre stock, finanzas o cualquier otro tema?", label: "Usá el Asistente IA" }}
           footnote={`${agent.name} solo lee: los números salen del CRM de ${profile.organizationName} y no incluye datos personales.`}
         />
       )}

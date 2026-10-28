@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { AssistantOrb } from "@/components/assistant/assistant-orb";
@@ -67,6 +68,8 @@ export function AgentChat({
   heading,
   intro,
   footnote,
+  scope,
+  crossLink,
 }: {
   action: (history: AnalystTurn[], question: string) => Promise<AnalystAnswer>;
   agentName: string;
@@ -78,6 +81,10 @@ export function AgentChat({
   heading?: string;
   intro?: string;
   footnote?: string;
+  // De qué sabe este agente (se muestra en la bienvenida) y un atajo al otro agente, para que quede clara la diferencia
+  // entre el Asistente IA (toda la empresa, conversación libre) y el analítico (métricas de la atención).
+  scope?: string[];
+  crossLink?: { href: string; text: string; label: string };
 }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [typing, setTyping] = useState<number | null>(null);
@@ -166,6 +173,24 @@ export function AgentChat({
                   {intro ?? "Preguntame lo que quieras sobre la organización. Busco el dato real en el CRM y te lo explico. No modifico nada."}
                 </p>
               </div>
+              {scope && scope.length > 0 ? (
+                <ul className="flex flex-wrap items-center justify-center gap-1.5" aria-label={`De qué sabe ${agentName}`}>
+                  <li className="eyebrow !text-[0.65rem]">Sabe de</li>
+                  {scope.map((item) => (
+                    <li key={item} className="rounded-full border border-line bg-surface/80 px-2.5 py-0.5 text-xs backdrop-blur">
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {crossLink ? (
+                <p className="text-xs text-muted">
+                  {crossLink.text}{" "}
+                  <Link href={crossLink.href} className="font-medium text-accent hover:underline">
+                    {crossLink.label} →
+                  </Link>
+                </p>
+              ) : null}
             </div>
 
             <ul className="grid w-full grid-cols-1 gap-3 text-left sm:grid-cols-2">

@@ -61,6 +61,9 @@ export default async function AsistentePage() {
         organizationName={profile.organizationName}
         suggestions={SUGGESTIONS}
         toolLabels={TOOL_LABELS}
+        intro="Soy la inteligencia artificial de la empresa: conversá conmigo como con una persona. Busco el dato en todo el CRM, lo cruzo y te lo explico. No modifico nada."
+        scope={["Casos", "Conversaciones", "Contactos", "Stock", "Finanzas", "Consumo"]}
+        crossLink={{ href: "/analitico", text: "¿Querés métricas de la atención (tiempos, volumen, rendimiento)?", label: "Usá el Analítico" }}
       />
     </main>
   );

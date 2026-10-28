@@ -36,8 +36,8 @@ export const SECTION_GROUPS: SectionGroup[] = [
   {
     title: "Inteligencia",
     sections: [
-      { href: "/asistente", label: "Asistente", description: "Preguntale cualquier cosa sobre los datos de tu organización. Siempre encendido.", icon: <AssistantIcon />, roles: REPORTS },
-      { href: "/analitico", label: "Analítico", description: "Preguntale al agente analítico sobre tus datos, en lenguaje natural.", icon: <SparkIcon />, roles: REPORTS },
+      { href: "/asistente", label: "Asistente IA", description: "Inteligencia artificial conversacional: preguntale lo que sea de la empresa (casos, stock, finanzas, contactos).", icon: <AssistantIcon />, roles: REPORTS },
+      { href: "/analitico", label: "Analítico", description: "Métricas de la atención: volumen, tiempos de respuesta y rendimiento por sector y persona.", icon: <SparkIcon />, roles: REPORTS },
       { href: "/finanzas", label: "Finanzas", description: "Ingresos, gastos y lo que falta cobrar, con el agente financiero.", icon: <CoinIcon />, roles: REPORTS },
       { href: "/reportes", label: "Reportes", description: "Volumen, tiempos de respuesta y casos por sector y por persona.", icon: <ChartIcon />, roles: REPORTS },
       { href: "/consumo", label: "Consumo", description: "Créditos usados, costo de la IA y límites del mes.", icon: <GaugeIcon />, roles: REPORTS },
