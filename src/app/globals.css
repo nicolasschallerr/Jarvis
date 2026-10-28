@@ -34,6 +34,7 @@
   --agent-sinapsis: #b8741a; /* ámbar: distingue al agente analítico */
   --agent-stock: #6d4fc2; /* violeta: distingue al agente de stock (el verde queda para estados de éxito) */
   --agent-finance: #b0386a; /* frambuesa: distingue al agente financiero */
+  --agent-assistant: #3557c9; /* índigo: el Asistente de la empresa */
   --glow: rgb(34 184 201 / 0.18);
   /* Tokens semánticos: un solo lugar para el significado de cada color (ADR-028). */
   --muted: #5e6e78; /* texto secundario, contraste ≥ 5:1 sobre Bruma */
@@ -62,6 +63,7 @@
   --agent-sinapsis: #e8a948;
   --agent-stock: #a58bf0;
   --agent-finance: #f08cb4;
+  --agent-assistant: #93a9ff;
   --glow: rgb(34 184 201 / 0.22);
   --muted: #9fb3bc;
   --line: #1a2a36;
@@ -87,6 +89,7 @@
   --color-agent-sinapsis: var(--agent-sinapsis);
   --color-agent-stock: var(--agent-stock);
   --color-agent-finance: var(--agent-finance);
+  --color-agent-assistant: var(--agent-assistant);
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-success: var(--success);
@@ -344,6 +347,90 @@ body {
 .grow-x {
   transform-origin: left;
   animation: grow-x 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Asistente (ADR-050): núcleo del orbe que respira, halo de la marca, texto con brillo y puntos de "pensando". */
+.orb-halo {
+  background: radial-gradient(circle, var(--accent) 0%, var(--agent-assistant) 45%, transparent 72%);
+  animation: glow-pulse 4s ease-in-out infinite;
+  transition: opacity 0.4s;
+}
+
+@keyframes orb-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+.orb-core {
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, var(--accent) 38%, var(--agent-assistant) 100%);
+  box-shadow:
+    0 0 18px 2px color-mix(in srgb, var(--accent) 55%, transparent),
+    inset 0 0 6px rgb(255 255 255 / 0.5);
+  animation: orb-breathe 3.6s ease-in-out infinite;
+}
+
+.orb-core-thinking {
+  animation-duration: 0.9s;
+}
+
+.gradient-text {
+  background: linear-gradient(100deg, var(--foreground) 10%, var(--accent) 55%, var(--agent-assistant) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes text-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(90deg, var(--muted) 30%, var(--accent) 50%, var(--muted) 70%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shimmer 2.2s linear infinite;
+}
+
+@keyframes dot-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.typing-dot {
+  animation: dot-bounce 1.2s ease-in-out infinite;
+}
+
+/* Cursor que parpadea al final de la respuesta mientras se escribe. */
+.answer-caret::after {
+  content: "";
+  display: inline-block;
+  width: 0.5ch;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  border-radius: 1px;
+  background: var(--accent);
+  animation: caret-blink 1s steps(1) infinite;
 }
 
 /* Columnas que crecen desde abajo (Finanzas). */

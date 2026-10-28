@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { connection } from "next/server";
-import { toAgentKind, type AgentView } from "@/components/agents/agent-card";
+import { byAgentOrder, toAgentKind, type AgentView } from "@/components/agents/agent-card";
 import { EmptyState, NoAccess } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { BotIcon } from "@/components/ui/icons";
@@ -31,7 +31,9 @@ export default async function AgentesPage() {
     supabase.from("catalog_sources").select("id", { count: "exact", head: true }),
   ]);
   // Solo los agentes que son compañeros visibles del equipo (la base tiene otros tipos internos).
-  const agents = (allAgents ?? []).filter((agent) => toAgentKind(agent.kind) !== null);
+  const agents = (allAgents ?? [])
+    .filter((agent) => toAgentKind(agent.kind) !== null)
+    .sort((a, b) => byAgentOrder(toAgentKind(a.kind) ?? "attention", toAgentKind(b.kind) ?? "attention"));
 
   return (
     <main className="flex flex-1 flex-col">
@@ -64,6 +66,13 @@ export default async function AgentesPage() {
                     {sources ? ` en ${sources} ${sources === 1 ? "fuente" : "fuentes"}` : ""}.{" "}
                     <Link href="/stock" className="font-medium text-accent hover:underline">
                       Ver el stock
+                    </Link>
+                  </p>
+                ) : kind === "assistant" ? (
+                  <p className="text-sm text-muted">
+                    Responde cualquier pregunta sobre los datos de la organización.{" "}
+                    <Link href="/asistente" className="font-medium text-accent hover:underline">
+                      Abrir el Asistente
                     </Link>
                   </p>
                 ) : kind === "finance" ? (

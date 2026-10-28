@@ -18,7 +18,8 @@ const plural = (count: number, one: string, many: string) => `${count} ${count =
 
 // Lo que dice cada agente al recibirte. Son datos reales de la bandeja, dichos en voz del agente: ninguna
 // frase afirma algo que el agente hizo (los agentes todavía no responden por su cuenta).
-export function welcomeLine(kind: "attention" | "analytic" | "stock" | "finance", counts: WelcomeCounts, products = 0): string {
+export function welcomeLine(kind: "attention" | "analytic" | "stock" | "finance" | "assistant", counts: WelcomeCounts, products = 0): string {
+  if (kind === "assistant") return "Estoy siempre encendido: preguntame lo que quieras sobre la empresa.";
   if (kind === "finance") return "Preguntame por los números de la empresa: están en Finanzas.";
   if (kind === "stock") {
     if (products === 0) return "Todavía no hay stock cargado.";

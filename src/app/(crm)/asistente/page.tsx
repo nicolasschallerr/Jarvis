@@ -1,12 +1,11 @@
 import { connection } from "next/server";
 
 import { NoAccess } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/ui/page-header";
 import { ASSISTANT_NAME } from "@/lib/assistant/ask";
 import { getCurrentProfile } from "@/lib/auth/profile";
+import { createClient } from "@/lib/supabase/server";
 
-import { AnalystChat } from "../analitico/chat";
-import { askAssistantAction } from "./actions";
+import { AssistantChat, type Suggestion } from "./assistant-chat";
 
 export const metadata = { title: "Asistente" };
 
@@ -30,15 +29,16 @@ const TOOL_LABELS: Record<string, string> = {
   contar_contactos: "contactos",
 };
 
-const EXAMPLES = [
-  "¿Cuántos movimientos de más de 2 millones hubo este mes?",
-  "¿Cuántos casos de garantía abrimos este mes y cuántos siguen abiertos?",
-  "¿Qué productos están agotados?",
-  "¿Cuánto le pagamos a proveedores en los últimos tres meses?",
-  "¿Cuántos contactos nuevos se sumaron este mes?",
-  "¿Qué sector tiene más casos abiertos?",
+const SUGGESTIONS: Suggestion[] = [
+  { topic: "finanzas", question: "¿Cuántos préstamos de 2 millones hicimos este mes?" },
+  { topic: "casos", question: "¿Cuántos casos de garantía abrimos este mes y cuántos siguen abiertos?" },
+  { topic: "stock", question: "¿Qué productos están agotados o con pocas unidades?" },
+  { topic: "finanzas", question: "¿Quién nos debe plata y cuánto está vencido?" },
+  { topic: "conversaciones", question: "¿Cuántas conversaciones atendimos esta semana?" },
+  { topic: "contactos", question: "¿Cuántos contactos nuevos se sumaron este mes?" },
 ];
 
+// El Asistente de la empresa (ADR-050): siempre encendido, responde sobre todos los datos de la organización.
 export default async function AsistentePage() {
   await connection();
   const profile = await getCurrentProfile();
@@ -47,21 +47,19 @@ export default async function AsistentePage() {
     return <NoAccess title="Asistente" reason="Solo el superadministrador y los usuarios de consulta y reportes pueden usar el Asistente." />;
   }
 
+  const supabase = await createClient();
+  const { data: agent } = await supabase.from("agents").select("name").eq("kind", "assistant").maybeSingle();
+
   return (
-    <main className="flex flex-1 flex-col">
-      <PageHeader
-        title={ASSISTANT_NAME}
-        description={`Preguntale lo que quieras sobre ${profile.organizationName}: casos, conversaciones, contactos, stock y finanzas. Siempre encendido, solo lectura.`}
+    <main className="flex min-h-0 flex-1 flex-col">
+      <h1 className="sr-only">{agent?.name ?? ASSISTANT_NAME}</h1>
+      <AssistantChat
+        agentName={agent?.name ?? ASSISTANT_NAME}
+        firstName={profile.fullName.trim().split(/\s+/)[0] ?? ""}
+        organizationName={profile.organizationName}
+        suggestions={SUGGESTIONS}
+        toolLabels={TOOL_LABELS}
       />
-      <div className="flex flex-1 flex-col gap-4 p-4 sm:p-6">
-        <AnalystChat
-          agentName={ASSISTANT_NAME}
-          action={askAssistantAction}
-          examples={EXAMPLES}
-          toolLabels={TOOL_LABELS}
-          intro={`Soy el asistente de ${profile.organizationName}. Respondo con los datos reales de la organización y no modifico nada. Probá con alguna de estas:`}
-        />
-      </div>
     </main>
   );
 }

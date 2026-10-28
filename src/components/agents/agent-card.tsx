@@ -1,4 +1,4 @@
-export type AgentKind = "attention" | "analytic" | "stock" | "finance";
+export type AgentKind = "attention" | "analytic" | "stock" | "finance" | "assistant";
 export type AgentStatus = "paused" | "working" | "waiting_approval";
 
 const ROLES: Record<AgentKind, string> = {
@@ -6,12 +6,19 @@ const ROLES: Record<AgentKind, string> = {
   analytic: "Agente analítico",
   stock: "Agente de stock",
   finance: "Agente financiero",
+  assistant: "Asistente de la empresa · siempre encendido",
 };
 
 // Los agentes que se muestran en el CRM. La base tiene otros tipos de agente internos (resumen, clasificador...) que no
 // son compañeros de equipo visibles: para esos devuelve null.
 export function toAgentKind(kind: string): AgentKind | null {
-  return kind === "attention" || kind === "analytic" || kind === "stock" || kind === "finance" ? kind : null;
+  return kind === "attention" || kind === "analytic" || kind === "stock" || kind === "finance" || kind === "assistant" ? kind : null;
+}
+
+// Orden en que se muestran: primero el Asistente (siempre encendido), después los que conversan y analizan.
+const AGENT_ORDER: AgentKind[] = ["assistant", "attention", "analytic", "stock", "finance"];
+export function byAgentOrder(a: AgentKind, b: AgentKind): number {
+  return AGENT_ORDER.indexOf(a) - AGENT_ORDER.indexOf(b);
 }
 
 export const AGENT_COLOR: Record<AgentKind, string> = {
@@ -19,6 +26,7 @@ export const AGENT_COLOR: Record<AgentKind, string> = {
   analytic: "var(--agent-sinapsis)",
   stock: "var(--agent-stock)",
   finance: "var(--agent-finance)",
+  assistant: "var(--agent-assistant)",
 };
 
 const AGENT_BAR: Record<AgentKind, string> = {
@@ -26,6 +34,7 @@ const AGENT_BAR: Record<AgentKind, string> = {
   analytic: "bg-agent-sinapsis",
   stock: "bg-agent-stock",
   finance: "bg-agent-finance",
+  assistant: "bg-agent-assistant",
 };
 
 export type AgentView = {

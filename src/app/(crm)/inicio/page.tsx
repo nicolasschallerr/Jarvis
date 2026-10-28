@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import Link from "next/link";
 
-import { AgentCard, AgentEmblem, StatusDot, agentStatus, toAgentKind, type AgentView } from "@/components/agents/agent-card";
+import { AgentCard, AgentEmblem, StatusDot, agentStatus, byAgentOrder, toAgentKind, type AgentView } from "@/components/agents/agent-card";
 import { ActivityChart } from "@/components/overview/activity-chart";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { Avatar } from "@/components/ui/avatar";
@@ -71,7 +71,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
   const agents: AgentView[] = summary.agents.flatMap((agent) => {
     const kind = toAgentKind(agent.kind);
     return kind ? [{ kind, name: agent.name, tagline: agent.tagline, status: agent.status as AgentView["status"], isEnabled: agent.is_enabled }] : [];
-  });
+  }).sort((a, b) => byAgentOrder(a.kind, b.kind));
 
   const tiles: Tile[] = [
     { label: "Esperando respuesta", value: summary.counts.awaitingReply, href: "/conversaciones?filtro=esperando", hint: "conversaciones", icon: <ChatIcon /> },
@@ -169,7 +169,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
           </div>
 
           {agents.length > 0 ? (
-            <ul className="flex flex-col gap-2" aria-label="Estado de los agentes">
+            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2" aria-label="Estado de los agentes">
               {agents.map((agent) => {
                 const status = agentStatus(agent);
                 return (

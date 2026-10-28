@@ -9,14 +9,17 @@ por ejemplo "¿cuántos préstamos de 2 millones hicimos este mes?", siempre dis
 
 ## Decisión
 - **Página Asistente** (primera del grupo Inteligencia), para superadmin y consulta y reportes, como Reportes y Finanzas.
-- **Siempre encendido**: no tiene fila en `agents` ni interruptor. Existe el valor `assistant` de `agent_kind` solo para
-  registrar su gasto aparte en `ai_calls` (Consumo).
+- **Siempre encendido y visible como agente**: tiene su fila en `agents` (tipo `assistant`, la crea un trigger) para
+  aparecer primero en Agentes y en el Panorama, con nombre y frase editables. No tiene interruptor y la tabla tiene una
+  regla (`agents_assistant_always_on`) que no deja apagarlo. Su gasto se registra aparte en `ai_calls` (Consumo).
+- **Apartado propio**: pantalla de bienvenida con el orbe (las tres órbitas del logo girando alrededor de un núcleo
+  que respira; gira más rápido mientras piensa), saludo con el nombre, sugerencias por tema en tarjetas, respuesta que se
+  escribe de a palabras y caja de texto flotante. "Menos movimiento" deja todo quieto y muestra la respuesta entera.
 - **Herramientas**: reúne las del analítico, las del financiero y la búsqueda del catálogo, y suma tres con filtros:
   `buscar_movimientos` (tipo, texto en categoría/descripción/contraparte, rango de monto, fechas y estado),
   `buscar_casos` (texto en título o resumen, estado, sector, fechas) y `contar_contactos`. Todas leen con la sesión de
   quien pregunta (RLS): el Asistente nunca ve más que esa persona.
 - **Sin datos personales**: como el analítico, no devuelve nombres, documentos ni mensajes de clientes o asociados.
-- El chat es el mismo del analítico y el financiero (`analitico/chat.tsx`), que ahora muestra las negritas.
 
 ## Pendiente
 Que el Asistente pueda leer también la base de conocimiento de cada sector y los datos que conecte cada cliente.

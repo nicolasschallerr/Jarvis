@@ -173,15 +173,15 @@ describe("Inicio: datos reales y agentes", () => {
     await syncAgents(admin, orgA, renamed.config);
 
     const result = await summary(operator);
-    // Además de los dos de la configuración, cada organización nace con sus agentes de stock y financiero (ADR-046, ADR-049).
-    expect(result.agents.map((agent) => agent.name).sort()).toEqual(["Finanzas", "Jarvis Renombrado", "Sinapsis de Prueba", "Stock"]);
+    // Además de los dos de la configuración, cada organización nace con sus agentes de stock, financiero y el Asistente (ADR-046, ADR-049, ADR-050).
+    expect(result.agents.map((agent) => agent.name).sort()).toEqual(["Asistente", "Finanzas", "Jarvis Renombrado", "Sinapsis de Prueba", "Stock"]);
     const attention = result.agents.find((agent) => agent.kind === "attention");
     expect(attention).toMatchObject({ status: "working", is_enabled: true });
     const analytic = result.agents.find((agent) => agent.kind === "analytic");
     expect(analytic).toMatchObject({ status: "paused", is_enabled: false });
 
     // Otra organización no ve los agentes de esta: solo el suyo de stock.
-    expect((await summary(foreigner)).agents.map((agent) => agent.kind).sort()).toEqual(["finance", "stock"]);
+    expect((await summary(foreigner)).agents.map((agent) => agent.kind).sort()).toEqual(["assistant", "finance", "stock"]);
   });
 
   it("solo el superadmin cambia agentes: un operador no puede crearlos ni modificarlos", async () => {

@@ -44,7 +44,8 @@ export async function updateAgent(params: UpdateAgentParams): Promise<AgentResul
 
   const { error } = await params.userClient
     .from("agents")
-    .update({ name, tagline: tagline || null, is_enabled: params.isEnabled })
+    // El Asistente está siempre encendido (ADR-050): se ignora lo que llegue del formulario.
+    .update({ name, tagline: tagline || null, is_enabled: agent.kind === "assistant" ? true : params.isEnabled })
     .eq("id", params.agentId);
   if (error) return { ok: false, error: "No se pudo guardar el agente." };
 
