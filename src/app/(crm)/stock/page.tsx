@@ -153,7 +153,7 @@ export default async function StockPage({ searchParams }: PageProps<"/stock">) {
           {filtered.length === 0 ? (
             <EmptyState icon={<SearchIcon className="size-5" />} title="No hay nada con esa búsqueda" description="Probá con otra palabra o sacá el filtro." />
           ) : (
-            <ul className="grid gap-4 p-4 sm:grid-cols-2 sm:p-6 xl:grid-cols-3 2xl:grid-cols-4">
+            <ul className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:p-6 xl:grid-cols-3 2xl:grid-cols-4">
               {filtered.slice(0, limit).map((item) => (
                 <li key={item.externalId} className="card spotlight group overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
                   <div className="relative aspect-[4/3] bg-zinc-200/60 dark:bg-zinc-800">

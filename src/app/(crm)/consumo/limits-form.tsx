@@ -12,7 +12,7 @@ export function LimitsForm({ credits, costUsd, alertPercent }: { credits: number
   return (
     <form action={action} className="flex flex-col gap-3 border-t border-line pt-4">
       <p className="text-sm text-muted">Dejá un campo vacío si no querés ese límite. Es un aviso: el agente no se corta al llegar.</p>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <label className="flex flex-col gap-1 text-sm">
           Límite de créditos por mes
           <input name="credits" inputMode="numeric" defaultValue={credits ?? ""} placeholder="Sin límite" className="field !py-1.5" />

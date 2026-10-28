@@ -117,7 +117,7 @@ export default async function ReportesPage({ searchParams }: PageProps<"/reporte
             />
           </section>
 
-          <section aria-label="Tiempos de respuesta" className="grid gap-3 sm:grid-cols-3">
+          <section aria-label="Tiempos de respuesta" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <StatTile index={4} icon={<BotIcon className="size-4" />} tone="info" value={durationLabel(report.responseMedianSecondsAgent)} label="Respuesta del agente" hint="mediana" />
             <StatTile index={5} icon={<TeamIcon className="size-4" />} tone="info" value={durationLabel(report.responseMedianSecondsOperator)} label="Respuesta del equipo" hint="mediana, cuando responde una persona" />
             <StatTile
@@ -131,7 +131,7 @@ export default async function ReportesPage({ searchParams }: PageProps<"/reporte
           </section>
 
           {/* Cada gráfico lleva su tabla oculta a la vista: el lector de pantalla también recibe los números de cada día. */}
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <section aria-labelledby="mensajes-por-dia" className="card flex flex-col gap-3 p-4">
               <h3 id="mensajes-por-dia" className="text-sm font-semibold">
                 Mensajes por día
@@ -160,7 +160,7 @@ export default async function ReportesPage({ searchParams }: PageProps<"/reporte
             </section>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <CountTable
               title="Casos abiertos por estado"
               rows={Object.entries(report.openByStatus).map(([status, count]) => ({ name: STATUS_LABELS[status] ?? status, count, color: STATUS_BAR[status] }))}

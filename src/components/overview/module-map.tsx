@@ -158,14 +158,14 @@ export function ModuleMap({ groups, metrics }: { groups: SectionGroup[]; metrics
             ) : (
               <>
                 {featured.length > 0 ? (
-                  <ul className="grid gap-3 md:grid-cols-2">
+                  <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     {featured.map((section) => (
                       <FeaturedCard key={section.href} section={section} metric={metrics[section.href]} index={counter++} />
                     ))}
                   </ul>
                 ) : null}
                 {rest.length > 0 ? (
-                  <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {rest.map((section) => (
                       <MediumCard key={section.href} section={section} metric={metrics[section.href]} index={counter++} />
                     ))}

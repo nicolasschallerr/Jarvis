@@ -78,7 +78,7 @@ export function TemplateForm({
           )}
         </p>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-[1fr_1fr]">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <div className="flex flex-col gap-2">
             <label className="flex flex-col gap-1 text-sm font-medium">
               Plantilla

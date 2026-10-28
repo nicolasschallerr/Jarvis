@@ -28,16 +28,17 @@ export function LinkTabs({ items, label }: { items: TabItem[]; label: string }) 
   );
 }
 
-// Selector de dos o tres opciones (por ejemplo, Tablero / Lista), también con enlaces.
+// Selector de pocas opciones (por ejemplo, Tablero / Lista), también con enlaces. Si no entra en el ancho (en celular,
+// los canales), se desliza de costado en vez de salirse de la pantalla.
 export function SegmentedLinks({ items, label }: { items: TabItem[]; label: string }) {
   return (
-    <nav aria-label={label} className="inline-flex rounded-lg border border-line bg-surface p-0.5">
+    <nav aria-label={label} className="inline-flex max-w-full overflow-x-auto rounded-lg border border-line bg-surface p-0.5 [scrollbar-width:none]">
       {items.map((item) => (
         <Link
           key={item.href}
           href={item.href}
           aria-current={item.active ? "page" : undefined}
-          className={`rounded-md px-3 py-1 text-sm font-medium transition duration-150 ${
+          className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition duration-150 ${
             item.active ? "bg-accent-soft text-accent" : "text-muted hover:text-foreground"
           }`}
         >

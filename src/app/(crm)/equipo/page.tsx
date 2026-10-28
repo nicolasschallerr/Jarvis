@@ -86,7 +86,7 @@ export default async function EquipoPage() {
           description="Se cargan con el script de configuración del cliente."
         />
       ) : (
-        <div className="grid gap-4 p-4 sm:p-6 md:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 p-4 sm:p-6 md:grid-cols-2 2xl:grid-cols-3">
           {views.map((view) => (
             <SectorCard key={view.id} sector={view} />
           ))}

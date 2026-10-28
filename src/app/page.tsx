@@ -64,7 +64,7 @@ export default function LandingPage() {
       </header>
 
       <main id="contenido" className="relative z-10 flex flex-1 flex-col">
-        <section className="mx-auto grid w-full max-w-6xl items-center gap-10 px-5 pt-10 pb-20 lg:grid-cols-[1.1fr_1fr] lg:pt-16">
+        <section className="mx-auto grid grid-cols-1 w-full max-w-6xl items-center gap-10 px-5 pt-10 pb-20 lg:grid-cols-[1.1fr_1fr] lg:pt-16">
           <div className="rise-in flex flex-col gap-6">
             <p className="eyebrow">Software y automatización con IA</p>
             <h1 className="text-4xl leading-[1.05] font-bold tracking-tight sm:text-6xl">
@@ -103,7 +103,7 @@ export default function LandingPage() {
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Tres piezas que trabajan juntas</h2>
               <p className="text-muted">Cada una sirve sola; juntas cubren la atención de punta a punta, del primer mensaje al reporte.</p>
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               {CAPABILITIES.map((item, index) => (
                 <article key={item.title} className="card rise-in flex flex-col gap-3 p-6" style={{ animationDelay: `${index * 0.08}s` }}>
                   <span className="grid size-10 place-items-center rounded-xl bg-accent-soft text-accent">{item.icon}</span>
@@ -121,7 +121,7 @@ export default function LandingPage() {
               <p className="eyebrow">Cómo funciona</p>
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Del mensaje al caso resuelto</h2>
             </div>
-            <ol className="grid gap-4 md:grid-cols-4">
+            <ol className="grid grid-cols-1 gap-4 md:grid-cols-4">
               {STEPS.map((step) => (
                 <li key={step.tag} className="relative flex flex-col gap-3 rounded-xl border border-line p-5">
                   <span className="font-mono text-xs tracking-wider text-accent">{step.tag}</span>

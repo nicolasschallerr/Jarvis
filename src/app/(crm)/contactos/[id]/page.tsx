@@ -56,7 +56,7 @@ export default async function ContactoPage({ params }: PageProps<"/contactos/[id
         </div>
       </header>
 
-      <div className="grid gap-6 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid grid-cols-1 gap-6 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <section aria-labelledby="conversaciones" className="flex flex-col gap-3">
             <h2 id="conversaciones" className="text-sm font-semibold tracking-wide text-muted uppercase">

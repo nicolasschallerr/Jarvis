@@ -71,7 +71,7 @@ export default async function EnvioPage({ params }: PageProps<"/envios/[id]">) {
         actions={<Link href="/envios" className="btn-secondary">Todos los envíos</Link>}
       />
 
-      <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[1fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
           <section className="card flex flex-col gap-3 p-4" aria-label="Qué se envía">
             <h2 className="eyebrow">Qué se envía</h2>

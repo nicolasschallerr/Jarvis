@@ -41,7 +41,7 @@ export const metadata = { title: "Ingresar" };
 
 export default function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
-    <main className="grid flex-1 lg:grid-cols-[1.05fr_1fr]">
+    <main className="grid grid-cols-1 flex-1 lg:grid-cols-[1.05fr_1fr]">
       {/* Columna de marca: los agentes y una frase. En celulares se oculta para ir directo al formulario. */}
       <section className="relative hidden overflow-hidden bg-zinc-950 text-zinc-100 lg:flex lg:flex-col lg:justify-between lg:p-10">
         <div

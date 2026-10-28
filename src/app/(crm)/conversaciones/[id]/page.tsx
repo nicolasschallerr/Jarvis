@@ -148,7 +148,8 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
             <ArrowLeftIcon />
           </Link>
           <Avatar name={contactName} size="lg" />
-          <div className="min-w-0 flex-1">
+          {/* basis-40: el nombre nunca se achica a nada; si no entra todo en una línea (celular), los botones bajan. */}
+          <div className="min-w-0 flex-1 basis-40">
             <h1 className="truncate text-lg font-semibold tracking-tight">
               {conversation.contact_id ? (
                 <Link href={`/contactos/${conversation.contact_id}`} className="underline-offset-2 hover:underline" title="Ver todo el historial del contacto">
@@ -236,12 +237,16 @@ export default async function ConversacionPage({ params, searchParams }: PagePro
             Pasaron más de 24 horas desde el último mensaje de la persona y {channelLabel(channel)} no permite escribirle hasta que vuelva a escribir.
           </p>
         ) : mode === "closed" ? (
-          <TemplateForm
-            conversationId={conversation.id ?? id}
-            templates={approvedTemplates}
-            contactFirstName={contactName === "Sin nombre" ? "" : (contactName.trim().split(/\s+/)[0] ?? "")}
-            canManage={profile.role === "superadmin"}
-          />
+          // En pantallas chicas el formulario de plantilla es largo: ocupa como mucho la mitad y se desliza, para que
+          // los mensajes sigan a la vista.
+          <div className="max-h-[50dvh] shrink-0 overflow-y-auto lg:max-h-none">
+            <TemplateForm
+              conversationId={conversation.id ?? id}
+              templates={approvedTemplates}
+              contactFirstName={contactName === "Sin nombre" ? "" : (contactName.trim().split(/\s+/)[0] ?? "")}
+              canManage={profile.role === "superadmin"}
+            />
+          </div>
         ) : (
           <>
             {mode === "human_agent" ? (

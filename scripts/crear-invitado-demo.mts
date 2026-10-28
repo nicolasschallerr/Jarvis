@@ -15,7 +15,8 @@ import type { Database } from "../src/lib/supabase/database.types";
 // La contraseña se genera y se guarda en .env.local (JARVIS_INVITADO_<SLUG>_EMAIL / _PASSWORD). Nunca se imprime.
 // Si el invitado ya existe, se le genera una contraseña nueva.
 
-const { values } = parseArgs({ options: { "org-slug": { type: "string" }, nombre: { type: "string" } } });
+// En producción: --salida .env.invitados (así la contraseña no se mezcla con las variables de desarrollo).
+const { values } = parseArgs({ options: { "org-slug": { type: "string" }, nombre: { type: "string" }, salida: { type: "string" } } });
 
 function fail(message: string): never {
   console.error(`Error: ${message}`);
@@ -23,7 +24,7 @@ function fail(message: string): never {
 }
 
 const slug = values["org-slug"] ?? fail("Falta --org-slug (ej. mi-cliente-demo).");
-if (!slug.endsWith("-demo")) fail("Por seguridad, los invitados solo se crean en organizaciones de demostración (slug terminado en -demo).");
+if (slug !== "demo" && !slug.endsWith("-demo")) fail('Por seguridad, los invitados solo se crean en organizaciones de demostración (slug "demo" o terminado en -demo).');
 const name = values.nombre?.trim() || "Invitado";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -53,5 +54,6 @@ if (existing) {
   }
 }
 
-appendFileSync(".env.local", `\n# Invitado de solo consulta en ${org.name} (scripts/crear-invitado-demo.mts). Solo desarrollo.\n${envKey}_EMAIL=${email}\n${envKey}_PASSWORD=${password}\n`);
-console.log(`Invitado listo en ${org.name}: ${email} (solo consulta). Contraseña en .env.local (${envKey}_PASSWORD).`);
+const salida = values.salida ?? ".env.local";
+appendFileSync(salida, `\n# Invitado de solo consulta en ${org.name} (scripts/crear-invitado-demo.mts).\n${envKey}_EMAIL=${email}\n${envKey}_PASSWORD=${password}\n`);
+console.log(`Invitado listo en ${org.name}: ${email} (solo consulta). Contraseña en ${salida} (${envKey}_PASSWORD).`);

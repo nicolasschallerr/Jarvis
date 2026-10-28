@@ -61,7 +61,7 @@ function AddPerson() {
   return (
     <form action={action} className="card flex flex-col gap-3 p-4">
       <h3 className="text-sm font-semibold">Sumar una persona</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
           Nombre y apellido
           <input name="fullName" required minLength={2} maxLength={120} autoComplete="off" className="field !py-1.5" />

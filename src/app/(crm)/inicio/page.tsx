@@ -231,7 +231,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
 
       {/* Cómo viene la actividad. */}
       {report ? (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <section aria-labelledby="actividad" className="card rise-in flex flex-col gap-5 p-5 lg:col-span-2" style={stagger(5)}>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 id="actividad" className="text-sm font-semibold">
@@ -329,7 +329,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
         </section>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section aria-labelledby="esperando" className="rise-in flex flex-col gap-3" style={stagger(8)}>
           <div className="flex items-center justify-between">
             <h2 id="esperando" className="eyebrow">
@@ -424,7 +424,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
             Todavía no hay agentes configurados. Se cargan con la sección <code>agentes</code> del archivo de configuración del cliente.
           </p>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {agents.map((agent, index) => (
               <div key={agent.kind} className="rise-in" style={stagger(10 + index)}>
                 <AgentCard agent={agent} />

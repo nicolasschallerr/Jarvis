@@ -32,7 +32,7 @@ export function SourcesPanel({ sources }: { sources: SourceView[] }) {
       <h2 id="conexiones" className="eyebrow mb-3">
         Conectado a
       </h2>
-      <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {sources.map((source) => {
           const failed = source.lastStatus === "error";
           return (

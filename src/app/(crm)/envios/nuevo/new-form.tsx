@@ -21,7 +21,7 @@ export function NewBroadcastForm({ templates, consentedTotal }: { templates: Tem
   const preview = template ? renderTemplate(template.body, Object.fromEntries(templateVariables(template.body).map((key) => [key, isNameVariable(key) ? "Ana" : (values[key] ?? "")]))) : "";
 
   return (
-    <form action={action} className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+    <form action={action} className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm font-medium">
           Nombre del envío

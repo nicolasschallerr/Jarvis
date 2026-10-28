@@ -46,7 +46,7 @@ export default async function AgentesPage() {
           description="Se cargan con el script de configuración del cliente."
         />
       ) : (
-        <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 p-4 sm:p-6 lg:grid-cols-2 2xl:grid-cols-3">
           {agents.map((agent) => {
             const kind = toAgentKind(agent.kind) ?? "attention";
             const view: AgentView = {

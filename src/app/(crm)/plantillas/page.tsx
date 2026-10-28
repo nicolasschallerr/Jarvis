@@ -61,7 +61,7 @@ export default async function PlantillasPage() {
           description="Crealas y mandalas a aprobar en el Administrador de WhatsApp de Meta. Después tocá «Sincronizar con Meta». El canal de WhatsApp necesita su token en el servidor y el id de la cuenta de WhatsApp Business (waba_id)."
         />
       ) : (
-        <ul className="grid gap-4 p-4 sm:p-6 lg:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-2">
           {(templates ?? []).map((template) => {
             const status = template.meta_status as TemplateStatus;
             const variables = templateVariables(template.body);
