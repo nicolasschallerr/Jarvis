@@ -48,7 +48,7 @@ export function NavLink({
         onClick={() => setHint(null)}
         onFocus={show}
         onBlur={() => setHint(null)}
-        className={`group relative flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-150 ${
+        className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[0.9375rem] font-medium transition-colors duration-150 ${
           active ? "text-accent" : "text-muted hover:text-foreground"
         }`}
       >
@@ -63,7 +63,7 @@ export function NavLink({
         ) : (
           <span className="absolute inset-0 rounded-lg transition-colors duration-150 group-hover:bg-zinc-200/60 dark:group-hover:bg-zinc-800/70" aria-hidden="true" />
         )}
-        {icon ? <span className="relative shrink-0 transition-transform duration-200 group-hover:scale-110">{icon}</span> : null}
+        {icon ? <span className="relative shrink-0 transition-transform duration-200 group-hover:scale-110 [&>svg]:size-[1.35rem]">{icon}</span> : null}
         <span className="relative flex-1">{children}</span>
         {count ? (
           <span className="relative rounded-full bg-accent px-1.5 text-xs font-semibold tabular-nums text-accent-foreground" aria-label={countLabel}>

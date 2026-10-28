@@ -3,10 +3,20 @@ export type AgentStatus = "paused" | "working" | "waiting_approval";
 
 const ROLES: Record<AgentKind, string> = {
   attention: "Agente de atención",
-  analytic: "Agente analítico · métricas de la atención",
+  analytic: "Agente analítico",
   stock: "Agente de stock",
   finance: "Agente financiero",
-  assistant: "Asistente IA · responde sobre toda la empresa",
+  assistant: "Asistente IA",
+};
+
+// Qué hace cada agente, en una línea. Es fijo para todos los clientes: así cualquiera entiende para qué sirve cada uno
+// (la frase ya no se edita).
+const BLURB: Record<AgentKind, string> = {
+  attention: "Atiende a tus clientes por WhatsApp e Instagram.",
+  analytic: "Mide la atención: volumen, tiempos y rendimiento.",
+  stock: "Consulta tu stock para responder con datos reales.",
+  finance: "Te cuenta cómo vienen ingresos, gastos y cobranzas.",
+  assistant: "La IA de tu empresa: responde sobre cualquier dato.",
 };
 
 // Los agentes que se muestran en el CRM. La base tiene otros tipos de agente internos (resumen, clasificador...) que no
@@ -40,7 +50,6 @@ const AGENT_BAR: Record<AgentKind, string> = {
 export type AgentView = {
   kind: AgentKind;
   name: string;
-  tagline: string | null;
   status: AgentStatus;
   isEnabled: boolean;
 };
@@ -100,8 +109,7 @@ export function AgentEmblem({ kind, name, tone, className = "size-14" }: { kind:
   );
 }
 
-// Tarjeta de un agente: su emblema, su rol, su estado en vivo y una frase suya. La frase es de personalidad (la
-// configura el cliente): no cuenta cosas que el agente no hizo.
+// Tarjeta de un agente: su emblema, su rol, su estado en vivo y una descripción breve y fija de lo que hace.
 export function AgentCard({ agent }: { agent: AgentView }) {
   const status = agentStatus(agent);
   const accent = AGENT_BAR[agent.kind];
@@ -122,9 +130,7 @@ export function AgentCard({ agent }: { agent: AgentView }) {
           <span>{status.label}</span>
         </p>
 
-        <p className="text-sm text-muted italic">
-          {agent.isEnabled ? `“${agent.tagline ?? "Acá estoy."}”` : "Todavía no está activo: cuando lo enciendas, va a trabajar con tu equipo."}
-        </p>
+        <p className="text-sm text-muted">{BLURB[agent.kind]}</p>
       </div>
     </article>
   );

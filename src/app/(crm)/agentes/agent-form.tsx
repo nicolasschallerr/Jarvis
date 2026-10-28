@@ -29,11 +29,6 @@ export function AgentForm({ id, agent, children }: { id: string; agent: AgentVie
           <input name="name" defaultValue={agent.name} maxLength={40} required className="field" />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm">
-          Frase
-          <input name="tagline" defaultValue={agent.tagline ?? ""} maxLength={140} className="field" />
-        </label>
-
         {agent.kind === "assistant" ? (
           // El Asistente no se apaga (la base tampoco lo deja): solo se le cambian el nombre y la frase.
           <p className="flex items-center gap-2 text-sm text-muted">

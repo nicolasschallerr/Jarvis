@@ -16,7 +16,6 @@ export async function saveAgent(agentId: string, _previous: AgentFormState, form
     profile,
     agentId,
     name: String(formData.get("name") ?? ""),
-    tagline: String(formData.get("tagline") ?? ""),
     isEnabled: formData.get("isEnabled") === "on",
   });
 

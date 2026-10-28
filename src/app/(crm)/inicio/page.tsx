@@ -70,7 +70,7 @@ export default async function InicioPage({ searchParams }: PageProps<"/inicio">)
   // Solo los agentes visibles del equipo; la base tiene otros tipos internos.
   const agents: AgentView[] = summary.agents.flatMap((agent) => {
     const kind = toAgentKind(agent.kind);
-    return kind ? [{ kind, name: agent.name, tagline: agent.tagline, status: agent.status as AgentView["status"], isEnabled: agent.is_enabled }] : [];
+    return kind ? [{ kind, name: agent.name, status: agent.status as AgentView["status"], isEnabled: agent.is_enabled }] : [];
   }).sort((a, b) => byAgentOrder(a.kind, b.kind));
 
   const tiles: Tile[] = [

@@ -26,7 +26,7 @@ export default async function AgentesPage() {
 
   const supabase = await createClient();
   const [{ data: allAgents, error }, { count: products }, { count: sources }] = await Promise.all([
-    supabase.from("agents").select("id, kind, name, tagline, status, is_enabled").order("kind"),
+    supabase.from("agents").select("id, kind, name, status, is_enabled").order("kind"),
     supabase.from("catalog_items").select("id", { count: "exact", head: true }).eq("is_available", true),
     supabase.from("catalog_sources").select("id", { count: "exact", head: true }),
   ]);
@@ -54,7 +54,6 @@ export default async function AgentesPage() {
             const view: AgentView = {
               kind,
               name: agent.name,
-              tagline: agent.tagline,
               status: agent.status === "working" || agent.status === "waiting_approval" ? agent.status : "paused",
               isEnabled: agent.is_enabled,
             };
